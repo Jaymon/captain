@@ -19,7 +19,7 @@ if not version:
     raise RuntimeError('Unable to find version number')
 
 setup(
-    name='captain',
+    name=name,
     version=version,
     description='python cli scripts for humans',
     author='Jay Marcyes',

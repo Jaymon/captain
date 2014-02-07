@@ -9,7 +9,7 @@ import getopt
 from collections import defaultdict
 import fnmatch
 
-__version__ = '0.1'
+__version__ = '0.1.1'
 
 
 class Script(object):
