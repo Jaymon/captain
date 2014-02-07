@@ -4,7 +4,7 @@ import subprocess
 
 import testdata
 
-from commands import Script, ScriptArg
+from commands import Script
 
 class TestScript(object):
 
@@ -20,7 +20,7 @@ class TestScript(object):
     def __str__(self):
         return self.path
 
-    def run(arg_str=''):
+    def run(self, arg_str=''):
         pwd = os.path.dirname(__file__)
         cmd = "python {}/commands.py {} {}".format(pwd, self.path, arg_str)
 
@@ -34,34 +34,93 @@ class TestScript(object):
         return r
 
 
-def run(script, arg_str, cwd):
-    pwd = os.path.dirname(__file__)
-    cmd = "python {}/commands.py {} {}".format(pwd, script, arg_str)
-
-    r = ''
-    try:
-        r = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, cwd=cwd).rstrip()
-
-    except subprocess.CalledProcessError, e:
-        raise RuntimeError("cmd returned {} with output: {}".format(e.returncode, e.output))
-
-    return r
-
-
-def get_script(body):
-    cwd = testdata.create_dir()
-    script = testdata.create_file(
-        "{}/{}.py".format(testdata.get_ascii(5), testdata.get_ascii(5)),
-        "\n".join(body),
-        cwd
-    )
-
-    return script, cwd
-
-
 class CommandsTest(TestCase):
 
+    def test_list(self):
+        script = TestScript([""])
+        cwd = script.cwd
+        testdata.create_files(
+            {
+                'foo/bar.py': "\n".join([
+                    "#!/usr/bin/env python",
+                    "def main():",
+                    "  '''the description for bar'''",
+                    "  return 0"
+                ]),
+                'che.py': "\n".join([
+                    "#!/usr/bin/env python",
+                    "def main(): return 0"
+                ]),
+                'bar/boo.py': "\n".join([
+                    "def main():",
+                    "  '''the description for boo'''",
+                    "  return 0"
+                ]),
+                'bar/baz.py': "\n".join([
+                    "#!/usr/bin/env python",
+                    "if __name__ == u'__main__': pass"
+                ]),
+            },
+            cwd
+        )
+
+        script.path = ''
+        r = script.run()
+        self.assertTrue('che.py' in r)
+        self.assertTrue('foo/bar.py' in r)
+        self.assertFalse('bar/boo.py' in r)
+        self.assertFalse('bar/baz.py' in r)
+
+    def test_help(self):
+        script = TestScript([
+            "#!/usr/bin/env python",
+            "def main(foo=int, bar=0, *args, **kwargs):",
+            "  return 0"
+        ])
+        r = script.run("--help")
+        self.assertTrue(os.path.basename(script.path) in r)
+        self.assertTrue('foo' in r)
+        self.assertTrue('bar' in r)
+        self.assertTrue('args' in r)
+
+
     def test_run_script(self):
+        script = TestScript([
+            "#!/usr/bin/env python",
+            "def main(foo, bar=0, *args, **kwargs):",
+            "  print args[0], kwargs['che']",
+            "  return 0"
+        ])
+        r = script.run("--foo=1 --che=oh_yeah awesome")
+        self.assertEqual('awesome oh_yeah', r)
+
+        script = TestScript([
+            "#!/usr/bin/env python",
+            "def main(foo, bar=0, *args):",
+            "  print args[0]",
+            "  return 0"
+        ])
+        r = script.run("--foo=1 awesome")
+        self.assertEqual('awesome', r)
+
+        script = TestScript([
+            "#!/usr/bin/env python",
+            "def main(foo=int, *args):",
+            "  print args[0]",
+            "  return 0"
+        ])
+        r = script.run("--foo=1 awesome")
+        self.assertEqual('awesome', r)
+
+        script = TestScript([
+            "#!/usr/bin/env python",
+            "def main(foo=int, bar=int):",
+            "  print 'foo'",
+            "  return 0"
+        ])
+        r = script.run("--foo=1 --bar=2")
+        self.assertEqual('foo', r)
+
         script = TestScript([
             "def main(*args, **kwargs):",
             "  return 0"
@@ -69,7 +128,6 @@ class CommandsTest(TestCase):
 
         with self.assertRaises(RuntimeError):
             script.run()
-
 
 class ScriptTest(TestCase):
     def test_scripts(self):
@@ -83,14 +141,14 @@ class ScriptTest(TestCase):
 
         s = Script(script_path)
 
-    def test_validate(self):
+    def test_is_cli(self):
         script_path = TestScript([
             "def main(*args, **kwargs):",
             "  return 0"
         ])
 
-        with self.assertRaises(ValueError):
-            s = Script(script_path)
+        s = Script(script_path)
+        self.assertFalse(s.is_cli())
 
         script_path = TestScript([
             "#!/usr/bin/env python",
@@ -98,8 +156,8 @@ class ScriptTest(TestCase):
             "# another python comment"
         ])
 
-        with self.assertRaises(ValueError):
-            s = Script(script_path)
+        s = Script(script_path)
+        self.assertFalse(s.is_cli())
 
         script_path = TestScript([
             "#!/usr/bin/env python",
@@ -107,12 +165,12 @@ class ScriptTest(TestCase):
             "  return 0"
         ])
         s = Script(script_path)
-        self.assertTrue(s)
+        self.assertTrue(s.is_cli())
 
-    def test_get_args(self):
+    def test_parse(self):
 
         tests = [
-            # TODO -- check float
+            ("foo, bar=0, *args, **kwargs", "--foo=1 --che=oh_yeah awesome", dict(foo='1', bar=0)),
             ("foo=Baboom", '--foo=5', ValueError),
             ("foo=int", '--foo=5', dict(foo=5)),
             ("foo=1.0", '--foo=5.0', dict(foo=5.0)),
@@ -137,11 +195,12 @@ class ScriptTest(TestCase):
             s = Script(script_path)
             if isinstance(test_assert, type) and issubclass(test_assert, Exception):
                 with self.assertRaises(test_assert):
-                    parser = s.get_args()
+                    parser = s.parse()
 
             else:
-                parser = s.get_args()
-                args = parser.parse_args(test_out.split())
+                s.parse()
+                parser = s.parser
+                args, _ = parser.parse_known_args(test_out.split())
                 for k, v in test_assert.iteritems():
                     self.assertEqual(v, getattr(args, k))
 
@@ -152,9 +211,8 @@ class ScriptTest(TestCase):
             ])
 
             s = Script(script_path)
-            parser = s.get_args()
-            self.assertTrue(parser.unknown_args)
-
+            s.parse()
+            self.assertTrue(s.parser.unknown_args)
 
         # make sure docblock works as description
         desc = 'this is the docblock'
@@ -166,14 +224,7 @@ class ScriptTest(TestCase):
         ])
 
         s = Script(script_path)
-        parser = s.get_args()
+        s.parse()
         #parser.print_help()
-        self.assertEqual(desc, parser.description)
-
-#class ScriptArgTest(TestCase):
-#    def test_args(self):
-#        a = 
-#
-
-
+        self.assertEqual(desc, s.parser.description)
 
