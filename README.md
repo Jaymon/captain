@@ -60,7 +60,7 @@ You can get a list of all available scripts in a directory by running commands w
 
 Use pip:
 
-    $ pip install commands
+    $ pip install pycommands
 
 ## License
 
