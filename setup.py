@@ -6,7 +6,7 @@ import sys
 from setuptools import setup
 import ast
 
-name = 'commands'
+name = 'captain'
 version = ''
 with open('{}.py'.format(name), 'rU') as f:
     for node in (n for n in ast.parse(f.read()).body if isinstance(n, ast.Assign)):
@@ -19,7 +19,7 @@ if not version:
     raise RuntimeError('Unable to find version number')
 
 setup(
-    name='py{}'.format(name),
+    name='captain',
     version=version,
     description='python cli scripts for humans',
     author='Jay Marcyes',

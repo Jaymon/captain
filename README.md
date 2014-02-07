@@ -1,12 +1,12 @@
-# Commands
+# Captain
 
 Easy python cli scripts for people that just want get things done.
 
-Commands was lovingly crafted for [First Opinion](http://firstopinionapp.com).
+Captain was lovingly crafted for [First Opinion](http://firstopinionapp.com).
 
 ## Usage
 
-A valid `commands` cli script needs two things:
+A valid `captain` cli script needs two things:
 
 1. a shebang on the first line
 
@@ -35,12 +35,17 @@ can be called on the command line:
 
 ## Examples
 
+A typical standard python cli script:
+
 ```python
 import argparse
 
-parser.add_argument("--foo", action='store_true')
-parser.add_argument("--bar", default=0, type=int)
-parser.add_argument("args", nargs='*')
+if __name__ == u'__main__':
+    parser = argparse.ArgumentParser(description='fancy script description')
+    parser.add_argument("--foo", action='store_true')
+    parser.add_argument("--bar", default=0, type=int)
+    parser.add_argument("args", nargs='*')
+    args = parser.parse_args()
 ```
 
 would become:
@@ -49,18 +54,19 @@ would become:
 #!/usr/bin/env python
 
 def main(foo=False, bar=0, *args):
+    '''fancy script description'''
     return 0
 ```
 
-You can get a list of all available scripts in a directory by running commands with no arguments:
+You can get a list of all available scripts in a directory by running captain with no arguments:
 
-    $ pyc
+    $ captain
 
 ## Install
 
 Use pip:
 
-    $ pip install pycommands
+    $ pip install captain
 
 ## License
 

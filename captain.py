@@ -23,7 +23,7 @@ class Script(object):
     @property
     def module(self):
         """load the module so we can actually run the script's function"""
-        module = imp.load_source('commands_script', self.path)
+        module = imp.load_source('captain_script', self.path)
         return module
 
     @property
@@ -235,7 +235,6 @@ def console():
     return -- integer -- the exit code
     '''
     parser = argparse.ArgumentParser(description='Easy Python Command line script running', add_help=False)
-    #parser.add_argument('--basedir', dest='basedir', default=os.curdir, help='base directory, defaults to current working directory')
     #parser.add_argument('--debug', dest='debug', action='store_true', help='print debugging info')
     parser.add_argument("-v", "--version", action='version', version="%(prog)s {}".format(__version__))
     #parser.add_argument('args', nargs=argparse.REMAINDER, help='all other arguments')
@@ -251,7 +250,7 @@ def console():
 
     else:
         basepath = os.getcwd()
-        print "Known Commands in {}:".format(basepath)
+        print "Available scripts in {}:".format(basepath)
         for root_dir, dirs, files in os.walk(basepath, topdown=True):
             for f in fnmatch.filter(files, '*.py'):
                 filepath = os.path.join(root_dir, f)

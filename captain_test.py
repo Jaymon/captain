@@ -4,7 +4,7 @@ import subprocess
 
 import testdata
 
-from commands import Script
+from captain import Script
 
 class TestScript(object):
 
@@ -22,7 +22,7 @@ class TestScript(object):
 
     def run(self, arg_str=''):
         pwd = os.path.dirname(__file__)
-        cmd = "python {}/commands.py {} {}".format(pwd, self.path, arg_str)
+        cmd = "python {}/captain.py {} {}".format(pwd, self.path, arg_str)
 
         r = ''
         try:
@@ -34,7 +34,7 @@ class TestScript(object):
         return r
 
 
-class CommandsTest(TestCase):
+class CaptainTest(TestCase):
 
     def test_list(self):
         script = TestScript([""])
