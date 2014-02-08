@@ -1,3 +1,8 @@
+"""
+some other solutions I considered:
+http://zacharyvoase.com/2009/12/09/django-boss/
+https://github.com/zacharyvoase/django-boss
+"""
 import sys
 import os
 import argparse
@@ -23,6 +28,7 @@ class Script(object):
     @property
     def module(self):
         """load the module so we can actually run the script's function"""
+        # http://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path
         module = imp.load_source('captain_script', self.path)
         return module
 
@@ -76,6 +82,7 @@ class Script(object):
         else:
             parsed_args = self.parser.parse_args(raw_args)
 
+        # http://parezcoydigo.wordpress.com/2012/08/04/from-argparse-to-dictionary-in-python-2-7/
         kwargs.update(vars(parsed_args))
 
         # because of how args works, we need to make sure the kwargs are put in correct
@@ -93,6 +100,7 @@ class Script(object):
         return self(*args, **kwargs)
 
     def has_shebang(self):
+        # http://stackoverflow.com/questions/17846908/proper-shebang-for-python-script
         body = self.body
         ret = False
         if re.match("^#!.*?python.*$", body, re.I | re.MULTILINE):
