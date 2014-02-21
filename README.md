@@ -72,3 +72,11 @@ Use pip:
 
 MIT
 
+## TODO
+
+allow you to set *_arg values, so you could do `arg=[int]` to make sure the *args values where all ints, likewise, you could do `foo_arg, bar_arg` and that would be positional arg 0 and 1, I think this would work ok and be ok, we could also make everything that ends in `_kwarg` be a named argument and everything that ends in `_arg` be a positional argument. Then `*args` and `**kwargs` would just be for everything else (the catchall).
+
+Add some output stuff so you can do `captain.out()` or `captain.err` to print to stdout and stderr
+
+might want to make `some_var` equivalent to `some-var` on the command line, so if you used the name `some_var` you could declare it on the command line either by doing `--some_var` or `--some-var`
+
