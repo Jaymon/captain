@@ -22,11 +22,20 @@ class TestScript(object):
 
     def run(self, arg_str=''):
         pwd = os.path.dirname(__file__)
-        cmd = "python {}/captain.py {} {}".format(pwd, self.path, arg_str)
+        cmd_env = os.environ.copy()
+        cmd_env['PYTHONPATH'] = pwd + os.pathsep + cmd_env.get('PYTHONPATH', '')
+
+        cmd = "python -m captain {} {}".format(self.path, arg_str)
 
         r = ''
         try:
-            r = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, cwd=self.cwd).rstrip()
+            r = subprocess.check_output(
+                cmd,
+                shell=True,
+                stderr=subprocess.STDOUT,
+                cwd=self.cwd,
+                env=cmd_env
+            ).rstrip()
 
         except subprocess.CalledProcessError, e:
             raise RuntimeError("cmd returned {} with output: {}".format(e.returncode, e.output))

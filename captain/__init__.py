@@ -14,7 +14,10 @@ import getopt
 from collections import defaultdict
 import fnmatch
 
-__version__ = '0.1.1'
+from . import echo
+
+
+__version__ = '0.1.2'
 
 
 class Script(object):
@@ -155,7 +158,9 @@ class Script(object):
                     for i, arg in enumerate(nas.args):
                         arg_args = []
                         arg_kwargs = {}
+
                         arg_args.append('--{}'.format(arg.id))
+                        arg_args.append('--{}'.format(arg.id.replace('_', '-')))
                         kwarg_info['order'].append(arg.id)
                         default_i = len(nas.args) - len(nas.defaults) - i
 
@@ -226,16 +231,6 @@ class Script(object):
         else:
             raise ValueError("No main function found")
 
-
-
-#def console_out(format_str, *args, **kwargs):
-#    sys.stderr.write(format_str.format(*args, **kwargs))
-#    sys.stderr.write(os.linesep)
-#
-#def console_debug(*args, **kwargs):
-#    if debug:
-#        console_out(*args, **kwargs)
-#
 def console():
     '''
     cli hook
@@ -245,10 +240,13 @@ def console():
     parser = argparse.ArgumentParser(description='Easy Python Command line script running', add_help=False)
     #parser.add_argument('--debug', dest='debug', action='store_true', help='print debugging info')
     parser.add_argument("-v", "--version", action='version', version="%(prog)s {}".format(__version__))
+    parser.add_argument("--quiet", action='store_true', dest='quiet')
     #parser.add_argument('args', nargs=argparse.REMAINDER, help='all other arguments')
     parser.add_argument('script', metavar='SCRIPT', nargs='?', help='The script you want to run')
 
     args, command_args = parser.parse_known_args()
+
+    echo.quiet = args.quiet
 
     ret_code = 0
 
@@ -275,6 +273,3 @@ def console():
 
     return ret_code
 
-
-if __name__ == u'__main__':
-    sys.exit(console())
