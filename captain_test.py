@@ -176,9 +176,32 @@ class ScriptTest(TestCase):
         s = Script(script_path)
         self.assertTrue(s.is_cli())
 
-    def test_parse(self):
-
+    def test_parse_bad(self):
+        """makes sure bad input is caught in parsing"""
         tests = [
+            ("foo=int", ''),
+            ("foo=[int]", ''),
+            ("foo=[1, 2]", '--foo=3'),
+        ]
+
+        for test_in, test_out in tests:
+            s = TestScript([
+                "#!/usr/bin/env python",
+                "def main({}):".format(test_in),
+                "  return 0"
+            ])
+
+            with self.assertRaises(RuntimeError):
+                s.run(test_out)
+
+    def test_parse_good(self):
+        tests = [
+            ("foo=[1, 2]", '--foo=2', dict(foo=2)),
+            (
+                "count=1, dry_run=False, matches_per=5, match_all=False, testing=False",
+                '--match-all --testing',
+                dict(count=1, dry_run=False, matches_per=5, match_all=True, testing=True)
+            ),
             ("foo, bar=0, *args, **kwargs", "--foo=1 --che=oh_yeah awesome", dict(foo='1', bar=0)),
             ("foo=Baboom", '--foo=5', ValueError),
             ("foo=int", '--foo=5', dict(foo=5)),
@@ -213,15 +236,16 @@ class ScriptTest(TestCase):
                 for k, v in test_assert.iteritems():
                     self.assertEqual(v, getattr(args, k))
 
-            # test whether parser knows it shouldn't fail on unknown args
-            script_path = TestScript([
-                "#!/usr/bin/env python",
-                "def main(**kwargs): return 0"
-            ])
+        # test whether parser knows it shouldn't fail on unknown args
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "def main(**kwargs): return 0"
+        ])
 
-            s = Script(script_path)
-            s.parse()
-            self.assertTrue(s.parser.unknown_args)
+        s = Script(script_path)
+        s.parse()
+        self.assertTrue(s.parser.unknown_args)
+
 
         # make sure docblock works as description
         desc = 'this is the docblock'

@@ -17,7 +17,7 @@ import fnmatch
 from . import echo
 
 
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 
 class Script(object):
@@ -155,40 +155,72 @@ class Script(object):
                         description=desc
                     )
                     nas = n.args
+                    #pout.v(nas.args, nas.defaults)
                     for i, arg in enumerate(nas.args):
                         arg_args = []
                         arg_kwargs = {}
 
                         arg_args.append('--{}'.format(arg.id))
-                        arg_args.append('--{}'.format(arg.id.replace('_', '-')))
+                        arg_additional_id = arg.id.replace('_', '-')
+                        if arg_additional_id != arg.id:
+                            arg_args.append('--{}'.format(arg.id.replace('_', '-')))
+
                         kwarg_info['order'].append(arg.id)
-                        default_i = len(nas.args) - len(nas.defaults) - i
+                        default_i = abs(len(nas.args) - len(nas.defaults) - i)
+                        #pout.v(arg.id, default_i)
+
+                        def get_val_info(na):
+                            val = None
+                            vtype = None
+                            if isinstance(na, ast.Num):
+                                repr_n = repr(na.n)
+                                val = na.n
+                                vtype = float if '.' in repr_n else int
+
+                            elif isinstance(na, ast.Str):
+                                val = na.s
+                                vtype = str
+
+                            else:
+                                raise ValueError("unsupported val")
+
+                            return val, vtype
 
                         if len(nas.defaults) > default_i:
                             try:
                                 na = nas.defaults[default_i]
-                                if isinstance(na, ast.Num):
-                                    repr_n = repr(na.n)
-                                    arg_kwargs['default'] = na.n
-                                    kwarg_info['optional'][arg.id] = na.n
-                                    if '.' in repr_n:
-                                        arg_kwargs['type'] = float
-
-                                    else:
-                                        arg_kwargs['type'] = int
-
-                                elif isinstance(na, ast.Str):
-                                    arg_kwargs['default'] = na.s
-                                    arg_kwargs['type'] = str
-                                    kwarg_info['optional'][arg.id] = na.s
+                                if isinstance(na, (ast.Num, ast.Str)):
+                                    val, vtype = get_val_info(na)
+                                    arg_kwargs['default'] = val
+                                    kwarg_info['optional'][arg.id] = val
+                                    arg_kwargs['type'] = vtype
 
                                 elif isinstance(na, ast.List):
                                     arg_kwargs['action'] = 'append'
                                     kwarg_info['required'].append(arg.id)
+                                    arg_kwargs['required'] = True
 
                                     if len(na.elts) > 0:
                                         if isinstance(na.elts[0], ast.Name):
                                             arg_kwargs['type'] = type_map[na.elts[0].id]
+
+                                        else:
+                                            # we are now reverting this to a choices check
+                                            arg_kwargs['action'] = 'store'
+                                            l = set()
+                                            ltype = None
+                                            for elt in na.elts:
+                                                val, vtype = get_val_info(elt)
+                                                l.add(val)
+                                                if ltype is None:
+                                                    ltype = vtype
+
+                                                else:
+                                                    if ltype is not vtype:
+                                                        ltype = str
+
+                                            arg_kwargs['choices'] = l
+                                            arg_kwargs['type'] = vtype
 
                                 elif isinstance(na, ast.Name):
                                     if na.id == 'True':
@@ -202,6 +234,7 @@ class Script(object):
                                     else:
                                         arg_kwargs['type'] = type_map[na.id]
                                         kwarg_info['required'].append(arg.id)
+                                        arg_kwargs['required'] = True
 
                                 else:
                                     raise ValueError("{} has an unsupported default".format(arg.id))
@@ -212,7 +245,6 @@ class Script(object):
                         else:
                             kwarg_info['required'].append(arg.id)
                             arg_kwargs['required'] = True
-
 
                         #pout.v(arg_args, arg_kwargs)
                         parser.add_argument(*arg_args, **arg_kwargs)
