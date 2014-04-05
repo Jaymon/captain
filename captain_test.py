@@ -8,11 +8,15 @@ from captain import Script
 
 class TestScript(object):
 
-    def __init__(self, body):
+    def __init__(self, body, fname=''):
         self.body = "\n".join(body)
         self.cwd = testdata.create_dir()
+
+        if not fname:
+            fname = "{}/{}.py".format(testdata.get_ascii(5), testdata.get_ascii(5))
+
         self.path = testdata.create_file(
-            "{}/{}.py".format(testdata.get_ascii(5), testdata.get_ascii(5)),
+            fname,
             self.body,
             self.cwd
         )
@@ -44,6 +48,64 @@ class TestScript(object):
 
 
 class CaptainTest(TestCase):
+#    def test_argument(self):
+#        script = TestScript(
+#            [
+#                "#!/usr/bin/env python",
+#                "def main(*args, **kwargs):",
+#                "  '''the description for foo module'''",
+#                "  print 'nailed it'",
+#                "  return 0"
+#            ]
+#        )
+#
+#        r = script.run('--foo=1 --bar=2 --che=3 one two three')
+#        pout.v(r)
+
+    def test_init_module(self):
+        script = TestScript(
+            [
+                "#!/usr/bin/env python",
+                "def main():",
+                "  '''the description for foo module'''",
+                "  print 'foo/__init__'",
+                "  return 0"
+            ],
+            'foo/__init__.py'
+        )
+
+        script.path = 'foo'
+        r = script.run()
+        self.assertRegexpMatches(r, 'foo/__init__')
+
+        script = TestScript(
+            [
+                "#!/usr/bin/env python",
+                "def main():",
+                "  '''the description for foo module'''",
+                "  print 'foo/__main__'",
+                "  return 0"
+            ],
+            'foo/__main__.py'
+        )
+
+        script.path = 'foo'
+        r = script.run()
+        self.assertRegexpMatches(r, 'foo/__main__')
+
+        script = TestScript(
+            [
+                "#!/usr/bin/env python",
+                "def main():",
+                "  '''the description for foo module'''",
+                "  return 0"
+            ],
+            'foo/bar.py'
+        )
+
+        script.path = 'foo'
+        with self.assertRaises(RuntimeError):
+            r = script.run()
 
     def test_list(self):
         script = TestScript([""])
@@ -69,6 +131,18 @@ class CaptainTest(TestCase):
                     "#!/usr/bin/env python",
                     "if __name__ == u'__main__': pass"
                 ]),
+                'mod1/__init__.py': "\n".join([
+                    "#!/usr/bin/env python",
+                    "def main():",
+                    "  '''the description for mod1'''",
+                    "  return 0"
+                ]),
+                'mod2/__main__.py': "\n".join([
+                    "#!/usr/bin/env python",
+                    "def main():",
+                    "  '''the description for mod1'''",
+                    "  return 0"
+                ])
             },
             cwd
         )
@@ -79,6 +153,11 @@ class CaptainTest(TestCase):
         self.assertTrue('foo/bar.py' in r)
         self.assertFalse('bar/boo.py' in r)
         self.assertFalse('bar/baz.py' in r)
+
+        self.assertTrue('mod1' in r)
+        self.assertFalse('__init__' in r)
+        self.assertTrue('mod2' in r)
+        self.assertFalse('__main__' in r)
 
     def test_help(self):
         script = TestScript([
@@ -138,7 +217,54 @@ class CaptainTest(TestCase):
         with self.assertRaises(RuntimeError):
             script.run()
 
+
+class ArgTest(TestCase):
+    def test_decorator(self):
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "from captain import arg",
+            "@arg('--foo', default=True)",
+            "@arg('--bar', default='something')",
+            "def main(foo, bar, che=1, baz=2, *args, **kwargs):",
+            "  return 0"
+        ])
+        s = Script(script_path)
+        parser = s.parser
+        #pout.v(parser)
+
+
+
 class ScriptTest(TestCase):
+    def test_parser(self):
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "def main(foo, bar, che=1, baz=2, *args, **kwargs):",
+            "  return 0"
+        ])
+        s = Script(script_path)
+
+        s.parser
+
+    def test_parse(self):
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "def main(*args, **kwargs):",
+            "  return 0"
+        ])
+        s = Script(script_path)
+        s.parse()
+        self.assertEqual('', s.description)
+
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "def main(*args, **kwargs):",
+            "  '''this is the description'''",
+            "  return 0"
+        ])
+        s = Script(script_path)
+        s.parse()
+        self.assertEqual('this is the description', s.description)
+
     def test_scripts(self):
         with self.assertRaises(IOError):
             s = Script("this/is/a/bogus/path")
@@ -203,11 +329,11 @@ class ScriptTest(TestCase):
                 dict(count=1, dry_run=False, matches_per=5, match_all=True, testing=True)
             ),
             ("foo, bar=0, *args, **kwargs", "--foo=1 --che=oh_yeah awesome", dict(foo='1', bar=0)),
-            ("foo=Baboom", '--foo=5', ValueError),
+            ("foo=baboom", '--foo=5', dict(foo=5)),
             ("foo=int", '--foo=5', dict(foo=5)),
             ("foo=1.0", '--foo=5.0', dict(foo=5.0)),
-            ("foo=set()", '--foo=5', ValueError),
-            #("foo=set(1, 2)", '--foo=1', dict(foo=1)), # this should set the choice argument
+            ("foo=set()", '--foo=5', dict(foo=['5'])),
+            ("foo=set([1, 2])", '--foo=1', dict(foo=1)),
             ("*args", '1 2', dict(args=['1', '2'])),
             ("foo=[int]", '--foo=5 --foo=6', dict(foo=[5, 6])),
             ("foo=[]", '--foo=1 --foo=2', dict(foo=['1', '2'])),
@@ -220,6 +346,8 @@ class ScriptTest(TestCase):
         for test_in, test_out, test_assert in tests:
             script_path = TestScript([
                 "#!/usr/bin/env python",
+                "def baboom(v): return int(v)",
+                "",
                 "def main({}):".format(test_in),
                 "  return 0"
             ])
