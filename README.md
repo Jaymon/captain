@@ -28,9 +28,62 @@ def main(foo, bar):
     return 0
 ```
 
-can be called on the command line:
+So `foo` and `bar` can be called on the command line:
 
     $ pyc path/to/script.py --foo=1 --bar=2
+
+
+## Argument Decorator
+
+The `captain.decorators.arg()` decorator provides a nice passthrough api to the full [argparse](https://docs.python.org/2/library/argparse.html) module if you need to really customize how arguments are passed into your script:
+
+```python
+#!/usr/bin/env python
+
+from captain import echo
+from captain.decorators import arg 
+
+
+@arg('--foo', '-f')
+@arg('arg', metavar='ARG')
+def main(**kwargs):
+    '''this is the help description'''
+    print kwargs['foo'], kwargs['a']
+    return 0
+```
+
+Would print a help string like this:
+
+    usage: script.py [-h] [--foo FOO] ARG
+
+    this is the help description
+
+    positional arguments:
+      ARG
+
+    optional arguments:
+      -h, --help         show this help message and exit
+      --foo FOO, -f FOO
+
+
+## Echo
+
+This small module makes it easy to print output in your script while still giving you full control by being able to configure the logger if you need to. It also will obey the global `--quiet` flag.
+
+```python
+from captain import echo
+
+var1 = "print"
+
+var2 = "stdout"
+echo.out("this will {} to {}", var1, var2)
+
+var2 = "stderr"
+echo.err("this will {} to {}", var1, var2)
+
+e = ValueError("this will print with stacktrace and everything")
+echo.exception(e)
+```
 
 
 ## Examples

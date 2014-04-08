@@ -4,12 +4,24 @@ import subprocess
 
 import testdata
 
-from captain import Script
+from captain import Script, ScriptArg
 
 class TestScript(object):
 
+    @property
+    def instance(self):
+        return Script(self)
+
+    @classmethod
+    def create_instance(cls, *args, **kwargs):
+        script_path = cls(*args, **kwargs)
+        return script_path.instance
+
     def __init__(self, body, fname=''):
-        self.body = "\n".join(body)
+        self.body = body
+        if not isinstance(body, basestring):
+            self.body = "\n".join(body)
+
         self.cwd = testdata.create_dir()
 
         if not fname:
@@ -48,19 +60,29 @@ class TestScript(object):
 
 
 class CaptainTest(TestCase):
-#    def test_argument(self):
-#        script = TestScript(
-#            [
-#                "#!/usr/bin/env python",
-#                "def main(*args, **kwargs):",
-#                "  '''the description for foo module'''",
-#                "  print 'nailed it'",
-#                "  return 0"
-#            ]
-#        )
-#
-#        r = script.run('--foo=1 --bar=2 --che=3 one two three')
-#        pout.v(r)
+    def test_echo(self):
+        """make sure you don't get double echoing when echo is imported before other
+        set up logging"""
+        script = TestScript(
+            [
+                "#!/usr/bin/env python",
+                "import sys",
+                "import logging",
+                "rl = logging.getLogger()",
+                "log_handler = logging.StreamHandler(stream=sys.stderr)",
+                "log_formatter = logging.Formatter('[%(asctime)s] %(message)s', '%m-%dT%H:%M:%S')",
+                "log_handler.setFormatter(log_formatter)",
+                "rl.addHandler(log_handler)",
+                "from captain import echo",
+                "",
+                "def main():",
+                "  echo.out('gotcha')",
+                "  return 0"
+            ]
+        )
+
+        r = script.run()
+        self.assertEqual(1, r.count("gotcha"))
 
     def test_init_module(self):
         script = TestScript(
@@ -218,20 +240,51 @@ class CaptainTest(TestCase):
             script.run()
 
 
+class ScriptArgTest(TestCase):
+    def test_default(self):
+        s = ScriptArg('foo')
+        s.set_default(True)
+        self.assertTrue(s.default)
+
+
 class ArgTest(TestCase):
+    def test_help(self):
+
+        script_path = TestScript("""#!/usr/bin/env python
+
+from captain import echo
+from captain.decorators import arg 
+
+
+@arg('--foo', '-f')
+@arg('arg', metavar='ARG')
+def main(**kargs):
+    '''this is the help description'''
+    print args, kwargs
+    return 0
+""")
+
+        r = script_path.run('--help')
+
     def test_decorator(self):
         script_path = TestScript([
             "#!/usr/bin/env python",
-            "from captain import arg",
+            "from captain.decorators import arg",
             "@arg('--foo', default=True)",
-            "@arg('--bar', default='something')",
+            "@arg('--bar', '-b', default='bar')",
+            "@arg('--boom', default='boom')",
+            "@arg('a')",
             "def main(foo, bar, che=1, baz=2, *args, **kwargs):",
+            "  print kwargs['a']",
             "  return 0"
         ])
-        s = Script(script_path)
+        s = script_path.instance
         parser = s.parser
-        #pout.v(parser)
+        #pout.v(s.arg_info)
 
+        a = "aaaaaaaa"
+        r = script_path.run(a)
+        self.assertTrue(a in r)
 
 
 class ScriptTest(TestCase):

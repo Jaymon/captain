@@ -10,16 +10,20 @@ import logging
 log_formatter = logging.Formatter('%(message)s')
 
 stdout = logging.getLogger('{}.stdout'.format(__name__))
-stdout.setLevel(logging.DEBUG)
-log_handler = logging.StreamHandler(stream=sys.stdout)
-log_handler.setFormatter(log_formatter)
-stdout.addHandler(log_handler)
+if len(stdout.handlers) == 0:
+    stdout.propagate = False
+    stdout.setLevel(logging.DEBUG)
+    log_handler = logging.StreamHandler(stream=sys.stdout)
+    log_handler.setFormatter(log_formatter)
+    stdout.addHandler(log_handler)
 
 stderr = logging.getLogger('{}.stderr'.format(__name__))
-stderr.setLevel(logging.DEBUG)
-log_handler = logging.StreamHandler(stream=sys.stderr)
-log_handler.setFormatter(log_formatter)
-stderr.addHandler(log_handler)
+if len(stderr.handlers) == 0:
+    stderr.propagate = False
+    stderr.setLevel(logging.DEBUG)
+    log_handler = logging.StreamHandler(stream=sys.stderr)
+    log_handler.setFormatter(log_formatter)
+    stderr.addHandler(log_handler)
 
 quiet = True
 
