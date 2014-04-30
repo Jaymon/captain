@@ -46,7 +46,19 @@ def out(format_msg, *args, **kwargs):
     global quiet
     if quiet: return
 
-    stdout.info(format_msg.format(*args, **kwargs))
+    if isinstance(format_msg, basestring):
+        stdout.info(format_msg.format(*args, **kwargs))
+
+    else:
+        stdout.info(str(format_msg))
+
+def bar(sep='-', count=80):
+    out(sep * count)
+
+def blank(count=1):
+    """print out a blank newline"""
+    for x in xrange(count):
+        out('')
 
 #def console_out(format_str, *args, **kwargs):
 #    sys.stderr.write(format_str.format(*args, **kwargs))

@@ -4,7 +4,8 @@ import subprocess
 
 import testdata
 
-from captain import Script, ScriptArg
+from captain import Script, ScriptArg, echo
+
 
 class TestScript(object):
 
@@ -59,8 +60,24 @@ class TestScript(object):
         return r
 
 
-class CaptainTest(TestCase):
-    def test_echo(self):
+class EchoTest(TestCase):
+    def setUp(self):
+        echo.quiet = False
+
+    def test_non_string(self):
+        a = range(5)
+        echo.out(a)
+
+    def test_blank_bar(self):
+        echo.out("no args, should be one Newline")
+        echo.blank()
+        echo.bar()
+
+        echo.out("passed in 5")
+        echo.blank(5)
+        echo.bar('=', 5)
+
+    def test_echo_logging(self):
         """make sure you don't get double echoing when echo is imported before other
         set up logging"""
         script = TestScript(
@@ -84,6 +101,10 @@ class CaptainTest(TestCase):
         r = script.run()
         self.assertEqual(1, r.count("gotcha"))
 
+
+
+
+class CaptainTest(TestCase):
     def test_init_module(self):
         script = TestScript(
             [
