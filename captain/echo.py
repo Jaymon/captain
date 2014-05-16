@@ -19,7 +19,10 @@ if len(stdout.handlers) == 0:
 
 stderr = logging.getLogger('{}.stderr'.format(__name__))
 if len(stderr.handlers) == 0:
-    stderr.propagate = False
+    # we want to propogate error messages up through the chain, this allows us to
+    # do things like attach a logging handler that will do more important things
+    # with exceptions and the like
+    stderr.propagate = True 
     stderr.setLevel(logging.DEBUG)
     log_handler = logging.StreamHandler(stream=sys.stderr)
     log_handler.setFormatter(log_formatter)
@@ -28,10 +31,7 @@ if len(stderr.handlers) == 0:
 quiet = True
 
 def exception(e):
-    '''print an exception message to stderr'''
-    global quiet
-    if quiet: return
-
+    '''print an exception message to stderr (this does not honor quiet)'''
     stderr.exception(e)
 
 def err(format_msg, *args, **kwargs):

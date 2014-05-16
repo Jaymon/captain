@@ -20,7 +20,7 @@ from . import echo
 from . import decorators
 
 
-__version__ = '0.1.6'
+__version__ = '0.1.7'
 
 
 class ScriptArg(object):
