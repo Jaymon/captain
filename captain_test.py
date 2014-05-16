@@ -105,6 +105,18 @@ class EchoTest(TestCase):
 
 
 class CaptainTest(TestCase):
+    def test_raised_exception(self):
+        """I want to make sure exception handling is handled correctly"""
+        script = TestScript([
+            "#!/usr/bin/env python",
+            "def main():",
+            "  raise ValueError('boom_error')",
+            "  return 0"
+        ])
+
+        with self.assertRaisesRegexp(RuntimeError, 'returned 1 with output: boom_error') as e:
+            r = script.run()
+
     def test_init_module(self):
         script = TestScript(
             [

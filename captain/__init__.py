@@ -20,7 +20,7 @@ from . import echo
 from . import decorators
 
 
-__version__ = '0.1.7'
+__version__ = '0.1.8'
 
 
 class ScriptArg(object):
@@ -399,7 +399,11 @@ def console():
 
     if args.script:
         s = Script(args.script)
-        ret_code = s.run(command_args)
+        try:
+            ret_code = s.run(command_args)
+        except Exception, e:
+            echo.exception(e)
+            ret_code = 1
 
     else:
         basepath = os.getcwd()
