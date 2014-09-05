@@ -281,8 +281,33 @@ class ScriptArgTest(TestCase):
 
 
 class ArgTest(TestCase):
-    def test_help(self):
+    def test___call___decorator(self):
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "from captain.decorators import arg",
+            "from captain import echo",
+            "class BahPleaseWork(object):",
+            "    @arg('--output-file', default='')",
+            "    @arg('--output-dir', default='/tmp')",
+            "    @arg('--print-lines', action='store_true')",
+            "    @arg('--no-zip-output', action='store_true')",
+            "    def __call__(self, output_file, output_dir, print_lines, no_zip_output):",
+            "        echo.out('self={}, output_file={}, output_dir={}, print_lines={}, no_zip_output={}',",
+            "            self, output_file, output_dir, print_lines, no_zip_output",
+            "        )",
+            "main = BahPleaseWork()"
+        ])
 
+        with self.assertRaises(RuntimeError):
+            r = script_path.run("--output-file=foobar --final-dir=/tmp --print-lines")
+
+        s = script_path.instance
+        parser = s.parser
+
+        r = script_path.run("")
+        pout.v(r)
+
+    def test_help(self):
         script_path = TestScript("""#!/usr/bin/env python
 
 from captain import echo
@@ -334,7 +359,6 @@ class ScriptTest(TestCase):
         ])
         s = Script(script_path)
         s.parser
-        return
 
         script_path = TestScript([
             "#!/usr/bin/env python",
@@ -342,7 +366,6 @@ class ScriptTest(TestCase):
             "  return 0"
         ])
         s = Script(script_path)
-
         s.parser
 
     def test_parse_main_class(self):

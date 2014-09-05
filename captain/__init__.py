@@ -20,7 +20,7 @@ from . import echo
 from . import decorators
 
 
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 
 
 class ScriptArg(object):
@@ -178,7 +178,6 @@ class Script(object):
             'kwargs': None
         }
 
-        self.parse()
         m = self.module
         main = self.callback
         parser = argparse.ArgumentParser(
@@ -187,11 +186,13 @@ class Script(object):
         )
 
         all_arg_names = set()
-        decorator_args = main.__dict__.get('decorator_args', [])
         if inspect.isfunction(main):
+            decorator_args = main.__dict__.get('decorator_args', [])
             args, args_name, kwargs_name, args_defaults = inspect.getargspec(main)
         else:
+            decorator_args = main.__call__.__dict__.get('decorator_args', [])
             args, args_name, kwargs_name, args_defaults = inspect.getargspec(main.__call__)
+            args = args[1:] # remove self which will always get passed in automatically
 
         if not args: args = []
         if not args_defaults: args_defaults = []
@@ -298,6 +299,7 @@ class Script(object):
 
     def run(self, raw_args):
         """parse and import the script, and then run the script's main function"""
+        self.parse()
         parser = self.parser
         args = []
         kwargs = dict(self.arg_info['optional'])
