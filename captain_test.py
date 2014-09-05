@@ -331,6 +331,39 @@ class ScriptTest(TestCase):
 
         s.parser
 
+    def test_parse_main_class(self):
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "class main(object):",
+            "  def __call__(self, *args, **kwargs):",
+            "    return 0"
+        ])
+        s = Script(script_path)
+        s.parse()
+        self.assertEqual('', s.description)
+
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "class main(object):",
+            "  def __call__(self, *args, **kwargs):",
+            "    '''this would be the description'''",
+            "    return 0"
+        ])
+        s = Script(script_path)
+        s.parse()
+        self.assertEqual('this would be the description', s.description)
+
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "class main(object):",
+            "  '''class description'''",
+            "  def __call__(self, *args, **kwargs):",
+            "    return 0"
+        ])
+        s = Script(script_path)
+        s.parse()
+        self.assertEqual('class description', s.description)
+
     def test_parse(self):
         script_path = TestScript([
             "#!/usr/bin/env python",

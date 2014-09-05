@@ -20,7 +20,7 @@ from . import echo
 from . import decorators
 
 
-__version__ = '0.1.8'
+__version__ = '0.1.9'
 
 
 class ScriptArg(object):
@@ -360,17 +360,31 @@ class Script(object):
                 "no shebang! Please add this as first line: #!/usr/bin/env python"
             )
 
+        def get_desc(n):
+            desc = ''
+            if n.body:
+                doc = n.body[0]
+                if isinstance(doc, ast.Expr) and isinstance(doc.value, ast.Str):
+                    desc = doc.value.s
+            return desc
+
         found_main = False
         ast_tree = ast.parse(self.body, self.path)
         for n in ast.walk(ast_tree):
             if isinstance(n, ast.FunctionDef):
                 if n.name == self.function_name:
                     found_main = True
-                    self._description = ''
-                    if n.body:
-                        doc = n.body[0]
-                        if isinstance(doc, ast.Expr) and isinstance(doc.value, ast.Str):
-                            self._description = doc.value.s
+                    self._description = get_desc(n)
+
+            elif isinstance(n, ast.ClassDef):
+                if n.name == self.function_name:
+                    for sub_n in n.body:
+                        if isinstance(sub_n, ast.FunctionDef):
+                            if sub_n.name == '__call__':
+                                found_main = True
+                                self._description = get_desc(sub_n)
+                                if not self._description:
+                                    self._description = get_desc(n)
 
         if not found_main:
             raise ValueError("no main function found")
