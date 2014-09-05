@@ -20,7 +20,7 @@ from . import echo
 from . import decorators
 
 
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 
 
 class ScriptArg(object):
@@ -180,12 +180,7 @@ class Script(object):
 
         self.parse()
         m = self.module
-
-        for name, func in inspect.getmembers(m, inspect.isfunction):
-            if name == self.function_name:
-                main = func
-                break
-
+        main = self.callback
         parser = argparse.ArgumentParser(
             prog=self.name,
             description=self.description
@@ -193,7 +188,11 @@ class Script(object):
 
         all_arg_names = set()
         decorator_args = main.__dict__.get('decorator_args', [])
-        args, args_name, kwargs_name, args_defaults = inspect.getargspec(main)
+        if inspect.isfunction(main):
+            args, args_name, kwargs_name, args_defaults = inspect.getargspec(main)
+        else:
+            args, args_name, kwargs_name, args_defaults = inspect.getargspec(main.__call__)
+
         if not args: args = []
         if not args_defaults: args_defaults = []
         arg_info['order'] = args

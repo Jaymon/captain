@@ -324,6 +324,20 @@ class ScriptTest(TestCase):
     def test_parser(self):
         script_path = TestScript([
             "#!/usr/bin/env python",
+            "from captain.decorators import arg",
+            "class FooBar(object):",
+            "  @arg('--test', default=False)",
+            "  def __call__(self, *args, **kwargs):",
+            "    '''this would be the description'''",
+            "    return 0",
+            "main = FooBar()"
+        ])
+        s = Script(script_path)
+        s.parser
+        return
+
+        script_path = TestScript([
+            "#!/usr/bin/env python",
             "def main(foo, bar, che=1, baz=2, *args, **kwargs):",
             "  return 0"
         ])
