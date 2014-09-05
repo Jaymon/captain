@@ -334,24 +334,34 @@ class ScriptTest(TestCase):
     def test_parse_main_class(self):
         script_path = TestScript([
             "#!/usr/bin/env python",
-            "class main(object):",
+            "class FooBar(object):",
             "  def __call__(self, *args, **kwargs):",
-            "    return 0"
+            "    '''this would be the description'''",
+            "    return 0",
+            "main = FooBar()"
         ])
         s = Script(script_path)
-        s.parse()
-        self.assertEqual('', s.description)
+        self.assertEqual('this would be the description', s.description)
+
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "class FooBar(object):",
+            "  def __call__(self, *args, **kwargs):",
+            "    '''this would be the description'''",
+            "    return 0",
+            "main = FooBar()"
+        ])
+        s = Script(script_path)
+        self.assertEqual('this would be the description', s.description)
 
         script_path = TestScript([
             "#!/usr/bin/env python",
             "class main(object):",
             "  def __call__(self, *args, **kwargs):",
-            "    '''this would be the description'''",
             "    return 0"
         ])
         s = Script(script_path)
-        s.parse()
-        self.assertEqual('this would be the description', s.description)
+        self.assertEqual('', s.description)
 
         script_path = TestScript([
             "#!/usr/bin/env python",
@@ -361,7 +371,6 @@ class ScriptTest(TestCase):
             "    return 0"
         ])
         s = Script(script_path)
-        s.parse()
         self.assertEqual('class description', s.description)
 
     def test_parse(self):
@@ -371,7 +380,6 @@ class ScriptTest(TestCase):
             "  return 0"
         ])
         s = Script(script_path)
-        s.parse()
         self.assertEqual('', s.description)
 
         script_path = TestScript([
@@ -396,30 +404,45 @@ class ScriptTest(TestCase):
         s = Script(script_path)
 
     def test_is_cli(self):
-        script_path = TestScript([
-            "def main(*args, **kwargs):",
-            "  return 0"
-        ])
+        tests = [
+            [True, [
+                "#!/usr/bin/env python",
+                "from datetime import datetime as main",
+            ]],
+            [False, [
+                "#!/usr/bin/env python",
+                "",
+                "# another python comment"
+            ]],
+            [True, [
+                "#!/usr/bin/env python",
+                "def foo(*args, **kwargs):",
+                "  return 0",
+                "main = foo",
+            ]],
+            [True, [
+                "#!/usr/bin/env python",
+                "class Foo(object):",
+                "  def __call__(self, *args, **kwargs):",
+                "    return 0",
+                "",
+                "main = Foo()",
+            ]],
+            [False, [
+                "def main(*args, **kwargs):",
+                "  return 0"
+            ]],
+            [True, [
+                "#!/usr/bin/env python",
+                "def main(*args, **kwargs):",
+                "  return 0"
+            ]],
+        ]
 
-        s = Script(script_path)
-        self.assertFalse(s.is_cli())
-
-        script_path = TestScript([
-            "#!/usr/bin/env python",
-            "",
-            "# another python comment"
-        ])
-
-        s = Script(script_path)
-        self.assertFalse(s.is_cli())
-
-        script_path = TestScript([
-            "#!/usr/bin/env python",
-            "def main(*args, **kwargs):",
-            "  return 0"
-        ])
-        s = Script(script_path)
-        self.assertTrue(s.is_cli())
+        for expected, script_lines in tests:
+            script_path = TestScript(script_lines)
+            s = Script(script_path)
+            self.assertEqual(expected, s.is_cli())
 
     def test_parse_bad(self):
         """makes sure bad input is caught in parsing"""

@@ -20,7 +20,7 @@ from . import echo
 from . import decorators
 
 
-__version__ = '0.1.9'
+__version__ = '0.2.0'
 
 
 class ScriptArg(object):
@@ -152,7 +152,18 @@ class Script(object):
 
     @property
     def description(self):
-        self.parse()
+        if hasattr(self, '_description'):
+            return self._description
+
+        cb = self.callback
+        desc = inspect.getdoc(cb)
+        if not desc:
+            if not inspect.isfunction(cb):
+                cb_method = getattr(cb, '__call__', None)
+                desc = inspect.getdoc(cb_method)
+
+        if not desc: desc = ''
+        self._description = desc
         return self._description
 
     @property
@@ -244,9 +255,21 @@ class Script(object):
     def body(self):
         """get the contents of the script"""
         if not hasattr(self, '_body'):
-            with codecs.open(self.path, 'r+', 'utf-8') as fp:
+            with codecs.open(self.path, 'r', 'utf-8') as fp:
                 self._body = fp.read()
         return self._body
+
+    @property
+    def callback(self):
+        module = self.module
+        cb = getattr(module, self.function_name)
+        if not callable(cb):
+            raise AttributeError("no callback {} found in script {}".format(
+                self.function_name,
+                self.path
+            ))
+
+        return cb
 
     def __init__(self, script_path):
         self.parsed = False
@@ -272,8 +295,7 @@ class Script(object):
     def __call__(self, *args, **kwargs):
         """this wraps around the script's function, it is functionally equivalent
         to import the script and running function_name manually"""
-        module = self.module
-        return getattr(module, self.function_name)(*args, **kwargs)
+        return self.callback(*args, **kwargs)
 
     def run(self, raw_args):
         """parse and import the script, and then run the script's main function"""
@@ -321,7 +343,7 @@ class Script(object):
         ret = True
         try:
             self.parse()
-        except ValueError, e:
+        except (ValueError, AttributeError) as e:
             ret = False
 
         return ret
@@ -350,46 +372,64 @@ class Script(object):
         return rel_filepath
 
     def parse(self):
-        """load the script and set the parser and argument info"""
+        """load the script and set the parser and argument info
+
+        I feel that this is way too brittle to be used long term, I think it just
+        might be best to import the stupid module, the thing I don't like about that
+        is then we import basically everything, which seems bad?
+        """
         if self.parsed: return
 
         # http://stackoverflow.com/questions/17846908/proper-shebang-for-python-script
         body = self.body
         if not re.match("^#!.*?python.*$", body, re.I | re.MULTILINE):
             raise ValueError(
-                "no shebang! Please add this as first line: #!/usr/bin/env python"
-            )
-
-        def get_desc(n):
-            desc = ''
-            if n.body:
-                doc = n.body[0]
-                if isinstance(doc, ast.Expr) and isinstance(doc.value, ast.Str):
-                    desc = doc.value.s
-            return desc
+                "no shebang! Please add this as first line: #!/usr/bin/env python to {}".format(
+                self.path
+            ))
 
         found_main = False
         ast_tree = ast.parse(self.body, self.path)
-        for n in ast.walk(ast_tree):
-            if isinstance(n, ast.FunctionDef):
+        for n in ast_tree.body:
+            if hasattr(n, 'name'):
                 if n.name == self.function_name:
                     found_main = True
-                    self._description = get_desc(n)
+                    break
 
-            elif isinstance(n, ast.ClassDef):
-                if n.name == self.function_name:
-                    for sub_n in n.body:
-                        if isinstance(sub_n, ast.FunctionDef):
-                            if sub_n.name == '__call__':
-                                found_main = True
-                                self._description = get_desc(sub_n)
-                                if not self._description:
-                                    self._description = get_desc(n)
+            if hasattr(n, 'value'):
+                ns = n.value
+                if hasattr(ns, 'id'):
+                    if ns.id == self.function_name:
+                        found_main = True
+                        break
 
-        if not found_main:
+            if hasattr(n, 'targets'):
+                ns = n.targets[0]
+                if hasattr(ns, 'id'):
+                    if ns.id == self.function_name:
+                        found_main = True
+                        break
+
+            if hasattr(n, 'names'):
+                ns = n.names[0]
+                if hasattr(ns, 'name'):
+                    if ns.name == self.function_name:
+                        found_main = True
+                        break
+
+                if hasattr(ns, 'asname'):
+                    if ns.asname == self.function_name:
+                        found_main = True
+                        break
+
+        if found_main:
+            self.callback
+
+        else:
             raise ValueError("no main function found")
 
         self.parsed = True
+        return found_main
 
 
 def console():
@@ -415,7 +455,10 @@ def console():
         s = Script(args.script)
         try:
             ret_code = s.run(command_args)
-        except Exception, e:
+            if not ret_code:
+                ret_code = 0
+
+        except Exception as e:
             echo.exception(e)
             ret_code = 1
 
