@@ -2,7 +2,7 @@
 
 Easy python cli scripts for people that just want get things done.
 
-Captain was lovingly crafted for [First Opinion](http://firstopinionapp.com).
+Captain was lovingly crafted for [First Opinion](http://firstopinionapp.com) and powers all our command line scripts.
 
 ## Usage
 
@@ -65,6 +65,8 @@ Would print a help string like this:
       -h, --help         show this help message and exit
       --foo FOO, -f FOO
 
+If you want another nifty way to define arguments, take a look at [docopt](https://github.com/docopt/docopt).
+
 
 ## Echo
 
@@ -84,6 +86,8 @@ echo.err("this will {} to {}", var1, var2)
 e = ValueError("this will print with stacktrace and everything")
 echo.exception(e)
 ```
+
+Captain also can work with [clint](https://github.com/kennethreitz/clint) if you need to do more advanced cli output.
 
 
 ## Examples
@@ -115,15 +119,18 @@ You can get a list of all available scripts in a directory by running captain wi
 
     $ captain
 
+
 ## Install
 
 Use pip:
 
     $ pip install captain
 
+
 ## License
 
 MIT
+
 
 ## TODO
 
