@@ -20,46 +20,43 @@ from . import echo
 from . import decorators
 
 
-__version__ = '0.2.2'
+__version__ = '0.2.3'
 
 
-class ScriptArg(object):
-
-    @property
-    def parser_args(self):
-        args = set(self.args)
-        for a in self.other_args:
-            args |= set(a)
-
-        return list(args)
+class ScriptKwarg(object):
 
     @property
-    def parser_kwargs(self):
-        kwargs = dict(self.kwargs)
-        for kw in self.other_kwargs:
-            kwargs.update(kw)
+    def required(self):
+        kwargs = self.parser_kwargs
 
-        return kwargs
+        if 'required' in kwargs:
+            ret = kwargs['required']
+        else:
+            try:
+                self.default
+            except ValueError:
+                ret = True
+            else:
+                ret = False
 
-    @property
-    def names(self):
-        return self.args + [self.name]
+        return ret
 
     @property
     def default(self):
         r = None
         r_found = False
-        if 'default' in self.kwargs:
-            r = self.kwargs['default']
+        kwargs = self.parser_kwargs
+        if 'default' in kwargs:
+            r = kwargs['default']
             r_found = True
 
         else:
-            if 'action' in self.kwargs:
-                if self.kwargs['action'] == 'store_true':
+            if 'action' in kwargs:
+                if kwargs['action'] == 'store_true':
                     r = False
                     r_found = True
 
-                elif self.kwargs['action'] == 'store_false':
+                elif kwargs['action'] == 'store_false':
                     r = True
                     r_found = True
 
@@ -68,68 +65,79 @@ class ScriptArg(object):
 
         return r
 
-    def __init__(self, arg_name):
+    def __init__(self, arg_name, **kwargs):
         self.name = arg_name
-        self.args = list(set([
+
+        self.parser_args = set()
+        self.merge_args([
             '--{}'.format(arg_name),
-            '--{}'.format(arg_name.replace('_', '-'))
-        ]))
-        self.kwargs = {}
+            '--{}'.format(arg_name.replace('_', '-')),
+            '--{}'.format(arg_name.replace('-', '_'))
+        ])
 
-        self.other_args = []
-        self.other_kwargs = []
+        self.parser_kwargs = {}
+        self.merge_kwargs(kwargs)
 
-        self.required = True
+    def merge_args(self, args):
+        if args:
+            self.parser_args.update(set(args))
+
+    def merge_kwargs(self, kwargs):
+        if kwargs:
+            self.parser_kwargs.update(kwargs)
+
+        self.parser_kwargs['dest'] = self.name
 
     def merge_from_list(self, list_args):
-        # get decorator arguments lined up for merging with found information
-        args = []
-        kwargs = {}
-        for an in self.names:
-            try:
-                for la, lkw in list_args:
-                    if an in la:
-                        args = list(la)
-                        kwargs = lkw
+        """find any matching parser_args from list_args and merge them into this
+        instance
 
-                        # this is not a flag argument (eg, --foo) it is a positional
-                        if an == self.name:
-                            self.args = []
+        list_args -- list -- an array of (args, kwargs) tuples
+        """
+        def xs(name, parser_args, list_args):
+            """build the generator of matching list_args"""
+            for args, kwargs in list_args:
+                if len(set(args) & parser_args) > 0:
+                    yield args, kwargs
 
-                        raise StopIteration()
+                else:
+                    if 'dest' in kwargs:
+                        if kwargs['dest'] == name:
+                            yield args, kwargs
 
-            except StopIteration:
-                break
-
-        self.other_args.append(args)
-        self.other_kwargs.append(kwargs)
+        for args, kwargs in xs(self.name, self.parser_args, list_args):
+            self.merge_args(args)
+            self.merge_kwargs(kwargs)
 
     def set_default(self, na):
+        kwargs = {}
         if isinstance(na, (type, types.FunctionType)):
-            self.kwargs['type'] = na
-            self.kwargs['required'] = True
+            kwargs['type'] = na
+            kwargs['required'] = True
 
         elif isinstance(na, bool):
-            self.kwargs['action'] = 'store_false' if na else 'store_true'
-            self.required = False
+            kwargs['action'] = 'store_false' if na else 'store_true'
+            #self.required = False
+            kwargs['required'] = False
 
         elif isinstance(na, (int, float, str)):
-            self.kwargs['type'] = type(na)
-            self.kwargs['default'] = na
-            self.required = False
+            kwargs['type'] = type(na)
+            kwargs['default'] = na
+            #self.required = False
+            kwargs['required'] = False
 
         elif isinstance(na, (list, set)):
             na = list(na)
-            self.kwargs['action'] = 'append'
-            self.kwargs['required'] = True
+            kwargs['action'] = 'append'
+            kwargs['required'] = True
 
             if len(na) > 0:
                 if isinstance(na[0], type):
-                    self.kwargs['type'] = na[0]
+                    kwargs['type'] = na[0]
 
                 else:
                     # we are now reverting this to a choices check
-                    self.kwargs['action'] = 'store'
+                    kwargs['action'] = 'store'
                     l = set()
                     ltype = None
                     for elt in na:
@@ -142,8 +150,22 @@ class ScriptArg(object):
                             if ltype is not vtype:
                                 ltype = str
 
-                    self.kwargs['choices'] = l
-                    self.kwargs['type'] = ltype
+                    kwargs['choices'] = l
+                    kwargs['type'] = ltype
+
+        self.merge_kwargs(kwargs)
+
+
+class ScriptArg(ScriptKwarg):
+    def __init__(self, *args, **kwargs):
+        super(ScriptArg, self).__init__(*args, **kwargs)
+        self.parser_args = set([self.name])
+        kwargs.setdefault("nargs", "?")
+        self.merge_kwargs(kwargs)
+
+    def merge_kwargs(self, kwargs):
+        super(ScriptArg, self).merge_kwargs(kwargs)
+        self.parser_kwargs.pop("dest")
 
 
 class Script(object):
@@ -201,13 +223,15 @@ class Script(object):
         #pout.v(args, args_name, kwargs_name, args_defaults, default_offset)
 
         for i, arg_name in enumerate(args):
-            a = ScriptArg(arg_name)
-            a.merge_from_list(decorator_args)
+            a = ScriptKwarg(arg_name)
 
+            # set the default if it is available
             default_i = i - default_offset
             if default_i >= 0:
                 na = args_defaults[default_i]
                 a.set_default(na)
+
+            a.merge_from_list(decorator_args)
 
             if a.required:
                 arg_info['required'].append(a.name)
@@ -216,12 +240,15 @@ class Script(object):
                 arg_info['optional'][a.name] = a.default
 
             #pout.v(a.parser_args, a.parser_kwargs)
-            parser_args = a.parser_args
-            all_arg_names |= set(parser_args)
-            parser.add_argument(*parser_args, **a.parser_kwargs)
+            all_arg_names |= a.parser_args
+            parser.add_argument(*a.parser_args, **a.parser_kwargs)
 
         if args_name:
-            parser.add_argument(args_name, nargs='*')
+            a = ScriptArg(args_name, nargs='*')
+            a.merge_from_list(decorator_args)
+            all_arg_names |= a.parser_args
+            pout.v(a.parser_args, a.parser_kwargs)
+            parser.add_argument(*a.parser_args, **a.parser_kwargs)
             arg_info['args'] = args_name
 
         if kwargs_name:
@@ -236,6 +263,7 @@ class Script(object):
             if da[0] not in all_arg_names:
                 parser.add_argument(*da, **dkw)
 
+        #pout.v(parser)
         self._parser = parser
         self.arg_info = arg_info
         return self._parser

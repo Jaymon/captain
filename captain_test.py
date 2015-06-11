@@ -4,7 +4,7 @@ import subprocess
 
 import testdata
 
-from captain import Script, ScriptArg, echo
+from captain import Script, ScriptArg, ScriptKwarg, echo
 
 
 class TestScript(object):
@@ -273,11 +273,18 @@ class CaptainTest(TestCase):
             script.run()
 
 
-class ScriptArgTest(TestCase):
+class ScriptKwargTest(TestCase):
     def test_default(self):
-        s = ScriptArg('foo')
+        s = ScriptKwarg('foo')
         s.set_default(True)
         self.assertTrue(s.default)
+
+    def test_names(self):
+        s = ScriptKwarg("foo")
+        args = ("--foo", "--foo-id", "--foo-email")
+        l = [(args, {})]
+        s.merge_from_list(l)
+        self.assertEqual(set(args), s.parser_args)
 
 
 class ArgTest(TestCase):
@@ -343,6 +350,44 @@ def main(**kargs):
         a = "aaaaaaaa"
         r = script_path.run(a)
         self.assertTrue(a in r)
+
+    def test_arg_and_main(self):
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "from captain.decorators import arg",
+            '@arg("--foo", "--foo-id", "--foo-email", default="")',
+            '@arg("--bar", "--bar-id", default=0, type=int)',
+            '@arg("che_keys", nargs="+")',
+            "def main(foo, bar, *che_keys):",
+            "    return 0",
+        ])
+        s = script_path.instance
+        parser = s.parser
+        self.assertEqual(0, len(s.arg_info['required']))
+        self.assertTrue('foo' in s.arg_info['optional'])
+        self.assertTrue('bar' in s.arg_info['optional'])
+
+    def test_issue_7(self):
+        # https://github.com/firstopinion/captain/issues/7
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "from captain.decorators import arg",
+            '@arg("--count", type=int, dest="max_count")',
+            '@arg("--recv-timeout", type=int, dest="recv_timeout")',
+            '@arg("--unsync-count", type=int, dest="max_unsync_count", default=5)',
+            "def main(max_count, recv_timeout, max_unsync_count=5):",
+            "    return 0",
+        ])
+        s = script_path.instance
+
+        dests = set(["help", "max_count", "recv_timeout", "max_unsync_count"])
+        parser = s.parser
+        for a in s.parser._actions:
+            self.assertTrue(a.dest in dests)
+
+        #pout.v(parser)
+        #parser.print_help()
+        #pout.v(s.arg_info)
 
 
 class ScriptTest(TestCase):
