@@ -312,23 +312,19 @@ class ArgTest(TestCase):
         parser = s.parser
 
         r = script_path.run("")
-        pout.v(r)
 
     def test_help(self):
-        script_path = TestScript("""#!/usr/bin/env python
-
-from captain import echo
-from captain.decorators import arg 
-
-
-@arg('--foo', '-f')
-@arg('arg', metavar='ARG')
-def main(**kargs):
-    '''this is the help description'''
-    print args, kwargs
-    return 0
-""")
-
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "from captain import echo",
+            "from captain.decorators import arg ",
+            "@arg('--foo', '-f')",
+            "@arg('arg', metavar='ARG')",
+            "def main(**kargs):",
+            "    '''this is the help description'''",
+            "    print args, kwargs",
+            "    return 0",
+        ])
         r = script_path.run('--help')
 
     def test_decorator(self):
@@ -366,6 +362,23 @@ def main(**kargs):
         self.assertEqual(0, len(s.arg_info['required']))
         self.assertTrue('foo' in s.arg_info['optional'])
         self.assertTrue('bar' in s.arg_info['optional'])
+
+
+    def test_issue_6(self):
+        # https://github.com/firstopinion/captain/issues/6
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "from captain.decorators import arg",
+            "from captain import echo",
+            '@arg("--count")',
+            "def main(count):",
+            "    echo.out('foo')",
+            "    return 0",
+        ])
+        s = script_path.instance
+        with self.assertRaises(RuntimeError):
+            r = script_path.run('')
+
 
     def test_issue_7(self):
         # https://github.com/firstopinion/captain/issues/7

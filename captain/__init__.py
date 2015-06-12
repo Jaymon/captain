@@ -87,6 +87,15 @@ class ScriptKwarg(object):
             self.parser_kwargs.update(kwargs)
 
         self.parser_kwargs['dest'] = self.name
+        if 'default' in kwargs:
+            self.set_default(kwargs['default'])
+
+        elif 'action' in kwargs:
+            if kwargs['action'] in set(['store_false', 'store_true']):
+                self.parser_kwargs['required'] = False
+
+        else:
+            self.parser_kwargs.setdefault("required", True)
 
     def merge_from_list(self, list_args):
         """find any matching parser_args from list_args and merge them into this
@@ -153,7 +162,8 @@ class ScriptKwarg(object):
                     kwargs['choices'] = l
                     kwargs['type'] = ltype
 
-        self.merge_kwargs(kwargs)
+        #self.merge_kwargs(kwargs)
+        self.parser_kwargs.update(kwargs)
 
 
 class ScriptArg(ScriptKwarg):
@@ -166,6 +176,7 @@ class ScriptArg(ScriptKwarg):
     def merge_kwargs(self, kwargs):
         super(ScriptArg, self).merge_kwargs(kwargs)
         self.parser_kwargs.pop("dest")
+        self.parser_kwargs.pop("required")
 
 
 class Script(object):
@@ -247,7 +258,6 @@ class Script(object):
             a = ScriptArg(args_name, nargs='*')
             a.merge_from_list(decorator_args)
             all_arg_names |= a.parser_args
-            pout.v(a.parser_args, a.parser_kwargs)
             parser.add_argument(*a.parser_args, **a.parser_kwargs)
             arg_info['args'] = args_name
 
