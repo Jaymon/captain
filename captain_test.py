@@ -364,6 +364,19 @@ class ArgTest(TestCase):
         self.assertTrue('bar' in s.arg_info['optional'])
 
 
+    def test_issue_5(self):
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "from captain import echo",
+            "from captain.decorators import arg",
+            '@arg("--foo", type=int, dest="max_foo", default=5)',
+            "def main(max_foo):",
+            "    echo.out(max_foo)",
+        ])
+        s = script_path.instance
+        r = script_path.run('')
+        self.assertEqual("5", r)
+
     def test_issue_6(self):
         # https://github.com/firstopinion/captain/issues/6
         script_path = TestScript([
