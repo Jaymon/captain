@@ -30,9 +30,11 @@ if len(stderr.handlers) == 0:
 
 quiet = True
 
+
 def exception(e):
     '''print an exception message to stderr (this does not honor quiet)'''
     stderr.exception(e)
+
 
 def err(format_msg, *args, **kwargs):
     '''print format_msg to stderr'''
@@ -40,6 +42,7 @@ def err(format_msg, *args, **kwargs):
     if quiet: return
 
     stderr.info(format_msg.format(*args, **kwargs))
+
 
 def out(format_msg, *args, **kwargs):
     '''print format_msg to stdout, taking into account verbosity level'''
@@ -52,19 +55,69 @@ def out(format_msg, *args, **kwargs):
     else:
         stdout.info(str(format_msg))
 
+
 def bar(sep='-', count=80):
     out(sep * count)
+
 
 def blank(count=1):
     """print out a blank newline"""
     for x in xrange(count):
         out('')
 
-#def console_out(format_str, *args, **kwargs):
-#    sys.stderr.write(format_str.format(*args, **kwargs))
-#    sys.stderr.write(os.linesep)
-#
-#def console_debug(*args, **kwargs):
-#    if debug:
-#        console_out(*args, **kwargs)
-#
+
+def banner(*lines, **kwargs):
+    """prints a banner"""
+    sep = kwargs.get("sep", "*")
+    count = kwargs.get("count", 80)
+
+    out(sep * count)
+    if lines:
+        out(sep)
+
+        for line in lines:
+            out("{} {}".format(sep, line))
+
+        out(sep)
+        out(sep * count)
+
+
+def columns(*columns, **kwargs):
+    """
+    format columned data so we can easily print it out on a console, this just takes
+    columns of data and it will format it into properly aligned columns, it's not
+    fancy, but it works for most type of strings that I need it for, like server name
+    lists.
+
+    other formatting options:
+        http://stackoverflow.com/a/8234511/5006
+
+    *columns -- each column is a list of values you want in each row of the column
+    **kwargs --
+        prefix -- string -- what you want before each row (eg, a tab)
+        buf_count -- integer -- how many spaces between longest col value and its neighbor
+
+    return -- string
+    """
+    ret = []
+    prefix = kwargs.get('prefix', '')
+    buf_count = kwargs.get('buf_count', 2)
+    row_counts = [0] * len(columns)
+
+    for rows in itertools.izip(*columns):
+        for i, c in enumerate(rows):
+            c = String(c)
+            cl = len(c) 
+            if cl > row_counts[i]:
+                row_counts[i] = cl
+
+    for rows in itertools.izip(*columns):
+        row = [prefix]
+        for i, c in enumerate(rows):
+            c = String(c)
+            row.append("{}{}".format(c, " " * ((row_counts[i] + buf_count) - len(c))))
+
+        ret.append("".join(row).rstrip())
+
+    out(os.linesep.join(ret))
+
