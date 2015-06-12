@@ -336,7 +336,7 @@ class ArgTest(TestCase):
             "@arg('--boom', default='boom')",
             "@arg('a')",
             "def main(foo, bar, che=1, baz=2, *args, **kwargs):",
-            "  print kwargs['a']",
+            "  print args[0]",
             "  return 0"
         ])
         s = script_path.instance
@@ -363,6 +363,32 @@ class ArgTest(TestCase):
         self.assertTrue('foo' in s.arg_info['optional'])
         self.assertTrue('bar' in s.arg_info['optional'])
 
+    def test_issue_1(self):
+        """this test makes sure issue 1 is fixed, which is actually very similar to issue 6"""
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "from captain import echo",
+            "from captain.decorators import arg",
+            "@arg('--push_environment', '--push-environment', type=str, choices=['dev', 'prod'])",
+            "def main(**kwargs):",
+            "    echo.out(kwargs)",
+            "    return 0",
+        ])
+        s = script_path.instance
+        parser = s.parser
+        with self.assertRaises(RuntimeError):
+            r = script_path.run('')
+
+    def test_issue_3(self):
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "from captain import echo",
+            "from captain.decorators import arg",
+            "def main():",
+            "    echo.out('hello world')",
+        ])
+        r = script_path.run('--quiet')
+        self.assertEqual("", r)
 
     def test_issue_5(self):
         script_path = TestScript([
@@ -373,7 +399,6 @@ class ArgTest(TestCase):
             "def main(max_foo):",
             "    echo.out(max_foo)",
         ])
-        s = script_path.instance
         r = script_path.run('')
         self.assertEqual("5", r)
 
@@ -388,7 +413,6 @@ class ArgTest(TestCase):
             "    echo.out('foo')",
             "    return 0",
         ])
-        s = script_path.instance
         with self.assertRaises(RuntimeError):
             r = script_path.run('')
 

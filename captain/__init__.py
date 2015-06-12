@@ -66,6 +66,7 @@ class ScriptKwarg(object):
         return r
 
     def __init__(self, arg_name, **kwargs):
+        arg_name = arg_name.lstrip("-")
         self.name = arg_name
 
         self.parser_args = set()
@@ -271,9 +272,15 @@ class Script(object):
         # pick up any stragglers
         for da, dkw in decorator_args:
             if da[0] not in all_arg_names:
-                parser.add_argument(*da, **dkw)
+                arg_name = da[0]
+                if arg_name.startswith("-"):
+                    a = ScriptKwarg(arg_name)
+                else:
+                    a = ScriptArg(arg_name)
 
-        #pout.v(parser)
+                a.merge_kwargs(dkw)
+                parser.add_argument(*a.parser_args, **a.parser_kwargs)
+
         self._parser = parser
         self.arg_info = arg_info
         return self._parser
