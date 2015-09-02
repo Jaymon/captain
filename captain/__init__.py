@@ -20,7 +20,7 @@ from . import echo
 from . import decorators
 
 
-__version__ = '0.2.3'
+__version__ = '0.2.4'
 
 
 class ScriptKwarg(object):
@@ -84,10 +84,15 @@ class ScriptKwarg(object):
             self.parser_args.update(set(args))
 
     def merge_kwargs(self, kwargs):
+        """these kwargs come from the @arg decorator, they are then merged into any
+        keyword arguments that were automatically generated from the main function
+        introspection"""
         if kwargs:
             self.parser_kwargs.update(kwargs)
 
         self.parser_kwargs['dest'] = self.name
+
+        # special handling of any passed in values
         if 'default' in kwargs:
             self.set_default(kwargs['default'])
 
@@ -120,23 +125,32 @@ class ScriptKwarg(object):
             self.merge_kwargs(kwargs)
 
     def set_default(self, na):
+        """this is used for introspection from the main() method when there is an
+        argument with a default value, this figures out how to set up the ArgParse
+        arguments"""
         kwargs = {}
         if isinstance(na, (type, types.FunctionType)):
+            # if foo=some_func then some_func(foo) will be ran if foo is passed in
             kwargs['type'] = na
             kwargs['required'] = True
+            kwargs["default"] = argparse.SUPPRESS
 
         elif isinstance(na, bool):
+            # if false then passing --foo will set to true, if True then --foo will
+            # set foo to False
             kwargs['action'] = 'store_false' if na else 'store_true'
-            #self.required = False
             kwargs['required'] = False
 
         elif isinstance(na, (int, float, str)):
+            # for things like foo=int, this says that any value of foo is an integer
             kwargs['type'] = type(na)
             kwargs['default'] = na
-            #self.required = False
             kwargs['required'] = False
 
         elif isinstance(na, (list, set)):
+            # list is strange, [int] would mean we want a list of all integers, if
+            # there is a value in the list: ["foo", "bar"] then it would mean only
+            # those choices are valid
             na = list(na)
             kwargs['action'] = 'append'
             kwargs['required'] = True
@@ -216,7 +230,11 @@ class Script(object):
         main = self.callback
         parser = argparse.ArgumentParser(
             prog=self.name,
-            description=self.description
+            description=self.description,
+            # https://hg.python.org/cpython/file/2.7/Lib/argparse.py
+            # https://docs.python.org/2/library/argparse.html#formatter-class
+            # http://stackoverflow.com/questions/12151306/argparse-way-to-include-default-values-in-help
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         )
 
         all_arg_names = set()
