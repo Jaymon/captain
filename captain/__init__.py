@@ -3,7 +3,6 @@ some other solutions I considered:
 http://zacharyvoase.com/2009/12/09/django-boss/
 https://github.com/zacharyvoase/django-boss
 """
-import sys
 import os
 import argparse
 import imp
@@ -12,7 +11,6 @@ import re
 import ast
 import getopt
 from collections import defaultdict
-import fnmatch
 import inspect
 import types
 
@@ -20,7 +18,7 @@ from . import echo
 from . import decorators
 
 
-__version__ = '0.2.4'
+__version__ = '0.2.5'
 
 
 class ScriptKwarg(object):
@@ -495,53 +493,4 @@ class Script(object):
         self.parsed = True
         return found_main
 
-
-def console():
-    '''
-    cli hook
-
-    return -- integer -- the exit code
-    '''
-    parser = argparse.ArgumentParser(description='Easy Python Command line script running', add_help=False)
-    #parser.add_argument('--debug', dest='debug', action='store_true', help='print debugging info')
-    parser.add_argument("-v", "--version", action='version', version="%(prog)s {}".format(__version__))
-    parser.add_argument("--quiet", action='store_true', dest='quiet')
-    #parser.add_argument('args', nargs=argparse.REMAINDER, help='all other arguments')
-    parser.add_argument('script', metavar='SCRIPT', nargs='?', help='The script you want to run')
-
-    args, command_args = parser.parse_known_args()
-
-    echo.quiet = args.quiet
-
-    ret_code = 0
-
-    if args.script:
-        s = Script(args.script)
-        try:
-            ret_code = s.run(command_args)
-            if not ret_code:
-                ret_code = 0
-
-        except Exception as e:
-            echo.exception(e)
-            ret_code = 1
-
-    else:
-        basepath = os.getcwd()
-        print "Available scripts in {}:".format(basepath)
-        for root_dir, dirs, files in os.walk(basepath, topdown=True):
-            for f in fnmatch.filter(files, '*.py'):
-                filepath = os.path.join(root_dir, f)
-                s = Script(filepath)
-                if s.is_cli():
-                    rel_filepath = s.call_path(basepath)
-                    print "\t{}".format(rel_filepath)
-                    desc = s.description
-                    if desc:
-                        for l in desc.split("\n"):
-                            print "\t\t{}".format(l)
-
-                    print ""
-
-    return ret_code
 
