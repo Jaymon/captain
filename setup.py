@@ -36,8 +36,8 @@ setup(
     ],
     entry_points = {
         'console_scripts': [
-            'pyc = {}:console'.format(name),
-            '{} = {}:console'.format(name, name),
+            'cap = {}.__main__:console'.format(name),
+            '{} = {}.__main__:console'.format(name, name),
         ],
     }
 )
