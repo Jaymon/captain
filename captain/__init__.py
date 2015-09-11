@@ -18,7 +18,7 @@ from . import echo
 from . import decorators
 
 
-__version__ = '0.2.6'
+__version__ = '0.2.7'
 
 
 class ScriptKwarg(object):
@@ -306,11 +306,20 @@ class Script(object):
         return os.path.basename(self.path)
 
     @property
+    def module_name(self):
+        name, ext = os.path.splitext(self.name)
+        return name
+
+    @property
     def module(self):
         """load the module so we can actually run the script's function"""
-        # http://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path
-        module = imp.load_source('captain_script', self.path)
-        return module
+        # we have to guard this value because:
+        # https://thingspython.wordpress.com/2010/09/27/another-super-wrinkle-raising-typeerror/
+        if not hasattr(self, '_module'):
+            # http://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path
+            self._module = imp.load_source('captain_script', self.path)
+            #self._module = imp.load_source(self.module_name, self.path)
+        return self._module
 
     @property
     def body(self):
@@ -381,6 +390,7 @@ class Script(object):
             kwargs.update(d)
 
         else:
+            #pout.v(parser)
             parsed_args = parser.parse_args(raw_args)
 
         # http://parezcoydigo.wordpress.com/2012/08/04/from-argparse-to-dictionary-in-python-2-7/

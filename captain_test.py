@@ -1,6 +1,7 @@
 from unittest import TestCase
 import os
 import subprocess
+import argparse
 
 import testdata
 
@@ -286,8 +287,48 @@ class ScriptKwargTest(TestCase):
         s.merge_from_list(l)
         self.assertEqual(set(args), s.parser_args)
 
+    def test_custom_standard_type(self):
+        class FooType(str):
+            def __new__(cls, d):
+                d = "HAPPY" + d
+                return super(FooType, cls).__new__(cls, d)
+
+        s = ScriptKwarg("footype")
+        s.merge_kwargs({
+            "type": FooType
+        })
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument(*s.parser_args, **s.parser_kwargs)
+        args = parser.parse_args(["--footype", "/foo/bar/che"])
+        self.assertTrue(args.footype.startswith("HAPPY"))
+
+
 
 class ArgTest(TestCase):
+    def test_custom_type(self):
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "from captain.decorators import arg",
+            "from captain import echo",
+            "",
+            "class Directory(str):",
+            "    def __new__(cls, d):",
+            "        #pout.v(cls)",
+            "        #pout.v(Directory)",
+            "        #pout.v(cls)",
+            "        #pout.v(issubclass(cls, Directory))",
+            "        return super(Directory, cls).__new__(cls, d)",
+            "",
+            "@arg('--dir', '-d', dest='indir', type=Directory)",
+            "def main(indir):",
+            "    print indir",
+            "    return 0",
+        ])
+
+        r = script_path.run("--dir=/tmp")
+        self.assertTrue("/tmp" in r)
+
     def test___call___decorator(self):
         script_path = TestScript([
             "#!/usr/bin/env python",
