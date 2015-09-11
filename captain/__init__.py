@@ -390,7 +390,6 @@ class Script(object):
             kwargs.update(d)
 
         else:
-            #pout.v(parser)
             parsed_args = parser.parse_args(raw_args)
 
         # http://parezcoydigo.wordpress.com/2012/08/04/from-argparse-to-dictionary-in-python-2-7/
