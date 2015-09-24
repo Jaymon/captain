@@ -6,6 +6,7 @@ import argparse
 import testdata
 
 from captain import Script, ScriptArg, ScriptKwarg, echo
+from captain.client import Captain
 
 
 class TestScript(object):
@@ -42,22 +43,8 @@ class TestScript(object):
         pwd = os.path.dirname(__file__)
         cmd_env = os.environ.copy()
         cmd_env['PYTHONPATH'] = pwd + os.pathsep + cmd_env.get('PYTHONPATH', '')
-
-        cmd = "python -m captain {} {}".format(self.path, arg_str)
-
-        r = ''
-        try:
-            r = subprocess.check_output(
-                cmd,
-                shell=True,
-                stderr=subprocess.STDOUT,
-                cwd=self.cwd,
-                env=cmd_env
-            ).rstrip()
-
-        except subprocess.CalledProcessError, e:
-            raise RuntimeError("cmd returned {} with output: {}".format(e.returncode, e.output))
-
+        c = Captain(self.path, cwd=self.cwd)
+        r = "".join(c.run(arg_str, env=cmd_env)).strip()
         return r
 
 
@@ -115,7 +102,7 @@ class CaptainTest(TestCase):
             "  return 0"
         ])
 
-        with self.assertRaisesRegexp(RuntimeError, 'returned 1 with output: boom_error') as e:
+        with self.assertRaisesRegexp(RuntimeError, 'returned 1') as e:
             r = script.run()
 
     def test_init_module(self):
