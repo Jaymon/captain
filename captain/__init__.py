@@ -18,7 +18,7 @@ from . import echo
 from . import decorators
 
 
-__version__ = '0.2.9'
+__version__ = '0.3.0'
 
 
 class ScriptKwarg(object):
@@ -92,7 +92,13 @@ class ScriptKwarg(object):
 
         # special handling of any passed in values
         if 'default' in kwargs:
-            self.set_default(kwargs['default'])
+            # NOTE -- this doesn't use .set_default() because that is meant to
+            # parse from the function definition so it actually has different syntax
+            # than what the .set_default() method does. eg, @arg("--foo", default=[1, 2]) means
+            # that the default value should be an array with 1 and 2 in it, where main(foo=[1, 2])
+            # means foo should be constrained to choices=[1, 2]
+            self.parser_kwargs["default"] = kwargs["default"]
+            self.parser_kwargs["required"] = False
 
         elif 'action' in kwargs:
             if kwargs['action'] in set(['store_false', 'store_true']):

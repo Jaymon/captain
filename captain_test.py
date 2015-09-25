@@ -44,7 +44,10 @@ class TestScript(object):
         cmd_env = os.environ.copy()
         cmd_env['PYTHONPATH'] = pwd + os.pathsep + cmd_env.get('PYTHONPATH', '')
         c = Captain(self.path, cwd=self.cwd)
-        r = "".join(c.run(arg_str, env=cmd_env)).strip()
+        r = ""
+        for line in c.run(arg_str, env=cmd_env):
+            c.flush(line)
+            r += line.strip()
         return r
 
 
@@ -466,6 +469,24 @@ class ArgTest(TestCase):
         #pout.v(parser)
         #parser.print_help()
         #pout.v(s.arg_info)
+
+    def test_failing_arg_parse(self):
+        """one of our internal tests started failing on a setup similar to below, it
+        was failing because it wasn't passing in --at even though --at has a default
+        value"""
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "from captain.decorators import arg",
+            "from captain import echo",
+            "@arg('--a_t', '--a-t', default=['e', 'a'], type=str, action='append')",
+            "@arg('--p_e', '--p-e', type=str, choices=['d', 'p'])",
+            "def main(a_t, p_e):",
+            "    echo.out(a_t)",
+            "    echo.out(p_e)",
+            "    return 0",
+        ])
+        r = script_path.run('--p-e=d')
+        self.assertTrue("['e', 'a']" in r)
 
 
 class ScriptTest(TestCase):
