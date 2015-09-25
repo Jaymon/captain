@@ -18,7 +18,7 @@ from . import echo
 from . import decorators
 
 
-__version__ = '0.2.8'
+__version__ = '0.2.9'
 
 
 class ScriptKwarg(object):

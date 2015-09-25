@@ -41,7 +41,8 @@ def err(format_msg, *args, **kwargs):
     global quiet
     if quiet: return
 
-    stderr.info(format_msg.format(*args, **kwargs))
+    exc_info = kwargs.pop("exc_info", False)
+    stderr.info(str(format_msg).format(*args, **kwargs), exc_info=exc_info)
 
 
 def out(format_msg, *args, **kwargs):
