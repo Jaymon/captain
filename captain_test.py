@@ -573,6 +573,17 @@ class ScriptTest(TestCase):
         s.parse()
         self.assertEqual('this is the description', s.description)
 
+    def test_parse_multi_main(self):
+        script_path = TestScript([
+            "def main_foo(): return 0",
+            "def main_bar(): return 0",
+            "def main_che(): return 0",
+            "def main(): return 0"
+        ])
+        s = Script(script_path)
+        s.parse()
+        self.assertEqual(4, s.callbacks)
+
     def test_scripts(self):
         with self.assertRaises(IOError):
             s = Script("this/is/a/bogus/path")

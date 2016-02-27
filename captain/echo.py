@@ -28,7 +28,7 @@ if len(stderr.handlers) == 0:
     log_handler.setFormatter(log_formatter)
     stderr.addHandler(log_handler)
 
-quiet = True
+quiet = False
 
 
 def exception(e):

@@ -13,12 +13,46 @@ import getopt
 from collections import defaultdict
 import inspect
 import types
+import sys
 
 from . import echo
 from . import decorators
+from .exception import Error, ParseError
 
 
-__version__ = '0.3.0'
+__version__ = '0.4.0'
+
+
+def exit():
+#     import sys
+#     exc_info = sys.exc_info()
+#     pout.v(exc_info)
+
+    # TODO -- make this a classmethod of Script? 
+    # TODO -- check to see if there is only 2 frames, error out if more than 2,
+    # basically, we don't want to run if the module that called this was imported
+    # from a module that wasn't __main__
+
+    frame = inspect.currentframe()
+    frames = inspect.getouterframes(frame)
+
+#     if len(frames) > 2:
+#         pout.v(frames)
+#         pout.x()
+
+    path = frames[1][1]
+    s = Script(path)
+#     pout.v(sys.argv)
+#     pout.x()
+    raw_args = sys.argv[1:]
+    #pout.v(frames)
+    #pout.v(raw_args)
+
+    ret_code = s.run(raw_args)
+    sys.exit(ret_code)
+
+
+
 
 
 class ScriptKwarg(object):
@@ -203,6 +237,25 @@ class Script(object):
     function_name = 'main'
 
     @property
+    def default(self):
+        cmd = None
+        if self.function_name in self.callbacks:
+            cmd = self.function_name
+
+        return cmd
+
+    @property
+    def subcommands(self):
+        cmds = []
+        for function_name in self.callbacks:
+            bits = function_name.split("_", 2)
+            if len(bits) > 1:
+                cmds.append(bits[1])
+                #name = bits[1] if len(bits) > 1 else self.function_name
+
+        return cmds
+
+    @property
     def description(self):
         if hasattr(self, '_description'):
             return self._description
@@ -240,6 +293,7 @@ class Script(object):
             # http://stackoverflow.com/questions/12151306/argparse-way-to-include-default-values-in-help
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         )
+        parser.add_argument("--quiet", action='store_true', dest='quiet')
 
         all_arg_names = set()
         if inspect.isfunction(main):
@@ -322,9 +376,17 @@ class Script(object):
         # we have to guard this value because:
         # https://thingspython.wordpress.com/2010/09/27/another-super-wrinkle-raising-typeerror/
         if not hasattr(self, '_module'):
-            # http://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path
-            self._module = imp.load_source('captain_script', self.path)
-            #self._module = imp.load_source(self.module_name, self.path)
+            if "__main__" in sys.modules:
+                mod = sys.modules["__main__"]
+                path = self.normalize_path(mod.__file__)
+                if os.path.splitext(path) == os.path.splitext(self.path):
+                    self._module = mod
+
+                else:
+                    # http://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path
+                    self._module = imp.load_source('captain_script', self.path)
+                    #self._module = imp.load_source(self.module_name, self.path)
+
         return self._module
 
     @property
@@ -338,18 +400,19 @@ class Script(object):
     @property
     def callback(self):
         module = self.module
-        cb = getattr(module, self.function_name)
-        if not callable(cb):
+        try:
+            return self.callbacks[self.subcommand]
+
+        except KeyError:
             raise AttributeError("no callback {} found in script {}".format(
-                self.function_name,
+                self.subcommand,
                 self.path
             ))
-
-        return cb
 
     def __init__(self, script_path):
         self.parsed = False
         self.path = self.normalize_path(script_path)
+        self.parse()
 
     def normalize_path(self, path):
         path = os.path.abspath(os.path.expanduser(str(path)))
@@ -371,11 +434,32 @@ class Script(object):
     def __call__(self, *args, **kwargs):
         """this wraps around the script's function, it is functionally equivalent
         to import the script and running function_name manually"""
+
+        echo.quiet = kwargs.pop("quiet", False)
         return self.callback(*args, **kwargs)
 
     def run(self, raw_args):
         """parse and import the script, and then run the script's main function"""
-        self.parse()
+
+        # first we decide what command to run
+
+        subcommands = self.subcommands
+        if subcommands:
+            parser = argparse.ArgumentParser(description='Captain script', add_help=False)
+            parser.add_argument(
+                'command',
+                metavar='COMMAND',
+                nargs='?',
+                choices=subcommands,
+                help="The command you want to run"
+            )
+
+            args, raw_args = parser.parse_known_args(raw_args)
+            self.subcommand = "{}_{}".format(self.function_name, args.command)
+
+        else:
+            self.subcommand = self.function_name
+
         parser = self.parser
         args = []
         kwargs = dict(self.arg_info['optional'])
@@ -457,55 +541,53 @@ class Script(object):
         """
         if self.parsed: return
 
-        # http://stackoverflow.com/questions/17846908/proper-shebang-for-python-script
-        body = self.body
-        if not re.match("^#!.*?python.*$", body, re.I | re.MULTILINE):
-            raise ValueError(
-                "no shebang! Please add this as first line: #!/usr/bin/env python to {}".format(
-                self.path
-            ))
+        self.callbacks = {}
 
-        found_main = False
+        # search for main and any main_* callable objects
+        regex = re.compile("^{}_?".format(self.function_name), flags=re.I)
+        mains = set()
+        body = self.body
         ast_tree = ast.parse(self.body, self.path)
         for n in ast_tree.body:
             if hasattr(n, 'name'):
-                if n.name == self.function_name:
-                    found_main = True
-                    break
+                if regex.match(n.name):
+                    mains.add(n.name)
 
             if hasattr(n, 'value'):
                 ns = n.value
                 if hasattr(ns, 'id'):
-                    if ns.id == self.function_name:
-                        found_main = True
-                        break
+                    if regex.match(ns.id):
+                        mains.add(ns.id)
 
             if hasattr(n, 'targets'):
                 ns = n.targets[0]
                 if hasattr(ns, 'id'):
-                    if ns.id == self.function_name:
-                        found_main = True
-                        break
+                    if regex.match(ns.id):
+                        mains.add(ns.id)
 
             if hasattr(n, 'names'):
                 ns = n.names[0]
                 if hasattr(ns, 'name'):
-                    if ns.name == self.function_name:
-                        found_main = True
-                        break
+                    if regex.match(ns.name):
+                        mains.add(ns.name)
 
-                if hasattr(ns, 'asname'):
-                    if ns.asname == self.function_name:
-                        found_main = True
-                        break
+                if getattr(ns, 'asname', None):
+                    if regex.match(ns.asname):
+                        mains.add(ns.asname)
 
-        if found_main:
-            self.callback
+        if len(mains) > 0:
+            module = self.module
+            for function_name in mains:
+                cb = getattr(module, function_name, None)
+                if cb and callable(cb):
+                    self.callbacks[function_name] = cb
 
         else:
-            raise ValueError("no main function found")
+            raise ParseError("no main function found")
+
+        # TODO -- check for captain.run() in the module
 
         self.parsed = True
-        return found_main
+        return len(self.callbacks) > 0
 
 
