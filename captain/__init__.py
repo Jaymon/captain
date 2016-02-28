@@ -33,26 +33,19 @@ def exit():
     # basically, we don't want to run if the module that called this was imported
     # from a module that wasn't __main__
 
-    frame = inspect.currentframe()
-    frames = inspect.getouterframes(frame)
+    try:
+        frame = inspect.stack()[1]
+        calling_mod = inspect.getmodule(frame[0])
+        main_mod = sys.modules.get("__main__", None)
+        if main_mod:
+            if calling_mod is main_mod:
+                s = Script(inspect.getfile(calling_mod), module=calling_mod)
+                raw_args = sys.argv[1:]
+                ret_code = s.run(raw_args)
+                sys.exit(ret_code)
 
-#     if len(frames) > 2:
-#         pout.v(frames)
-#         pout.x()
-
-    path = frames[1][1]
-    s = Script(path)
-#     pout.v(sys.argv)
-#     pout.x()
-    raw_args = sys.argv[1:]
-    #pout.v(frames)
-    #pout.v(raw_args)
-
-    ret_code = s.run(raw_args)
-    sys.exit(ret_code)
-
-
-
+    finally:
+        del frame
 
 
 class ScriptKwarg(object):
@@ -232,49 +225,31 @@ class ScriptArg(ScriptKwarg):
         self.parser_kwargs.pop("required")
 
 
-class Script(object):
+class ArgParser(argparse.ArgumentParser):
+    def __init__(self, prog, callback):
+        super(ArgParser, self).__init__(
+            prog=prog,
+            description=self.find_desc(callback),
+            # https://hg.python.org/cpython/file/2.7/Lib/argparse.py
+            # https://docs.python.org/2/library/argparse.html#formatter-class
+            # http://stackoverflow.com/questions/12151306/argparse-way-to-include-default-values-in-help
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        )
 
-    function_name = 'main'
+        self.callback = callback
+        self.find_args()
 
-    @property
-    def default(self):
-        cmd = None
-        if self.function_name in self.callbacks:
-            cmd = self.function_name
-
-        return cmd
-
-    @property
-    def subcommands(self):
-        cmds = []
-        for function_name in self.callbacks:
-            bits = function_name.split("_", 2)
-            if len(bits) > 1:
-                cmds.append(bits[1])
-                #name = bits[1] if len(bits) > 1 else self.function_name
-
-        return cmds
-
-    @property
-    def description(self):
-        if hasattr(self, '_description'):
-            return self._description
-
-        cb = self.callback
-        desc = inspect.getdoc(cb)
+    def find_desc(self, callback):
+        desc = inspect.getdoc(callback)
         if not desc:
-            if not inspect.isfunction(cb):
-                cb_method = getattr(cb, '__call__', None)
+            if not inspect.isfunction(callback):
+                cb_method = getattr(callback, '__call__', None)
                 desc = inspect.getdoc(cb_method)
 
         if not desc: desc = ''
-        self._description = desc
-        return self._description
+        return desc
 
-    @property
-    def parser(self):
-        if hasattr(self, '_parser'): return self._parser
-
+    def find_args(self):
         arg_info = {
             'order': [],
             'required': [],
@@ -283,17 +258,8 @@ class Script(object):
             'kwargs': None
         }
 
-        m = self.module
         main = self.callback
-        parser = argparse.ArgumentParser(
-            prog=self.name,
-            description=self.description,
-            # https://hg.python.org/cpython/file/2.7/Lib/argparse.py
-            # https://docs.python.org/2/library/argparse.html#formatter-class
-            # http://stackoverflow.com/questions/12151306/argparse-way-to-include-default-values-in-help
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        )
-        parser.add_argument("--quiet", action='store_true', dest='quiet')
+        self.add_argument("--quiet", action='store_true', dest='quiet')
 
         all_arg_names = set()
         if inspect.isfunction(main):
@@ -329,21 +295,21 @@ class Script(object):
 
             #pout.v(a.parser_args, a.parser_kwargs)
             all_arg_names |= a.parser_args
-            parser.add_argument(*a.parser_args, **a.parser_kwargs)
+            self.add_argument(*a.parser_args, **a.parser_kwargs)
 
         if args_name:
             a = ScriptArg(args_name, nargs='*')
             a.merge_from_list(decorator_args)
             all_arg_names |= a.parser_args
-            parser.add_argument(*a.parser_args, **a.parser_kwargs)
+            self.add_argument(*a.parser_args, **a.parser_kwargs)
             arg_info['args'] = args_name
 
         if kwargs_name:
-            parser.unknown_args = True
+            self.unknown_args = True
             arg_info['kwargs'] = kwargs_name
 
         else:
-            parser.unknown_args = False
+            self.unknown_args = False
 
         # pick up any stragglers
         for da, dkw in decorator_args:
@@ -355,11 +321,33 @@ class Script(object):
                     a = ScriptArg(arg_name)
 
                 a.merge_kwargs(dkw)
-                parser.add_argument(*a.parser_args, **a.parser_kwargs)
+                self.add_argument(*a.parser_args, **a.parser_kwargs)
 
-        self._parser = parser
         self.arg_info = arg_info
-        return self._parser
+
+
+class Script(object):
+
+    function_name = 'main'
+
+    @property
+    def default(self):
+        cmd = None
+        if self.function_name in self.callbacks:
+            cmd = self.function_name
+
+        return cmd
+
+    @property
+    def subcommands(self):
+        cmds = []
+        for function_name in self.callbacks:
+            bits = function_name.split("_", 2)
+            if len(bits) > 1:
+                cmds.append(bits[1])
+                #name = bits[1] if len(bits) > 1 else self.function_name
+
+        return cmds
 
     @property
     def name(self):
@@ -397,24 +385,26 @@ class Script(object):
                 self._body = fp.read()
         return self._body
 
-    @property
-    def callback(self):
-        module = self.module
-        try:
-            return self.callbacks[self.subcommand]
+#     @property
+#     def callback(self):
+#         try:
+#             return self.callbacks[self.subcommand]
+# 
+#         except KeyError as e:
+#             raise AttributeError("no callback {} found in script {}".format(
+#                 self.subcommand,
+#                 self.path
+#             ))
 
-        except KeyError:
-            raise AttributeError("no callback {} found in script {}".format(
-                self.subcommand,
-                self.path
-            ))
-
-    def __init__(self, script_path):
+    def __init__(self, script_path, module=None):
         self.parsed = False
         self.path = self.normalize_path(script_path)
+        if module:
+            self._module = module
         self.parse()
 
-    def normalize_path(self, path):
+    @classmethod
+    def normalize_path(cls, path):
         path = os.path.abspath(os.path.expanduser(str(path)))
         is_valid = True
         if not os.path.isfile(path):
@@ -431,12 +421,12 @@ class Script(object):
 
         return path
 
-    def __call__(self, *args, **kwargs):
-        """this wraps around the script's function, it is functionally equivalent
-        to import the script and running function_name manually"""
-
-        echo.quiet = kwargs.pop("quiet", False)
-        return self.callback(*args, **kwargs)
+#     def __call__(self, *args, **kwargs):
+#         """this wraps around the script's function, it is functionally equivalent
+#         to import the script and running function_name manually"""
+# 
+#         echo.quiet = kwargs.pop("quiet", False)
+#         return self.callback(*args, **kwargs)
 
     def run(self, raw_args):
         """parse and import the script, and then run the script's main function"""
@@ -444,6 +434,7 @@ class Script(object):
         # first we decide what command to run
 
 
+        name = self.function_name
         subcommands = self.subcommands
         if subcommands:
 
@@ -459,14 +450,11 @@ class Script(object):
             )
 
             args, raw_args = parser.parse_known_args(raw_args)
-            self.subcommand = "{}_{}".format(self.function_name, args.command)
+            name = "{}_{}".format(self.function_name, args.command)
 
-        else:
-            self.subcommand = self.function_name
-
-        parser = self.parser
+        parser = self.parser(name)
         args = []
-        kwargs = dict(self.arg_info['optional'])
+        kwargs = dict(parser.arg_info['optional'])
 
         parsed_args = []
         if parser.unknown_args:
@@ -492,26 +480,17 @@ class Script(object):
         # because of how args works, we need to make sure the kwargs are put in correct
         # order to be passed to the function, otherwise our real *args won't make it
         # to the *args variable
-        for k in self.arg_info['order']:
+        for k in parser.arg_info['order']:
             args.append(kwargs.pop(k))
 
         # now that we have the correct order, tack the real *args on the end so they
         # get correctly placed into the function's *args variable
-        if self.arg_info['args']:
-            args.extend(kwargs.pop(self.arg_info['args']))
+        if parser.arg_info['args']:
+            args.extend(kwargs.pop(parser.arg_info['args']))
 
-        #pout.v(parsed_args, args, kwargs, self.arg_info)
-        return self(*args, **kwargs)
-
-    def is_cli(self):
-        """return True if this is an actual cli script"""
-        ret = True
-        try:
-            self.parse()
-        except (ValueError, AttributeError) as e:
-            ret = False
-
-        return ret
+        #pout.v(parsed_args, args, kwargs, parser.arg_info)
+        echo.quiet = kwargs.pop("quiet", False)
+        return self.callbacks[name](*args, **kwargs)
 
     def call_path(self, basepath):
         """return that path to be able to call this script from the passed in
@@ -535,6 +514,17 @@ class Script(object):
             rel_filepath = os.path.dirname(rel_filepath)
 
         return rel_filepath
+
+    def parser(self, name=""):
+        if not name: name = self.function_name
+        parser_name = "parser_{}".format(name)
+        parser = getattr(self, parser_name, None)
+        if not parser:
+            callback = self.callbacks[name]
+            parser = ArgParser(self.name, callback)
+            setattr(self, parser_name, parser)
+
+        return parser
 
     def parse(self):
         """load the script and set the parser and argument info
@@ -589,7 +579,8 @@ class Script(object):
         else:
             raise ParseError("no main function found")
 
-        # TODO -- check for captain.run() in the module
+        # TODO -- check for captain.exit() in the module
+        # it might be better to have like a cli parse method that checks for captain.exit()
 
         self.parsed = True
         return len(self.callbacks) > 0

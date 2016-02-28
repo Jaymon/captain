@@ -21,7 +21,7 @@ class Captain(object):
     script_postfix = ""
     """this will be appended to the passed in script on initialization"""
 
-    cmd_prefix = "python -m captain"
+    cmd_prefix = "python"
     """this is what will be used to invoke captain from the command line when run()
     is called"""
 
