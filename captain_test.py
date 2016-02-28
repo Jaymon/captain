@@ -55,6 +55,47 @@ class EchoTest(TestCase):
     def setUp(self):
         echo.quiet = False
 
+    def test_out_no_args(self):
+        echo.out("foo {}".format("bar"))
+        echo.out("this does not have any format args")
+        echo.out()
+
+    def test_bullets(self):
+        lines = [testdata.get_ascii_words(4) for x in range(5)]
+        echo.ul(*lines)
+        echo.br()
+        echo.ol(*lines)
+
+    def test_hr(self):
+        echo.out("text before")
+        echo.hr()
+        echo.out("text after")
+
+    def test_headers(self):
+        shorter = "this is the header"
+        longer = testdata.get_ascii_words(80)
+
+        echo.h1(shorter)
+        echo.br()
+        echo.h1(longer)
+
+        echo.br()
+
+        echo.h2(shorter)
+        echo.br()
+        echo.h2(longer)
+
+        echo.br()
+
+        echo.h3(shorter)
+        echo.br()
+        echo.h3(longer)
+
+        echo.br()
+
+    def test_subheader(self):
+        echo.header("this is the subheader")
+
     def test_non_string(self):
         a = range(5)
         echo.out(a)

@@ -443,8 +443,12 @@ class Script(object):
 
         # first we decide what command to run
 
+
         subcommands = self.subcommands
         if subcommands:
+
+            # TODO -- if no raw_args passed in and there contains subcommands, run default
+
             parser = argparse.ArgumentParser(description='Captain script', add_help=False)
             parser.add_argument(
                 'command',
