@@ -52,6 +52,13 @@ def console():
             ret_code = 1
 
     else:
+
+        # TODO -- have another method, is_runnable() that is similar to is_cli,
+        # but makes sure, above and beyond parse() that there exists captain.exit()
+        # call in the file. 
+
+        # TODO -- look at endpoints get_controllers() code to make this better
+
         basepath = os.getcwd()
         captain.echo.out("Available scripts in {}:".format(basepath))
         for root_dir, dirs, files in os.walk(basepath, topdown=True):

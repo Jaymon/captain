@@ -14,6 +14,7 @@ from collections import defaultdict
 import inspect
 import types
 import sys
+import collections
 
 from . import echo
 from . import decorators
@@ -239,6 +240,44 @@ class ArgParser(argparse.ArgumentParser):
         self.callback = callback
         self.find_args()
 
+    def parse_callback_args(self, raw_args):
+        args = []
+        kwargs = dict(self.arg_info['optional'])
+
+        parsed_args = []
+        if self.unknown_args:
+            parsed_args, parsed_unknown_args = self.parse_known_args(raw_args)
+
+            # **kwargs have to be in --key=val form
+            # http://stackoverflow.com/a/12807809/5006
+            d = defaultdict(list)
+            for k, v in ((k.lstrip('-'), v) for k,v in (a.split('=') for a in parsed_unknown_args)):
+                d[k].append(v)
+
+            for k in (k for k in d if len(d[k])==1):
+                d[k] = d[k][0]
+
+            kwargs.update(d)
+
+        else:
+            parsed_args = self.parse_args(raw_args)
+
+        # http://parezcoydigo.wordpress.com/2012/08/04/from-argparse-to-dictionary-in-python-2-7/
+        kwargs.update(vars(parsed_args))
+
+        # because of how args works, we need to make sure the kwargs are put in correct
+        # order to be passed to the function, otherwise our real *args won't make it
+        # to the *args variable
+        for k in self.arg_info['order']:
+            args.append(kwargs.pop(k))
+
+        # now that we have the correct order, tack the real *args on the end so they
+        # get correctly placed into the function's *args variable
+        if self.arg_info['args']:
+            args.extend(kwargs.pop(self.arg_info['args']))
+
+        return args, kwargs
+
     def find_desc(self, callback):
         desc = inspect.getdoc(callback)
         if not desc:
@@ -385,17 +424,6 @@ class Script(object):
                 self._body = fp.read()
         return self._body
 
-#     @property
-#     def callback(self):
-#         try:
-#             return self.callbacks[self.subcommand]
-# 
-#         except KeyError as e:
-#             raise AttributeError("no callback {} found in script {}".format(
-#                 self.subcommand,
-#                 self.path
-#             ))
-
     def __init__(self, script_path, module=None):
         self.parsed = False
         self.path = self.normalize_path(script_path)
@@ -421,13 +449,6 @@ class Script(object):
 
         return path
 
-#     def __call__(self, *args, **kwargs):
-#         """this wraps around the script's function, it is functionally equivalent
-#         to import the script and running function_name manually"""
-# 
-#         echo.quiet = kwargs.pop("quiet", False)
-#         return self.callback(*args, **kwargs)
-
     def run(self, raw_args):
         """parse and import the script, and then run the script's main function"""
 
@@ -438,7 +459,7 @@ class Script(object):
         subcommands = self.subcommands
         if subcommands:
 
-            # TODO -- if no raw_args passed in and there contains subcommands, run default
+            # TODO -- if no raw_args passed in and there are subcommands, run default
 
             parser = argparse.ArgumentParser(description='Captain script', add_help=False)
             parser.add_argument(
@@ -453,40 +474,7 @@ class Script(object):
             name = "{}_{}".format(self.function_name, args.command)
 
         parser = self.parser(name)
-        args = []
-        kwargs = dict(parser.arg_info['optional'])
-
-        parsed_args = []
-        if parser.unknown_args:
-            parsed_args, parsed_unknown_args = parser.parse_known_args(raw_args)
-
-            # **kwargs have to be in --key=val form
-            # http://stackoverflow.com/a/12807809/5006
-            d = defaultdict(list)
-            for k, v in ((k.lstrip('-'), v) for k,v in (a.split('=') for a in parsed_unknown_args)):
-                d[k].append(v)
-
-            for k in (k for k in d if len(d[k])==1):
-                d[k] = d[k][0]
-
-            kwargs.update(d)
-
-        else:
-            parsed_args = parser.parse_args(raw_args)
-
-        # http://parezcoydigo.wordpress.com/2012/08/04/from-argparse-to-dictionary-in-python-2-7/
-        kwargs.update(vars(parsed_args))
-
-        # because of how args works, we need to make sure the kwargs are put in correct
-        # order to be passed to the function, otherwise our real *args won't make it
-        # to the *args variable
-        for k in parser.arg_info['order']:
-            args.append(kwargs.pop(k))
-
-        # now that we have the correct order, tack the real *args on the end so they
-        # get correctly placed into the function's *args variable
-        if parser.arg_info['args']:
-            args.extend(kwargs.pop(parser.arg_info['args']))
+        args, kwargs = parser.parse_callback_args(raw_args)
 
         #pout.v(parsed_args, args, kwargs, parser.arg_info)
         echo.quiet = kwargs.pop("quiet", False)
@@ -516,6 +504,7 @@ class Script(object):
         return rel_filepath
 
     def parser(self, name=""):
+        """return the parser for the current name"""
         if not name: name = self.function_name
         parser_name = "parser_{}".format(name)
         parser = getattr(self, parser_name, None)
@@ -525,6 +514,12 @@ class Script(object):
             setattr(self, parser_name, parser)
 
         return parser
+
+    def parsers(self):
+        """return an iterator of all the parsers found in this script"""
+        for name in self.callbacks:
+            p = self.parser(name)
+            yield p
 
     def parse(self):
         """load the script and set the parser and argument info
@@ -579,10 +574,64 @@ class Script(object):
         else:
             raise ParseError("no main function found")
 
-        # TODO -- check for captain.exit() in the module
-        # it might be better to have like a cli parse method that checks for captain.exit()
-
         self.parsed = True
         return len(self.callbacks) > 0
+
+    def can_run_from_cli(self):
+        """return True if this script can be run from the command line"""
+        ret = False
+        ast_tree = ast.parse(self.body, self.path)
+        calls = self._find_calls(ast_tree, __name__, "exit")
+        for call in calls:
+            if re.search("{}\(".format(re.escape(call)), self.body):
+                ret = True
+                break
+
+        return ret
+
+    def _find_calls(self, ast_tree, called_module, called_func):
+        '''
+        scan the abstract source tree looking for possible ways to call the called_module
+        and called_func
+
+        borrowed from pout
+
+        ast_tree -- _ast.* instance -- the internal ast object that is being checked, returned from compile()
+            with ast.PyCF_ONLY_AST flag
+        called_module -- string -- we are checking the ast for imports of this module
+        called_func -- string -- we are checking the ast for aliases of this function
+        return -- set -- the list of possible calls the ast_tree could make to call the called_func
+        ''' 
+        s = set()
+
+        # always add the default call, the set will make sure there are no dupes...
+        s.add(u"{}.{}".format(called_module, called_func))
+
+        if hasattr(ast_tree, 'body'):
+            # further down the rabbit hole we go
+            if isinstance(ast_tree.body, collections.Iterable):
+                for ast_body in ast_tree.body:
+                    s.update(self._find_calls(ast_body, called_module, called_func))
+
+        elif hasattr(ast_tree, 'names'):
+            # base case
+            if hasattr(ast_tree, 'module'):
+                # we are in a from ... import ... statement
+                if ast_tree.module == called_module:
+                    for ast_name in ast_tree.names:
+                        if ast_name.name == called_func:
+                            s.add(unicode(ast_name.asname if ast_name.asname is not None else ast_name.name))
+
+            else:
+                # we are in a import ... statement
+                for ast_name in ast_tree.names:
+                    if hasattr(ast_name, 'name') and (ast_name.name == called_module):
+                        call = u"{}.{}".format(
+                            ast_name.asname if ast_name.asname is not None else ast_name.name,
+                            called_func
+                        )
+                        s.add(call)
+
+        return s
 
 

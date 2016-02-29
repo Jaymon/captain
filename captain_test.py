@@ -204,6 +204,8 @@ class CaptainTest(TestCase):
             r = script.run()
 
     def test_list(self):
+        # TODO -- look at pout and how it finds if it has import pout, use that
+        # code to make sure captain.exit is around
         raise SkipTest("still need to fix this one")
         script = TestScript([""])
         cwd = script.cwd
@@ -576,6 +578,36 @@ class ArgTest(TestCase):
 
 
 class ScriptTest(TestCase):
+    def test_can_run_from_cli(self):
+        script_path = TestScript([
+            "from captain import exit",
+            "def main(): pass",
+            "exit()",
+        ])
+        s = Script(script_path)
+        self.assertTrue(s.can_run_from_cli())
+
+        script_path = TestScript([
+            "def main(): pass",
+        ])
+        s = Script(script_path)
+        self.assertFalse(s.can_run_from_cli())
+
+        script_path = TestScript([
+            "import captain",
+            "def main(): pass",
+        ])
+        s = Script(script_path)
+        self.assertFalse(s.can_run_from_cli())
+
+        script_path = TestScript([
+            "import captain",
+            "def main(): pass",
+            "captain.exit()",
+        ])
+        s = Script(script_path)
+        self.assertTrue(s.can_run_from_cli())
+
     def test_parser(self):
         script_path = TestScript([
             "#!/usr/bin/env python",
