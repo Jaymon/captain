@@ -25,15 +25,6 @@ __version__ = '0.4.0'
 
 
 def exit():
-#     import sys
-#     exc_info = sys.exc_info()
-#     pout.v(exc_info)
-
-    # TODO -- make this a classmethod of Script? 
-    # TODO -- check to see if there is only 2 frames, error out if more than 2,
-    # basically, we don't want to run if the module that called this was imported
-    # from a module that wasn't __main__
-
     try:
         frame = inspect.stack()[1]
         calling_mod = inspect.getmodule(frame[0])
@@ -91,17 +82,28 @@ class ScriptKwarg(object):
 
         return r
 
-    def __init__(self, arg_name, **kwargs):
-        arg_name = arg_name.lstrip("-")
-        self.name = arg_name
-
+    def __init__(self, *arg_names, **kwargs):
+        # find the longest name
+        longest_name = ""
         self.parser_args = set()
-        self.merge_args([
-            '--{}'.format(arg_name),
-            '--{}'.format(arg_name.replace('_', '-')),
-            '--{}'.format(arg_name.replace('-', '_'))
-        ])
 
+        for arg_name in arg_names:
+            if len(longest_name) < len(arg_name):
+                longest_name = arg_name
+
+            if len(arg_name) > 2:
+                arg_name = arg_name.lstrip("-")
+                self.merge_args([
+                    '--{}'.format(arg_name),
+                    '--{}'.format(arg_name.replace('_', '-')),
+                    '--{}'.format(arg_name.replace('-', '_'))
+                ])
+
+            else:
+                # we've got a -N type argument
+                self.merge_args([arg_name])
+
+        self.name = longest_name
         self.parser_kwargs = {}
         self.merge_kwargs(kwargs)
 
@@ -131,6 +133,9 @@ class ScriptKwarg(object):
         elif 'action' in kwargs:
             if kwargs['action'] in set(['store_false', 'store_true']):
                 self.parser_kwargs['required'] = False
+
+            elif kwargs['action'] in set(['version']):
+                self.parser_kwargs.pop('required', False)
 
         else:
             self.parser_kwargs.setdefault("required", True)
@@ -227,6 +232,14 @@ class ScriptArg(ScriptKwarg):
 
 
 class ArgParser(argparse.ArgumentParser):
+
+    def find_subcommand(self):
+        cmd = ""
+        bits = self.callback.__name__.split("_", 2)
+        if len(bits) > 1:
+            cmd = bits[1]
+        return cmd
+
     def __init__(self, prog, callback):
         super(ArgParser, self).__init__(
             prog=prog,
@@ -315,7 +328,17 @@ class ArgParser(argparse.ArgumentParser):
         default_offset = len(args) - len(args_defaults)
         #pout.v(args, args_name, kwargs_name, args_defaults, default_offset)
 
+        #pout.v(args, decorator_args)
+
+        # build a list of potential *args, basically, if an arg_name matches exactly
+        # then it is an *arg and we shouldn't mess with it in the function
+        comp_args = set()
+        for da in decorator_args:
+            comp_args.update(da[0])
+
         for i, arg_name in enumerate(args):
+            if arg_name in comp_args: continue
+
             a = ScriptKwarg(arg_name)
 
             # set the default if it is available
@@ -355,9 +378,9 @@ class ArgParser(argparse.ArgumentParser):
             if da[0] not in all_arg_names:
                 arg_name = da[0]
                 if arg_name.startswith("-"):
-                    a = ScriptKwarg(arg_name)
+                    a = ScriptKwarg(*da)
                 else:
-                    a = ScriptArg(arg_name)
+                    a = ScriptArg(*da)
 
                 a.merge_kwargs(dkw)
                 self.add_argument(*a.parser_args, **a.parser_kwargs)
@@ -453,13 +476,11 @@ class Script(object):
         """parse and import the script, and then run the script's main function"""
 
         # first we decide what command to run
-
-
         name = self.function_name
         subcommands = self.subcommands
         if subcommands:
 
-            # TODO -- if no raw_args passed in and there are subcommands, run default
+            # TODO -- if no raw_args passed in and there are subcommands, run default?
 
             parser = argparse.ArgumentParser(description='Captain script', add_help=False)
             parser.add_argument(

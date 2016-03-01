@@ -204,11 +204,10 @@ class CaptainTest(TestCase):
             r = script.run()
 
     def test_list(self):
-        # TODO -- look at pout and how it finds if it has import pout, use that
-        # code to make sure captain.exit is around
-        raise SkipTest("still need to fix this one")
+        #raise SkipTest("")
         script = TestScript([""])
         cwd = script.cwd
+        #cwd = testdata.create_dir()
         testdata.create_files(
             {
                 'foo/bar.py': "\n".join([
@@ -249,13 +248,31 @@ class CaptainTest(TestCase):
                     "  '''the description for mod1'''",
                     "  return 0",
                     "captain.exit()"
-                ])
+                ]),
+                'mod3/multi.py': "\n".join([
+                    "import captain",
+                    "def main_multi1():",
+                    "  '''the 1 description'''",
+                    "  pass",
+                    "def main_multi2():",
+                    "  '''the 2 description'''",
+                    "  pass",
+                    "def main_multi3():",
+                    "  '''the 3 description'''",
+                    "  pass",
+                    "captain.exit()"
+                ]),
             },
             cwd
         )
 
-        script.path = ''
-        r = script.run()
+
+        #c = Captain(, cwd=self.cwd)
+        #c.cmd_prefix = "captain"
+
+        script.cwd = os.getcwd()
+        script.path = "captain/__main__.py"
+        r = script.run(cwd)
         self.assertTrue('che.py' in r)
         self.assertTrue('foo/bar.py' in r)
         self.assertFalse('bar/boo.py' in r)
@@ -265,6 +282,22 @@ class CaptainTest(TestCase):
         self.assertFalse('__init__' in r)
         self.assertTrue('mod2' in r)
         self.assertFalse('__main__' in r)
+
+        self.assertTrue("multi1" in r)
+        self.assertTrue("multi2" in r)
+        self.assertTrue("multi3" in r)
+
+    def test_version(self):
+
+        script = TestScript([
+            "#!/usr/bin/env python",
+            "import captain",
+            "@captain.decorators.arg('-v', '--version', action='version', version='0.1')",
+            "def main(): pass",
+            "captain.exit()",
+        ])
+        r = script.run("--version")
+        self.assertTrue("0.1" in r)
 
     def test_help(self):
         script = TestScript([
@@ -369,6 +402,21 @@ class ScriptKwargTest(TestCase):
 
 
 class ArgTest(TestCase):
+    def test_arg_in_main(self):
+        script_path = TestScript([
+            "import captain",
+            "@captain.decorators.arg('foo', nargs=1)",
+            "def main(foo):",
+            "    print foo",
+            "captain.exit()",
+        ])
+
+        with self.assertRaises(RuntimeError):
+            script_path.run("")
+
+        r = script_path.run("bar")
+        self.assertTrue("bar" in r)
+
     def test_custom_type(self):
         script_path = TestScript([
             "#!/usr/bin/env python",
@@ -579,6 +627,23 @@ class ArgTest(TestCase):
 
 class ScriptTest(TestCase):
     def test_can_run_from_cli(self):
+        script_path = TestScript([
+            "from captain import exit as ex",
+            "def main(): pass",
+            "ex()",
+        ])
+        s = Script(script_path)
+        self.assertTrue(s.can_run_from_cli())
+
+        script_path = TestScript([
+            "import captain as admiral",
+            "def main(): pass",
+            "admiral.exit()",
+        ])
+        s = Script(script_path)
+        self.assertTrue(s.can_run_from_cli())
+
+
         script_path = TestScript([
             "from captain import exit",
             "def main(): pass",

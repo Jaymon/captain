@@ -4,79 +4,40 @@ import fnmatch
 import argparse
 
 import captain
+from captain.decorators import arg
+from captain import echo
 
 
-def console():
-    '''
-    cli hook
+@arg("path", default=os.getcwd(), nargs='?', help="The path to scan for captain scripts")
+@arg("-v", "--version", action='version', version="%(prog)s {}".format(captain.__version__))
+def main(path):
+    '''scan path directory and any subdirectories for valid captain scripts'''
+    basepath = os.path.abspath(os.path.expanduser(str(path)))
 
-    return -- integer -- the exit code
-    '''
-    parser = argparse.ArgumentParser(description='Easy Python Command line script running', add_help=False)
-    #parser.add_argument('--debug', dest='debug', action='store_true', help='print debugging info')
-    parser.add_argument("-v", "--version", action='version', version="%(prog)s {}".format(captain.__version__))
-    parser.add_argument("--quiet", action='store_true', dest='quiet')
-    #parser.add_argument('args', nargs=argparse.REMAINDER, help='all other arguments')
-    parser.add_argument('script', metavar='SCRIPT', nargs='?', help='The script you want to run')
-
-    args, command_args = parser.parse_known_args()
-
-    captain.echo.quiet = args.quiet
-
-    ret_code = 0
-
-    if args.script:
-
-        # set up the path, basically, python does different things depending on how a script
-        # is called from the command line:
-        #   1)  python -m path.to.module -- this would add the current working directory to
-        #       the path, basically ""
-        #
-        #   2)  python path/to/module.py -- this would include the directory that contains
-        #       the script, so "path/to"
-        #
-        # because either could be expected, we're going to do them both
-        path_2 = os.path.abspath(os.path.expanduser(os.path.dirname(args.script)))
-        sys.path.insert(0, path_2)
-        path_1 = ""
-        sys.path.insert(0, path_1)
-
-        s = captain.Script(args.script)
-        try:
-            ret_code = s.run(command_args)
-            if not ret_code:
-                ret_code = 0
-
-        except Exception as e:
-            captain.echo.exception(e)
-            ret_code = 1
-
-    else:
-
-        # TODO -- have another method, is_runnable() that is similar to is_cli,
-        # but makes sure, above and beyond parse() that there exists captain.exit()
-        # call in the file. 
-
-        # TODO -- look at endpoints get_controllers() code to make this better
-
-        basepath = os.getcwd()
-        captain.echo.out("Available scripts in {}:".format(basepath))
-        for root_dir, dirs, files in os.walk(basepath, topdown=True):
-            for f in fnmatch.filter(files, '*.py'):
+    echo.h2("Available scripts in {}".format(basepath))
+    echo.br()
+    for root_dir, dirs, files in os.walk(basepath, topdown=True):
+        for f in fnmatch.filter(files, '*.py'):
+            try:
                 filepath = os.path.join(root_dir, f)
                 s = captain.Script(filepath)
-                if s.is_cli():
+                if s.can_run_from_cli():
                     rel_filepath = s.call_path(basepath)
-                    captain.echo.out("\t{}".format(rel_filepath))
-                    desc = s.description
-                    if desc:
-                        for l in desc.split("\n"):
-                            print "\t\t{}".format(l)
+                    for p in s.parsers():
+                        subcommand = p.find_subcommand()
+                        if subcommand:
+                            echo.h3("{} {}", rel_filepath, subcommand)
+                        else:
+                            echo.h3(rel_filepath)
 
-                    print ""
+                        desc = p.description
+                        if desc:
+                            echo.quote(desc)
 
-    return ret_code
+                        echo.br()
 
+            except captain.ParseError:
+                pass
 
-sys.exit(console())
+captain.exit()
 

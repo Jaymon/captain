@@ -120,6 +120,26 @@ def ol(*lines):
     bullets(*lines, numbers=False)
 
 
+def quote(format_msg, *args, **kwargs):
+    if args or kwargs:
+        s = format_msg.format(*args, **kwargs)
+    else:
+        s = format_msg
+
+    indent(s, indent="\t")
+
+
+def indent(msg, indent, width=0):
+    if not width: width = globals()["width"]
+
+    wrapper = textwrap.TextWrapper()
+    wrapper.width = width
+    wrapper.initial_indent = indent
+    wrapper.subsequent_indent = indent
+    s = wrapper.fill(msg)
+    out(s)
+
+
 def bar(sep='-', width=0):
     if not width: width = globals()["width"]
     out(sep * width)

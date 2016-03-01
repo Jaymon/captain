@@ -6,31 +6,29 @@ Captain was lovingly crafted for [First Opinion](http://firstopinionapp.com) and
 
 ## Usage
 
-A valid `captain` cli script needs two things:
+A valid `captain` cli script needs just two things:
 
-1. a shebang on the first line
-
-    ```python
-    #!/usr/bin/env python
-    ```
-
-2. a `main` function
+1. a `main` function
 
     ```python
     def main(foo, bar):
         return 0
     ```
 
-That's it! Whatever arguments you define in the `main` function will be options on the command line.
+2. to exit using `captain.exit()`
 
-```python
-def main(foo, bar):
-    return 0
-```
+    ```python
+    import captain
 
-So `foo` and `bar` can be called on the command line:
+    def main(foo, bar):
+        return 0
 
-    $ pyc path/to/script.py --foo=1 --bar=2
+    captain.exit()
+    ```
+
+That's it! Whatever arguments you define in the `main` function will be options on the command line. A captain script is called just like any other python command line script, so to run the above example you could do:
+
+    $ python path/to/script.py --foo=1 --bar=2
 
 
 ## Argument Decorator
@@ -38,8 +36,7 @@ So `foo` and `bar` can be called on the command line:
 The `captain.decorators.arg()` decorator provides a nice passthrough api to the full [argparse](https://docs.python.org/2/library/argparse.html) module if you need to really customize how arguments are passed into your script:
 
 ```python
-#!/usr/bin/env python
-
+from captain import exit
 from captain import echo
 from captain.decorators import arg 
 
@@ -50,6 +47,8 @@ def main(**kwargs):
     '''this is the help description'''
     print kwargs['foo'], kwargs['a']
     return 0
+
+exit()
 ```
 
 Would print a help string like this:
@@ -70,7 +69,7 @@ If you want another nifty way to define arguments, take a look at [docopt](https
 
 ## Echo
 
-This small module makes it easy to print output in your script while still giving you full control by being able to configure the logger if you need to. It also will obey the global `--quiet` flag.
+This small module makes it easy to print stuff in your script while still giving you full control by being able to configure the logger if you need to. It also will obey the global `--quiet` flag.
 
 ```python
 from captain import echo
@@ -92,7 +91,7 @@ Captain also can work with [clint](https://github.com/kennethreitz/clint) if you
 
 ## Examples
 
-A typical standard python cli script:
+### A typical standard python cli script
 
 ```python
 import argparse
@@ -108,12 +107,44 @@ if __name__ == u'__main__':
 would become:
 
 ```python
-#!/usr/bin/env python
+import captain
 
 def main(foo=False, bar=0, *args):
     '''fancy script description'''
     return 0
+
+captain.exit()
 ```
+
+
+### Subcommands
+
+Captain supports multiple subcommands defined in the script using the format `main_subcommand`.
+
+```python
+# cli.py
+
+import captain
+
+def main_foo():
+    pass
+
+def main_bar():
+    pass
+
+captain.exit()
+```
+
+So `foo` could be called using:
+
+    $ python cli.py foo
+
+So `bar` could be called using:
+
+    $ python cli.py bar
+
+
+### Easy listing of all captain scripts in a directory
 
 You can get a list of all available scripts in a directory by running captain with no arguments:
 
@@ -130,9 +161,4 @@ Use pip:
 ## License
 
 MIT
-
-
-## TODO
-
-allow you to set *_arg values, so you could do `arg=[int]` to make sure the *args values where all ints, likewise, you could do `foo_arg, bar_arg` and that would be positional arg 0 and 1, I think this would work ok and be ok, we could also make everything that ends in `_kwarg` be a named argument and everything that ends in `_arg` be a positional argument. Then `*args` and `**kwargs` would just be for everything else (the catchall).
 
