@@ -144,6 +144,37 @@ So `bar` could be called using:
     $ python cli.py bar
 
 
+
+### Embedding captain in another package
+
+If you want a script from you package to be usable using both `python -m example` and maybe a `console_scripts` entry point, you can set up your package's `__main__.py` module like this:
+
+
+```python
+# example/__main__.py
+
+from captain import exit as console
+
+def main():
+    pass
+
+console()
+```
+
+And then in your `setup.py` script you can add:
+
+
+```python
+entry_points = {
+    'console_scripts': [
+        'example = example.__main__:console'
+    ],
+}
+```
+
+That's all there is to it.
+
+
 ### Easy listing of all captain scripts in a directory
 
 You can get a list of all available scripts in a directory by running captain with no arguments:

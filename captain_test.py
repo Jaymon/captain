@@ -203,6 +203,26 @@ class CaptainTest(TestCase):
         with self.assertRaises(RuntimeError):
             r = script.run()
 
+    def test_import(self):
+        script = TestScript([
+            "print '1'",
+            "import foo.bar",
+            "print '2'",
+            "if __name__ == '__main__':",
+            "  print '3'",
+        ])
+
+        testdata.create_module("foo.bar", "\n".join([
+            "import captain",
+            "def main():",
+            "  '''the description for bar'''",
+            "  return 0",
+            "captain.exit()"
+        ]), tmpdir=script.cwd)
+
+        r = script.run()
+        self.assertEqual("123", r)
+
     def test_list(self):
         #raise SkipTest("")
         script = TestScript([""])

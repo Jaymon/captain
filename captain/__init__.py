@@ -6,7 +6,7 @@ https://github.com/zacharyvoase/django-boss
 import os
 import argparse
 import imp
-import codecs
+#import codecs
 import re
 import ast
 import getopt
@@ -25,16 +25,36 @@ __version__ = '0.4.0'
 
 
 def exit():
+
     try:
         frame = inspect.stack()[1]
-        calling_mod = inspect.getmodule(frame[0])
-        main_mod = sys.modules.get("__main__", None)
-        if main_mod:
-            if calling_mod is main_mod:
-                s = Script(inspect.getfile(calling_mod), module=calling_mod)
-                raw_args = sys.argv[1:]
-                ret_code = s.run(raw_args)
-                sys.exit(ret_code)
+        loc = frame[4][0].strip()
+
+        m = re.match("load_entry_point\(([^\)]+)\)", loc)
+        if m:
+            # we are using a setup.py defined console_scripts entry point
+
+            dist, group, name = m.group(1).split("', ")
+            from pkg_resources import get_distribution
+
+            ep = get_distribution(dist.strip("'")).get_entry_info(group.strip("'"), name.strip("'"))
+            calling_mod = sys.modules[ep.module_name]
+
+        else:
+            # we called captain from a normal python script in a directory
+            # either defined through setup.py "scripts" in a package or just
+            # some script
+
+            calling_mod = inspect.getmodule(frame[0])
+            main_mod = sys.modules.get("__main__", None)
+            if not main_mod or not (calling_mod is main_mod):
+                calling_mod = None
+
+        if calling_mod:
+            s = Script(inspect.getfile(calling_mod), module=calling_mod)
+            raw_args = sys.argv[1:]
+            ret_code = s.run(raw_args)
+            sys.exit(ret_code)
 
     finally:
         del frame
@@ -240,9 +260,9 @@ class ArgParser(argparse.ArgumentParser):
             cmd = bits[1]
         return cmd
 
-    def __init__(self, prog, callback):
+    def __init__(self, callback):
         super(ArgParser, self).__init__(
-            prog=prog,
+            #prog=prog,
             description=self.find_desc(callback),
             # https://hg.python.org/cpython/file/2.7/Lib/argparse.py
             # https://docs.python.org/2/library/argparse.html#formatter-class
@@ -443,8 +463,9 @@ class Script(object):
     def body(self):
         """get the contents of the script"""
         if not hasattr(self, '_body'):
-            with codecs.open(self.path, 'r', 'utf-8') as fp:
-                self._body = fp.read()
+            self._body = inspect.getsource(self.module)
+#             with codecs.open(self.path, 'r', 'utf-8') as fp:
+#                 self._body = fp.read()
         return self._body
 
     def __init__(self, script_path, module=None):
@@ -531,7 +552,7 @@ class Script(object):
         parser = getattr(self, parser_name, None)
         if not parser:
             callback = self.callbacks[name]
-            parser = ArgParser(self.name, callback)
+            parser = ArgParser(callback)
             setattr(self, parser_name, parser)
 
         return parser

@@ -6,6 +6,7 @@ import argparse
 import captain
 from captain.decorators import arg
 from captain import echo
+from captain import exit as console
 
 
 @arg("path", default=os.getcwd(), nargs='?', help="The path to scan for captain scripts")
@@ -39,5 +40,10 @@ def main(path):
             except captain.ParseError:
                 pass
 
-captain.exit()
+            except Exception as e:
+                #echo.err("Failed to parse {} because {}", f, e.message)
+                echo.err("Failed to parse {}", f)
+
+
+console()
 

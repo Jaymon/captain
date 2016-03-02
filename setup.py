@@ -3,10 +3,14 @@
 # http://docs.python.org/2/distutils/examples.html
 
 from setuptools import setup
+import re
+import os
 
-import captain as module
-name = module.__name__
-version = module.__version__
+
+name = "captain"
+with open(os.path.join(name, "__init__.py"), 'rU') as f:
+    version = re.search("^__version__\s*=\s*[\'\"]([^\'\"]+)", f.read(), flags=re.I | re.M).group(1)
+
 
 setup(
     name=name,
@@ -26,8 +30,11 @@ setup(
     ],
     entry_points = {
         'console_scripts': [
-            '{} = {}.__main__:main'.format(name, name),
+            '{} = {}.__main__:console'.format(name, name),
         ],
-    }
+    },
+#     scripts=[
+#         '{}/bin/captain'.format(name)
+#     ]
 )
 

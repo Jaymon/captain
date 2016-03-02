@@ -103,6 +103,7 @@ def h3(format_msg, *args, **kwargs):
 
     out(h)
 
+
 def blank(count=1): br(count) # DEPRECATED - 2-27-16 - use br
 def br(count=1):
     """print out a blank newline"""
