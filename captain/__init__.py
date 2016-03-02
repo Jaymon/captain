@@ -18,10 +18,10 @@ import collections
 
 from . import echo
 from . import decorators
-from .exception import Error, ParseError
+from .exception import Error, ParseError, ArgError
 
 
-__version__ = '0.4.0'
+__version__ = '0.4.1'
 
 
 def exit():
@@ -255,7 +255,7 @@ class ArgParser(argparse.ArgumentParser):
 
     def find_subcommand(self):
         cmd = ""
-        bits = self.callback.__name__.split("_", 2)
+        bits = self.callback.__name__.split("_", 1)
         if len(bits) > 1:
             cmd = bits[1]
         return cmd
@@ -424,9 +424,10 @@ class Script(object):
     def subcommands(self):
         cmds = []
         for function_name in self.callbacks:
-            bits = function_name.split("_", 2)
+            bits = function_name.split("_", 1)
             if len(bits) > 1:
                 cmds.append(bits[1])
+                #cmds.append("_".join(bits[1:]))
                 #name = bits[1] if len(bits) > 1 else self.function_name
 
         return cmds
@@ -500,6 +501,9 @@ class Script(object):
         name = self.function_name
         subcommands = self.subcommands
         if subcommands:
+            choices = set(subcommands)
+            for sc in subcommands:
+                choices.add(sc.replace("_", "-"))
 
             # TODO -- if no raw_args passed in and there are subcommands, run default?
 
@@ -508,19 +512,29 @@ class Script(object):
                 'command',
                 metavar='COMMAND',
                 nargs='?',
-                choices=subcommands,
+                choices=choices,
                 help="The command you want to run"
             )
 
             args, raw_args = parser.parse_known_args(raw_args)
-            name = "{}_{}".format(self.function_name, args.command)
+            name = "{}_{}".format(self.function_name, args.command.replace("-", "_"))
 
         parser = self.parser(name)
         args, kwargs = parser.parse_callback_args(raw_args)
 
         #pout.v(parsed_args, args, kwargs, parser.arg_info)
         echo.quiet = kwargs.pop("quiet", False)
-        return self.callbacks[name](*args, **kwargs)
+
+        try:
+            ret_code = self.callbacks[name](*args, **kwargs)
+            ret_code = int(ret_code) if ret_code else 0
+
+        except ArgError as e:
+            # https://hg.python.org/cpython/file/2.7/Lib/argparse.py#l2374
+            echo.err("{}: error: {}", parser.prog, e.message)
+            ret_code = 2
+
+        return ret_code
 
     def call_path(self, basepath):
         """return that path to be able to call this script from the passed in

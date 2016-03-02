@@ -796,6 +796,48 @@ class ScriptTest(TestCase):
         s = Script(script_path)
         self.assertEqual(4, len(s.callbacks))
 
+    def test_multi_main_underscores(self):
+        script_path = TestScript([
+            "from captain import echo",
+            "def main_foo_bar():",
+            #"  echo.out('foo_bar')",
+            "  return 5",
+            "def main_che_bar_baz_foo():",
+            #"  echo.out('che')",
+            "  return 6",
+        ])
+        s = Script(script_path)
+
+        self.assertTrue("foo_bar" in s.subcommands)
+
+        r = s.run(["foo-bar"])
+        self.assertEqual(5, r)
+
+        r = s.run(["foo_bar"])
+        self.assertEqual(5, r)
+
+        r = s.run(["che_bar_baz_foo"])
+        self.assertEqual(6, r)
+
+        r = s.run(["che-bar-baz-foo"])
+        self.assertEqual(6, r)
+
+    def test_argerror(self):
+        script_path = TestScript([
+            "from captain import echo, exit, ArgError",
+            "def main(foo=0, bar=0):",
+            "  if not foo and not bar:",
+            "    raise ArgError('either foo or bar is needed')",
+            "exit()",
+        ])
+        s = Script(script_path)
+        r = s.run([])
+        self.assertEqual(2, r)
+
+        r = s.run(["--bar=5"])
+        self.assertEqual(0, r)
+
+
     def test_scripts(self):
         with self.assertRaises(IOError):
             s = Script("this/is/a/bogus/path")
