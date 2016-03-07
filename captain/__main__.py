@@ -5,12 +5,12 @@ import argparse
 
 import captain
 from captain.decorators import arg
-from captain import echo
+from captain import echo, __version__
 from captain import exit as console
 
 
 @arg("path", default=os.getcwd(), nargs='?', help="The path to scan for captain scripts")
-@arg("-v", "--version", action='version', version="%(prog)s {}".format(captain.__version__))
+#@arg("-v", "--version", action='version', version="%(prog)s {}".format(captain.__version__))
 def main(path):
     '''scan path directory and any subdirectories for valid captain scripts'''
     basepath = os.path.abspath(os.path.expanduser(str(path)))
@@ -41,6 +41,7 @@ def main(path):
                 pass
 
             except Exception as e:
+                #echo.exception(e)
                 #echo.err("Failed to parse {} because {}", f, e.message)
                 echo.err("Failed to parse {}", f)
 

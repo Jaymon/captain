@@ -38,6 +38,10 @@ quiet = False
 """set this to True to suppress stdout output, stderr will not be affected"""
 
 
+verbose = False
+"""set this to true to make verbose function print output"""
+
+
 width = 80
 """lots of the functions are width constrained, this is the global width they default to"""
 
@@ -54,7 +58,7 @@ def err(format_msg, *args, **kwargs):
 
 
 def out(format_msg="", *args, **kwargs):
-    '''print format_msg to stdout, taking into account verbosity level'''
+    '''print format_msg to stdout, taking into account --quiet setting'''
     global quiet
     if quiet: return
 
@@ -71,6 +75,13 @@ def out(format_msg="", *args, **kwargs):
 
     else:
         stdout.info("")
+
+
+def verbose(format_msg="", *args, **kwargs):
+    '''print format_msg to stdout, taking into account --verbose flag'''
+    global verbose
+    if not verbose: return
+    out(format_msg, *args, **kwargs)
 
 
 def hr(width=0):
@@ -123,25 +134,28 @@ def ol(*lines):
 
 def quote(format_msg, *args, **kwargs):
     if args or kwargs:
-        s = format_msg.format(*args, **kwargs)
+        msg = format_msg.format(*args, **kwargs)
     else:
-        s = format_msg
+        msg = format_msg
 
-    indent(s, indent="\t")
-
-
-def indent(msg, indent, width=0):
-    if not width: width = globals()["width"]
+    default_indent = "    "
+    width = globals()["width"]
+    width -= len(default_indent) 
 
     wrapper = textwrap.TextWrapper()
     wrapper.width = width
-    wrapper.initial_indent = indent
-    wrapper.subsequent_indent = indent
+    wrapper.initial_indent = default_indent
+    wrapper.subsequent_indent = default_indent
     s = wrapper.fill(msg)
-    out(s)
+    indent(s, indent=default_indent)
 
 
-def bar(sep='-', width=0):
+def indent(msg, indent="    "):
+    width = len(indent)
+    out(msg)
+
+
+def bar(sep='*', width=0):
     if not width: width = globals()["width"]
     out(sep * width)
 

@@ -21,14 +21,19 @@ from . import decorators
 from .exception import Error, ParseError, ArgError
 
 
-__version__ = '0.4.1'
+__version__ = '0.4.2'
 
 
 def exit():
 
     try:
+        # http://stackoverflow.com/a/1095621/5006
         frame = inspect.stack()[1]
         loc = frame[4][0].strip()
+
+        # this might be more portable
+        # sys._getframe().f_back.f_code.co_name
+        # http://stackoverflow.com/questions/2654113/python-how-to-get-the-callers-method-name-in-the-called-method
 
         m = re.match("load_entry_point\(([^\)]+)\)", loc)
         if m:
@@ -109,7 +114,7 @@ class ScriptKwarg(object):
 
         for arg_name in arg_names:
             if len(longest_name) < len(arg_name):
-                longest_name = arg_name
+                longest_name = arg_name.lstrip("-")
 
             if len(arg_name) > 2:
                 arg_name = arg_name.lstrip("-")
@@ -260,7 +265,11 @@ class ArgParser(argparse.ArgumentParser):
             cmd = bits[1]
         return cmd
 
-    def __init__(self, callback):
+    def __init__(self, callback, **kwargs):
+        parents = self.find_parents(callback)
+        if parents:
+            kwargs.setdefault("parents", parents)
+
         super(ArgParser, self).__init__(
             #prog=prog,
             description=self.find_desc(callback),
@@ -268,10 +277,19 @@ class ArgParser(argparse.ArgumentParser):
             # https://docs.python.org/2/library/argparse.html#formatter-class
             # http://stackoverflow.com/questions/12151306/argparse-way-to-include-default-values-in-help
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            **kwargs
         )
 
         self.callback = callback
         self.find_args()
+
+    def find_parents(self, callback):
+        parents = []
+        scs = callback.__dict__.get('inherit_subcommands', [])
+        for sc in scs:
+            parser = type(self)(sc, add_help=False)
+            parents.append(parser)
+        return parents
 
     def parse_callback_args(self, raw_args):
         args = []
@@ -331,7 +349,10 @@ class ArgParser(argparse.ArgumentParser):
         }
 
         main = self.callback
-        self.add_argument("--quiet", action='store_true', dest='quiet')
+        if self.add_help:
+            # we aren't a parent parser if we have help so we should add magic args
+            self.add_argument("--quiet", action='store_true', dest='quiet')
+            self.add_argument("--verbose", "-v", action='store_true', dest='verbose')
 
         all_arg_names = set()
         if inspect.isfunction(main):
@@ -379,19 +400,18 @@ class ArgParser(argparse.ArgumentParser):
             all_arg_names |= a.parser_args
             self.add_argument(*a.parser_args, **a.parser_kwargs)
 
-        if args_name:
-            a = ScriptArg(args_name, nargs='*')
-            a.merge_from_list(decorator_args)
-            all_arg_names |= a.parser_args
-            self.add_argument(*a.parser_args, **a.parser_kwargs)
-            arg_info['args'] = args_name
+        self.unknown_args = False
+        if self.add_help:
+            if args_name:
+                a = ScriptArg(args_name, nargs='*')
+                a.merge_from_list(decorator_args)
+                all_arg_names |= a.parser_args
+                self.add_argument(*a.parser_args, **a.parser_kwargs)
+                arg_info['args'] = args_name
 
-        if kwargs_name:
-            self.unknown_args = True
-            arg_info['kwargs'] = kwargs_name
-
-        else:
-            self.unknown_args = False
+            if kwargs_name:
+                self.unknown_args = True
+                arg_info['kwargs'] = kwargs_name
 
         # pick up any stragglers
         for da, dkw in decorator_args:
@@ -511,19 +531,24 @@ class Script(object):
             parser.add_argument(
                 'command',
                 metavar='COMMAND',
-                nargs='?',
+                nargs=1, #'?',
                 choices=choices,
                 help="The command you want to run"
             )
+            self.add_version_if_available(parser)
 
             args, raw_args = parser.parse_known_args(raw_args)
-            name = "{}_{}".format(self.function_name, args.command.replace("-", "_"))
+            name = "{}_{}".format(self.function_name, args.command[0].replace("-", "_"))
 
         parser = self.parser(name)
+        if not subcommands:
+            self.add_version_if_available(parser)
+
         args, kwargs = parser.parse_callback_args(raw_args)
 
         #pout.v(parsed_args, args, kwargs, parser.arg_info)
         echo.quiet = kwargs.pop("quiet", False)
+        echo.verbose = kwargs.pop("verbose", False)
 
         try:
             ret_code = self.callbacks[name](*args, **kwargs)
@@ -535,6 +560,17 @@ class Script(object):
             ret_code = 2
 
         return ret_code
+
+
+    def add_version_if_available(self, parser):
+        m = self.module
+        version = getattr(m, "__version__", "")
+        if version:
+            parser.add_argument(
+                "-V", "--version",
+                action='version',
+                version="%(prog)s {}".format(version)
+            )
 
     def call_path(self, basepath):
         """return that path to be able to call this script from the passed in

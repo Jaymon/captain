@@ -55,6 +55,9 @@ class EchoTest(TestCase):
     def setUp(self):
         echo.quiet = False
 
+    def test_quote(self):
+        echo.quote("this is the string")
+
     def test_out_no_args(self):
         echo.out("foo {}".format("bar"))
         echo.out("this does not have any format args")
@@ -293,6 +296,7 @@ class CaptainTest(TestCase):
         script.cwd = os.getcwd()
         script.path = "captain/__main__.py"
         r = script.run(cwd)
+
         self.assertTrue('che.py' in r)
         self.assertTrue('foo/bar.py' in r)
         self.assertFalse('bar/boo.py' in r)
@@ -306,18 +310,6 @@ class CaptainTest(TestCase):
         self.assertTrue("multi1" in r)
         self.assertTrue("multi2" in r)
         self.assertTrue("multi3" in r)
-
-    def test_version(self):
-
-        script = TestScript([
-            "#!/usr/bin/env python",
-            "import captain",
-            "@captain.decorators.arg('-v', '--version', action='version', version='0.1')",
-            "def main(): pass",
-            "captain.exit()",
-        ])
-        r = script.run("--version")
-        self.assertTrue("0.1" in r)
 
     def test_help(self):
         script = TestScript([
@@ -615,7 +607,7 @@ class ArgTest(TestCase):
         ])
         s = script_path.instance
 
-        dests = set(["help", "max_count", "recv_timeout", "max_unsync_count", "quiet"])
+        dests = set(["help", "max_count", "recv_timeout", "max_unsync_count", "quiet", "verbose"])
         parser = s.parser()
         for a in parser._actions:
             self.assertTrue(a.dest in dests)
@@ -692,6 +684,46 @@ class ScriptTest(TestCase):
         ])
         s = Script(script_path)
         self.assertTrue(s.can_run_from_cli())
+
+    def test_custom_version(self):
+
+        script = TestScript([
+            "#!/usr/bin/env python",
+            "import captain",
+            "@captain.decorators.arg('-V', '--version', action='version', version='0.1')",
+            "def main(): pass",
+            "captain.exit()",
+        ])
+        r = script.run("--version")
+        self.assertTrue("0.1" in r)
+
+    def test_default_version(self):
+        script_path = TestScript([
+            "import captain",
+            "__version__ = '0.1.1'",
+            "def main_bar(): return 0",
+            "captain.exit()",
+        ])
+        r = script_path.run("-V")
+        self.assertTrue("0.1.1" in r)
+
+    def test_parser_inherit(self):
+        script_path = TestScript([
+            "import captain",
+            "from captain.decorators import arg, args",
+            "@arg('--one', default=True)",
+            "@arg('--two', default=True)",
+            "def main_foo(*args, **kwargs): return 0",
+            "",
+            "@args(main_foo)",
+            "@arg('--three', default=True)",
+            "def main_bar(*args, **kwargs): return 0",
+            "captain.exit()",
+        ])
+        r = script_path.run("bar --help")
+        self.assertTrue("--one" in r)
+        self.assertTrue("--two" in r)
+        self.assertTrue("--three" in r)
 
     def test_parser(self):
         script_path = TestScript([
