@@ -8,14 +8,14 @@ Captain was lovingly crafted for [First Opinion](http://firstopinionapp.com) and
 
 A valid `captain` cli script needs just two things:
 
-1. a `main` function
+1. A `main` function
 
     ```python
     def main(foo, bar):
         return 0
     ```
 
-2. to exit using `captain.exit()`
+2. Calling exit using `captain.exit()`
 
     ```python
     import captain
@@ -139,10 +139,9 @@ So `foo` could be called using:
 
     $ python cli.py foo
 
-So `bar` could be called using:
+And `bar` could be called using:
 
     $ python cli.py bar
-
 
 
 ### Embedding captain in another package
