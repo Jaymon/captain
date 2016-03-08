@@ -270,13 +270,16 @@ class ArgParser(argparse.ArgumentParser):
         if parents:
             kwargs.setdefault("parents", parents)
 
+        # https://docs.python.org/2/library/argparse.html#conflict-handler
+        kwargs.setdefault("conflict_handler", 'resolve')
+        # https://hg.python.org/cpython/file/2.7/Lib/argparse.py
+        # https://docs.python.org/2/library/argparse.html#formatter-class
+        # http://stackoverflow.com/questions/12151306/argparse-way-to-include-default-values-in-help
+        kwargs.setdefault("formatter_class", argparse.ArgumentDefaultsHelpFormatter)
+
         super(ArgParser, self).__init__(
             #prog=prog,
             description=self.find_desc(callback),
-            # https://hg.python.org/cpython/file/2.7/Lib/argparse.py
-            # https://docs.python.org/2/library/argparse.html#formatter-class
-            # http://stackoverflow.com/questions/12151306/argparse-way-to-include-default-values-in-help
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             **kwargs
         )
 
