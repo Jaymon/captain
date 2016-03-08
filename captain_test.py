@@ -846,6 +846,76 @@ class ScriptTest(TestCase):
         s = Script(script_path)
         self.assertEqual(4, len(s.callbacks))
 
+    def test_inheritance_args_passing(self):
+
+        script_path = TestScript([
+            "import captain",
+            "from captain import echo",
+            "from captain.decorators import arg, args",
+            "",
+            "@arg('--foo', type=int, choices=[1, 2])",
+            "def main_one(): pass",
+            "",
+            "@args(main_one)",
+            "def main_two(foo):",
+            "  echo.out(foo)",
+            "",
+            "@args(main_one)",
+            "def main_three(foo=[4,5]):",
+            "  echo.out(foo)",
+            "",
+            "@args(main_one)",
+            "@arg('--foo', type=int, choices=[5, 6])",
+            "def main_four(foo):",
+            "  echo.out(foo)",
+            "",
+            "captain.exit()",
+        ])
+
+        with self.assertRaises(RuntimeError):
+            r = script_path.run("two --foo=4")
+
+        r = script_path.run("two --foo=2")
+        self.assertEqual("2", r)
+
+        with self.assertRaises(RuntimeError):
+            r = script_path.run("three --foo=2")
+
+        r = script_path.run("three --foo=4")
+        self.assertEqual("4", r)
+
+        with self.assertRaises(RuntimeError):
+            r = script_path.run("four --foo=2")
+
+        r = script_path.run("four --foo=6")
+        self.assertEqual("6", r)
+
+
+        script_path = TestScript([
+            "import captain",
+            "from captain import echo",
+            "from captain.decorators import arg, args",
+            "",
+            "@arg('--foo', type=int, choices=[1, 2])",
+            "def main_one(): pass",
+            "",
+            "@arg('--foo', type=int, choices=[3, 4])",
+            "@arg('--bar', action='store_true')",
+            "def main_two(foo, bar): pass",
+            "",
+            "@args(main_one, main_two)",
+            "def main_three(foo, bar):",
+            "  echo.out(foo)",
+            "  echo.out(bar)",
+            "",
+            "captain.exit()",
+        ])
+
+        r = script_path.run("three --help")
+        self.assertTrue("{3,4}" in r)
+        self.assertTrue("--bar" in r)
+
+
     def test_run_multi_main(self):
         script_path = TestScript([
             "import captain",

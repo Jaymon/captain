@@ -400,7 +400,24 @@ class ArgParser(argparse.ArgumentParser):
 
             #pout.v(a.parser_args, a.parser_kwargs)
             all_arg_names |= a.parser_args
-            self.add_argument(*a.parser_args, **a.parser_kwargs)
+
+            # if the callback arg is just a value, respect the parent parser's config
+            if "default" not in a.parser_kwargs \
+            and "action" not in a.parser_kwargs \
+            and "choices" not in a.parser_kwargs:
+                keys = self._option_string_actions.keys()
+                found_arg = False
+                for pa in a.parser_args:
+                    if pa in keys:
+                        found_arg = True
+                        break
+
+                if not found_arg:
+                    self.add_argument(*a.parser_args, **a.parser_kwargs)
+
+            else:
+                # we want to override parent parser
+                self.add_argument(*a.parser_args, **a.parser_kwargs)
 
         self.unknown_args = False
         if self.add_help:
