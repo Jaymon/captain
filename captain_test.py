@@ -476,7 +476,7 @@ class ArgTest(TestCase):
             r = script_path.run("--output-file=foobar --final-dir=/tmp --print-lines")
 
         s = script_path.instance
-        parser = s.parser()
+        parser = s.parser
 
         r = script_path.run("")
 
@@ -527,7 +527,7 @@ class ArgTest(TestCase):
             "    return 0",
         ])
         s = script_path.instance
-        p = s.parser()
+        p = s.parser
         self.assertEqual(0, len(p.arg_info['required']))
         self.assertTrue('foo' in p.arg_info['optional'])
         self.assertTrue('bar' in p.arg_info['optional'])
@@ -608,7 +608,7 @@ class ArgTest(TestCase):
         s = script_path.instance
 
         dests = set(["help", "max_count", "recv_timeout", "max_unsync_count", "quiet", "verbose"])
-        parser = s.parser()
+        parser = s.parser
         for a in parser._actions:
             self.assertTrue(a.dest in dests)
 
@@ -638,6 +638,24 @@ class ArgTest(TestCase):
 
 
 class ScriptTest(TestCase):
+#     def test_description(self):
+#         script_path = TestScript([
+#             "import captain",
+#             "from captain import echo",
+#             "__version__ = '0.1'",
+#             "def main_foo():",
+#             "  '''description for foo'''",
+#             "  echo.out('foo out')",
+#             "  echo.verbose('foo verbose')",
+#             "def main_bar():",
+#             "  '''description for bar'''",
+#             "  echo.out('bar out')",
+#             "  echo.verbose('bar verbose')",
+#             "captain.exit()",
+#         ])
+#         s = Script(script_path)
+#         pout.v(s.description)
+
     def test_can_run_from_cli(self):
         script_path = TestScript([
             "from captain import exit as ex",
@@ -737,7 +755,7 @@ class ScriptTest(TestCase):
             "main = FooBar()"
         ])
         s = Script(script_path)
-        p = s.parser()
+        p = s.parser
         self.assertEqual("this would be the description", p.description)
         self.assertTrue("--test" in p._option_string_actions)
 
@@ -747,7 +765,7 @@ class ScriptTest(TestCase):
             "  return 0"
         ])
         s = Script(script_path)
-        p = s.parser()
+        p = s.parser
         #pout.v(p._option_string_actions.keys())
         for k in ["--foo", "--bar", "--che", "--baz"]:
             self.assertTrue(k in p._option_string_actions)
@@ -762,7 +780,7 @@ class ScriptTest(TestCase):
             "main = FooBar()"
         ])
         s = Script(script_path)
-        p = s.parser()
+        p = s.parser
         self.assertEqual('this would be the description', p.description)
 
         script_path = TestScript([
@@ -774,7 +792,7 @@ class ScriptTest(TestCase):
             "main = FooBar()"
         ])
         s = Script(script_path)
-        p = s.parser()
+        p = s.parser
         self.assertEqual('this would be the description', p.description)
 
         script_path = TestScript([
@@ -784,7 +802,7 @@ class ScriptTest(TestCase):
             "    return 0"
         ])
         s = Script(script_path)
-        p = s.parser()
+        p = s.parser
         self.assertEqual('', p.description)
 
         script_path = TestScript([
@@ -795,7 +813,7 @@ class ScriptTest(TestCase):
             "    return 0"
         ])
         s = Script(script_path)
-        p = s.parser()
+        p = s.parser
         self.assertEqual('class description', p.description)
 
     def test_parse_simple(self):
@@ -805,7 +823,7 @@ class ScriptTest(TestCase):
             "  return 0"
         ])
         s = Script(script_path)
-        p = s.parser()
+        p = s.parser
         self.assertEqual('', p.description)
 
         script_path = TestScript([
@@ -815,7 +833,7 @@ class ScriptTest(TestCase):
             "  return 0"
         ])
         s = Script(script_path)
-        p = s.parser()
+        p = s.parser
         self.assertEqual('this is the description', p.description)
 
     def test_parse_multi_main(self):
@@ -827,6 +845,42 @@ class ScriptTest(TestCase):
         ])
         s = Script(script_path)
         self.assertEqual(4, len(s.callbacks))
+
+    def test_run_multi_main(self):
+        script_path = TestScript([
+            "import captain",
+            "from captain import echo",
+            "__version__ = '0.1'",
+            "def main_foo():",
+            "  '''description for foo'''",
+            "  echo.out('foo out')",
+            "  echo.verbose('foo verbose')",
+            "def main_bar():",
+            "  '''description for bar'''",
+            "  echo.out('bar out')",
+            "  echo.verbose('bar verbose')",
+            "captain.exit()",
+        ])
+
+        r = script_path.run("--quiet --verbose foo")
+        self.assertEqual("", r)
+
+        with self.assertRaises(RuntimeError):
+            r = script_path.run("foo --quiet --verbose")
+
+        r = script_path.run("--verbose foo")
+        self.assertTrue("foo verbose" in r)
+        self.assertTrue("foo out" in r)
+
+        r = script_path.run("--verbose bar")
+        self.assertTrue("bar verbose" in r)
+        self.assertTrue("bar out" in r)
+
+        r = script_path.run("--help")
+        self.assertTrue("{foo,bar}" in r)
+
+        with self.assertRaises(RuntimeError):
+            r = script_path.run()
 
     def test_multi_main_underscores(self):
         script_path = TestScript([
@@ -845,11 +899,11 @@ class ScriptTest(TestCase):
         r = s.run(["foo-bar"])
         self.assertEqual(5, r)
 
-        r = s.run(["foo_bar"])
-        self.assertEqual(5, r)
+        #r = s.run(["foo_bar"])
+        #self.assertEqual(5, r)
 
-        r = s.run(["che_bar_baz_foo"])
-        self.assertEqual(6, r)
+        #r = s.run(["che_bar_baz_foo"])
+        #self.assertEqual(6, r)
 
         r = s.run(["che-bar-baz-foo"])
         self.assertEqual(6, r)
@@ -982,7 +1036,7 @@ class ScriptTest(TestCase):
                     parser = s.parse()
 
             else:
-                parser = s.parser()
+                parser = s.parser
                 args, _ = parser.parse_known_args(test_out.split())
                 for k, v in test_assert.iteritems():
                     self.assertEqual(v, getattr(args, k))
@@ -994,7 +1048,7 @@ class ScriptTest(TestCase):
         ])
 
         s = Script(script_path)
-        self.assertTrue(s.parser().unknown_args)
+        self.assertTrue(s.parser.unknown_args)
 
 
         # make sure docblock works as description
@@ -1007,5 +1061,5 @@ class ScriptTest(TestCase):
         ])
 
         s = Script(script_path)
-        self.assertEqual(desc, s.parser().description)
+        self.assertEqual(desc, s.parser.description)
 

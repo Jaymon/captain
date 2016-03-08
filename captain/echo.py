@@ -38,7 +38,7 @@ quiet = False
 """set this to True to suppress stdout output, stderr will not be affected"""
 
 
-verbose = False
+debug = False
 """set this to true to make verbose function print output"""
 
 
@@ -151,8 +151,7 @@ def quote(format_msg, *args, **kwargs):
 
 
 def indent(msg, indent="    "):
-    width = len(indent)
-    out(msg)
+    out(indent + msg)
 
 
 def bar(sep='*', width=0):

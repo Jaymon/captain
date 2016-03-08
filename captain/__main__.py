@@ -24,18 +24,22 @@ def main(path):
                 s = captain.Script(filepath)
                 if s.can_run_from_cli():
                     rel_filepath = s.call_path(basepath)
-                    for p in s.parsers():
-                        subcommand = p.find_subcommand()
-                        if subcommand:
-                            echo.h3("{} {}", rel_filepath, subcommand)
-                        else:
-                            echo.h3(rel_filepath)
+                    p = s.parser
 
-                        desc = p.description
-                        if desc:
-                            echo.quote(desc)
+                    echo.h3(rel_filepath)
 
+                    desc = p.description
+                    if desc:
+                        echo.indent(desc, indent=(" " * 4))
+
+                    subcommands = s.subcommands
+                    if subcommands:
                         echo.br()
+                        echo.indent("Subcommands:", indent=(" " * 4))
+                        for sc in subcommands.keys():
+                            echo.indent(sc, indent=(" " * 6))
+
+                    echo.br()
 
             except captain.ParseError:
                 pass
@@ -44,6 +48,8 @@ def main(path):
                 #echo.exception(e)
                 #echo.err("Failed to parse {} because {}", f, e.message)
                 echo.err("Failed to parse {}", f)
+                echo.verbose(e.message)
+                echo.br()
 
 
 console()
