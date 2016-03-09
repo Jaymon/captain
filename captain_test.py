@@ -55,6 +55,13 @@ class EchoTest(TestCase):
     def setUp(self):
         echo.quiet = False
 
+    def test_verbose(self):
+        echo.debug = False
+        echo.verbose("verbose should not show")
+
+        echo.debug = True
+        echo.verbose("verbose should show")
+
     def test_quote(self):
         echo.quote("this is the string")
 

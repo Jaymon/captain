@@ -21,7 +21,7 @@ from . import decorators
 from .exception import Error, ParseError, ArgError
 
 
-__version__ = '0.4.3'
+__version__ = '0.4.4'
 
 
 def exit():
