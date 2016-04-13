@@ -60,6 +60,7 @@ class Progress(object):
 
     def get_progress(self, current):
         # http://stackoverflow.com/a/5676884/5006
+        # http://stackoverflow.com/a/22776/5006
         bar = "{current: >{justify}}/{length} {percentage: >10}".format(
         #bar = "{: >10} {: >10}".format(
             current=current,

@@ -56,6 +56,13 @@ class Captain(object):
         self.async_thread = self.thread_class(target=target)
         self.async_thread.start()
 
+    def check_run(self, *args, **kwargs):
+        """runs the command and returns all the output"""
+        ret = ""
+        for line in self.run(*args, **kwargs):
+            ret += line
+        return ret
+
     def run(self, arg_str='', **process_kwargs):
         cmd = "{} {} {}".format(self.cmd_prefix, self.script, arg_str)
 
