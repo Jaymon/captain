@@ -10,7 +10,6 @@ from captain import exit as console
 
 
 @arg("path", default=os.getcwd(), nargs='?', help="The path to scan for captain scripts")
-#@arg("-v", "--version", action='version', version="%(prog)s {}".format(captain.__version__))
 def main(path):
     '''scan path directory and any subdirectories for valid captain scripts'''
     basepath = os.path.abspath(os.path.expanduser(str(path)))
@@ -52,5 +51,6 @@ def main(path):
                 echo.br()
 
 
-console()
+if __name__ == "__main__":
+    console()
 

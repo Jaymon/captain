@@ -10,8 +10,8 @@ def arg(*parser_args, **parser_kwargs):
 
 def args(*subcommands):
     def wrap(main):
-        main.__dict__.setdefault('inherit_subcommands', [])
-        main.__dict__['inherit_subcommands'].extend(subcommands)
+        main.__dict__.setdefault('inherit_args', [])
+        main.__dict__['inherit_args'].extend(subcommands)
         return main
 
     return wrap 

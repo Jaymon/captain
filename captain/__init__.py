@@ -65,8 +65,87 @@ def exit():
         del frame
 
 
-class ScriptKwarg(object):
+class CallbackInspect(object):
+    """Provides some handy helper introspection methods for dealing with the command
+    callback function/method
 
+    for the most part, the main command can either be a function or a class instance
+    with a __call__, but when inheriting args (using the @args decorator) there are
+    actually 2 other types: method and uninstantiated class, this makes sure when
+    data is being pulled out of the callback it uses the proper function/method that
+    will actually be called when the callback is ran
+    """
+    @property
+    def args(self):
+        args = self.get('decorator_args', [])
+        return args
+
+    @property
+    def inherit_args(self):
+        args = self.get('inherit_args', [])
+        return args
+
+    @property
+    def desc(self):
+        desc = inspect.getdoc(self.callback)
+        if not desc:
+            cb_method = self.callable
+            desc = inspect.getdoc(cb_method)
+        if not desc: desc = ''
+        return desc
+
+    @property
+    def callable(self):
+        if self.is_instance():
+            ret = self.callback.__call__
+        elif self.is_class():
+            #ret = self.callback.__init__
+            ret = self.callback.__call__
+        else:
+            ret = self.callback
+        return ret
+
+    @property
+    def argspec(self):
+        args, args_name, kwargs_name, args_defaults = inspect.getargspec(self.callable)
+        if self.is_instance() or self.is_class():
+            args = args[1:] # remove self which will always get passed in automatically
+
+        if not args: args = []
+        if not args_defaults: args_defaults = []
+        return args, args_name, kwargs_name, args_defaults
+
+    def __init__(self, callback):
+        self.callback = callback
+
+    def is_class(self):
+        return isinstance(self.callback, type)
+
+    def is_instance(self):
+        """return True if callback is an instance of a class"""
+        val = self.callback
+        if self.is_class(): return False
+        return isinstance(val, types.InstanceType) or hasattr(val, '__dict__') \
+            and not (hasattr(val, 'func_name') or hasattr(val, 'im_func'))
+
+    def is_function(self):
+        """return True if callback is a vanilla plain jane function"""
+        if self.is_instance() or self.is_class(): return False
+        return isinstance(self.callback, (collections.Callable, classmethod))
+
+    def get(self, key, default_val=None):
+        if self.is_instance():
+            ret = self.callback.__call__.__dict__.get(key, default_val)
+        elif self.is_class():
+            #ret = self.callback.__init__.__dict__.get(key, default_val)
+            ret = self.callback.__call__.__dict__.get(key, default_val)
+        else:
+            ret = self.callback.__dict__.get(key, default_val)
+
+        return ret
+
+
+class ScriptKwarg(object):
     @property
     def required(self):
         kwargs = self.parser_kwargs
@@ -297,7 +376,8 @@ class ArgParser(argparse.ArgumentParser):
 
     def find_parents(self, callback):
         parents = []
-        scs = callback.__dict__.get('inherit_subcommands', [])
+        cbi = CallbackInspect(callback)
+        scs = cbi.inherit_args
         for sc in scs:
             parser = type(self)(sc, add_help=False)
             parents.append(parser)
@@ -344,33 +424,20 @@ class ArgParser(argparse.ArgumentParser):
         return args, kwargs
 
     def find_desc(self, callback):
-        desc = inspect.getdoc(callback)
-        if not desc:
-            if not inspect.isfunction(callback):
-                cb_method = getattr(callback, '__call__', None)
-                desc = inspect.getdoc(cb_method)
-
-        if not desc: desc = ''
-        return desc
+        cbi = CallbackInspect(callback)
+        return cbi.desc
 
     def find_args(self):
         arg_info = self.arg_info
         main = self.callback
+        cbi = CallbackInspect(main)
         all_arg_names = set()
-        if inspect.isfunction(main):
-            decorator_args = main.__dict__.get('decorator_args', [])
-            args, args_name, kwargs_name, args_defaults = inspect.getargspec(main)
-        else:
-            decorator_args = main.__call__.__dict__.get('decorator_args', [])
-            args, args_name, kwargs_name, args_defaults = inspect.getargspec(main.__call__)
-            args = args[1:] # remove self which will always get passed in automatically
+        decorator_args = cbi.args
+        args, args_name, kwargs_name, args_defaults = cbi.argspec
 
-        if not args: args = []
-        if not args_defaults: args_defaults = []
         arg_info['order'] = args
         default_offset = len(args) - len(args_defaults)
         #pout.v(args, args_name, kwargs_name, args_defaults, default_offset)
-
         #pout.v(args, decorator_args)
 
         # build a list of potential *args, basically, if an arg_name matches exactly
@@ -571,8 +638,6 @@ class Script(object):
         """get the contents of the script"""
         if not hasattr(self, '_body'):
             self._body = inspect.getsource(self.module)
-#             with codecs.open(self.path, 'r', 'utf-8') as fp:
-#                 self._body = fp.read()
         return self._body
 
     def __init__(self, script_path, module=None):

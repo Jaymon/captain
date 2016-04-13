@@ -5,8 +5,9 @@ import argparse
 
 import testdata
 
-from captain import Script, ScriptArg, ScriptKwarg, echo
+from captain import Script, ScriptArg, ScriptKwarg, echo, CallbackInspect, ArgParser
 from captain.client import Captain
+from captain.decorators import arg, args
 
 
 class TestScript(object):
@@ -142,6 +143,113 @@ class EchoTest(TestCase):
 
         r = script.run()
         self.assertEqual(1, r.count("gotcha"))
+
+
+class CallbackInspectTest(TestCase):
+    def test_instance(self):
+        class MainClass(object):
+            @arg("--foo")
+            def __call__(self, **kwargs):
+                """the description on __call__"""
+                pass
+
+        main_instance = MainClass()
+        cbi = CallbackInspect(main_instance)
+        self.assertTrue(cbi.is_instance())
+        self.assertFalse(cbi.is_class())
+        self.assertFalse(cbi.is_function())
+        self.assertEqual("the description on __call__", cbi.desc)
+
+        argspec = cbi.argspec
+        self.assertEqual("kwargs", argspec[2])
+
+        args = cbi.args
+        self.assertEqual(1, len(args))
+
+        iargs = cbi.inherit_args
+        self.assertEqual(0, len(iargs))
+
+    def test_function(self):
+        @arg("--bar")
+        def main_func(**kwargs):
+            """the description on function"""
+            pass
+
+        cbi = CallbackInspect(main_func)
+        self.assertFalse(cbi.is_instance())
+        self.assertFalse(cbi.is_class())
+        self.assertTrue(cbi.is_function())
+        self.assertEqual("the description on function", cbi.desc)
+
+        argspec = cbi.argspec
+        self.assertEqual("kwargs", argspec[2])
+
+        args = cbi.args
+        self.assertEqual(1, len(args))
+
+        iargs = cbi.inherit_args
+        self.assertEqual(0, len(iargs))
+
+    def test_class(self):
+        class MainClass(object):
+            @arg("--che")
+            def __call__(self, **kwargs):
+                """the description on __call__"""
+                pass
+
+        cbi = CallbackInspect(MainClass)
+        self.assertFalse(cbi.is_instance())
+        self.assertTrue(cbi.is_class())
+        self.assertFalse(cbi.is_function())
+        self.assertEqual("the description on __call__", cbi.desc)
+
+        argspec = cbi.argspec
+        self.assertEqual("kwargs", argspec[2])
+
+        args = cbi.args
+        self.assertEqual(1, len(args))
+
+        iargs = cbi.inherit_args
+        self.assertEqual(0, len(iargs))
+
+    def test_method(self):
+        class MainClass(object):
+            @arg("--foo")
+            def __call__(self, **kwargs):
+                """the description on __call__"""
+                pass
+
+        cbi = CallbackInspect(MainClass.__call__)
+        self.assertFalse(cbi.is_instance())
+        self.assertFalse(cbi.is_class())
+        self.assertTrue(cbi.is_function())
+        self.assertEqual("the description on __call__", cbi.desc)
+
+    def test_inheritance(self):
+        class MainClass1(object):
+            @arg("--foo")
+            @arg("--bar")
+            def __call__(self, **kwargs): pass
+
+        class MainClass2(object):
+            @args(MainClass1)
+            @arg("--che")
+            def __call__(self, **kwargs): pass
+
+        class MainClass3(object):
+            @args(MainClass1.__call__, MainClass2)
+            @arg("--baz")
+            def __call__(self, **kwargs): pass
+
+        p = ArgParser(MainClass2())
+        hm = p.format_help()
+        for k in ["--foo", "--bar", "--che"]:
+            self.assertTrue(k in hm)
+
+        p = ArgParser(MainClass3())
+        hm = p.format_help()
+        for k in ["--foo", "--bar", "--che", "--baz"]:
+            self.assertTrue(k in hm)
 
 
 class CaptainTest(TestCase):
@@ -421,6 +529,30 @@ class ScriptKwargTest(TestCase):
 
 
 class ArgTest(TestCase):
+    def test_args_class___call__(self):
+        script_path = TestScript([
+            "import captain",
+            "from captain.decorators import arg, args",
+            "",
+            "class BaseMain(object):",
+            "    @arg('--foo')",
+            "    @arg('--bar')",
+            "    def __call__(self, **kwargs): pass",
+            "",
+            "class MainCommand(BaseMain):",
+            "    ",
+            "    @args(BaseMain)",
+            "    @arg('--che')",
+            "    def __call__(self, **kwargs): pass",
+            "",
+            "main = MainCommand()",
+            "captain.exit()",
+        ])
+
+        r = script_path.run("--help")
+        for k in ["--foo", "--bar", "--che"]:
+            self.assertTrue(k in r)
+
     def test_arg_in_main(self):
         script_path = TestScript([
             "import captain",
