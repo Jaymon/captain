@@ -56,6 +56,18 @@ class EchoTest(TestCase):
     def setUp(self):
         echo.quiet = False
 
+    def test_progress(self):
+        count = 100
+        with echo.progress(count) as pbar:
+            for x in range(count):
+                pbar.update(x)
+
+    def test_progress_bar(self):
+        count = 100
+        with echo.progress_bar(count) as pbar:
+            for x in range(count):
+                pbar.update(x)
+
     def test_verbose(self):
         echo.debug = False
         echo.verbose("verbose should not show")

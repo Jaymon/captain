@@ -9,6 +9,7 @@ import textwrap
 import itertools
 import os
 import re
+from contextlib import contextmanager
 
 
 # configure loggers
@@ -44,6 +45,95 @@ debug = False
 
 width = 80
 """lots of the functions are width constrained, this is the global width they default to"""
+
+
+class Progress(object):
+    def __init__(self, stream, length, quiet, **kwargs):
+        self.length = length
+        self.stream = stream
+        self.quiet = quiet
+
+    def get_percentage(self, current):
+        fill = float(current) / float(self.length)
+        percentage = "[{:3.2f}%]".format(fill * 100.0)
+        return percentage
+
+    def get_progress(self, current):
+        # http://stackoverflow.com/a/5676884/5006
+        bar = "{current: >{justify}}/{length} {percentage: >10}".format(
+        #bar = "{: >10} {: >10}".format(
+            current=current,
+            justify=len(str(self.length)) + 1,
+            length=self.length,
+            percentage=self.get_percentage(current)
+        )
+        return bar
+
+    def update(self, current):
+        if self.quiet: return
+        bar = self.get_progress(current)
+        self.stream.write(bar + chr(8) * (len(bar) + 1))
+        self.stream.flush()
+
+
+class ProgressBar(Progress):
+    def __init__(self, stream, length, width, quiet):
+        super(ProgressBar, self).__init__(stream, length, quiet)
+        self.bar_width = width - 11
+        self.width = width
+
+    def get_progress(self, current):
+        # http://stackoverflow.com/a/21008062/5006
+        fill = float(current) / float(self.length)
+        bar_length = int(self.bar_width * fill)
+        bar = "[{}{}]{: >10}".format(
+            "#" * bar_length,
+            " " * (self.bar_width - bar_length),
+            self.get_percentage(current)
+        )
+        return bar
+
+
+@contextmanager
+def progress(length, **kwargs):
+    """display a progress that can update in place
+
+    example -- 
+        total_length = 1000
+        with echo.progress(total_length) as p:
+            for x in range(total_length):
+                # do something crazy
+                p.update(x)
+
+    length -- int -- the total size of what you will be updating progress on
+    """
+    global quiet
+    progress_class = kwargs.pop("progress_class", Progress)
+    kwargs["stream"] = sys.stdout
+    kwargs["width"] = kwargs.get("width", globals()["width"])
+    kwargs["length"] = length
+    kwargs["quiet"] = quiet
+    pbar = progress_class(**kwargs)
+    pbar.update(0)
+    yield pbar
+    pbar.update(length)
+    pbar.stream.write("\n")
+
+
+def progress_bar(length, **kwargs):
+    """display a progress bar
+
+    example -- 
+        total_length = 1000
+        with echo.progress_bar(total_length) as bar:
+            for x in range(total_length):
+                # do something crazy
+                bar.update(x)
+
+    length -- int -- the total size of what you will be iterating on
+    """
+    kwargs["progress_class"] = ProgressBar
+    return progress(length, **kwargs)
 
 
 def exception(e):
