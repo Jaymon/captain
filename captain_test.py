@@ -56,6 +56,10 @@ class EchoTest(TestCase):
     def setUp(self):
         echo.quiet = False
 
+    def test_nolines(self):
+        for x in range(100):
+            echo.ch(".")
+
     def test_progress(self):
         count = 100
         with echo.progress(count) as pbar:

@@ -148,6 +148,23 @@ def err(format_msg, *args, **kwargs):
     stderr.info(str(format_msg).format(*args, **kwargs), exc_info=exc_info)
 
 
+def ch(c):
+    """print one or more characters without a newline at the end, while this does
+    respect --quiet, it does not use the stdout logger, that's because the loggers
+    automatically add the newline and there's nothing I can easily do about it.
+
+    example --
+        for x in range(1000):
+            echo.ch(".")
+
+    c -- string -- the chars that will be output
+    """
+    global quiet
+    if quiet: return
+    # http://stackoverflow.com/questions/493386/how-to-print-in-python-without-newline-or-space
+    sys.stdout.write(c)
+    sys.stdout.flush()
+
 def out(format_msg="", *args, **kwargs):
     '''print format_msg to stdout, taking into account --quiet setting'''
     global quiet
