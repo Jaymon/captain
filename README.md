@@ -43,10 +43,10 @@ from captain.decorators import arg
 
 @arg('--foo', '-f')
 @arg('arg', metavar='ARG')
-def main(**kwargs):
+def main(*args, **kwargs):
     '''this is the help description'''
-    print kwargs['foo'], kwargs['a']
-    return 0
+    echo.out(args)
+    echo.out(kwargs)
 
 exit()
 ```
@@ -86,7 +86,7 @@ e = ValueError("this will print with stacktrace and everything")
 echo.exception(e)
 ```
 
-Captain also can work with [clint](https://github.com/kennethreitz/clint) if you need to do more advanced cli output.
+The `echo` module has a lot of nice little helper features but Captain also can work with modules like [clint](https://github.com/kennethreitz/clint) if you need to do more advanced cli output.
 
 
 ## Examples
@@ -186,9 +186,4 @@ You can get a list of all available scripts in a directory by running captain wi
 Use pip:
 
     $ pip install captain
-
-
-## License
-
-MIT
 
