@@ -19,8 +19,11 @@ class Captain(object):
     script_prefix = ""
     """this will be prepended to the passed in script on initialization"""
 
-    script_postfix = ".py"
+    script_postfix = ""
     """this will be appended to the passed in script on initialization"""
+
+    script_quiet = True
+    """this is the default quiet setting for running a script, it can be overriden in run()"""
 
     cmd_prefix = "python"
     """this is what will be used to invoke captain from the command line when run()
@@ -91,33 +94,33 @@ class Captain(object):
         self.async_thread = self.thread_class(target=target)
         self.async_thread.start()
 
-    def run(self, *args, **kwargs):
-        quiet = kwargs.pop("quiet", True)
-        for line in self.execute(*args, **kwargs):
+    def run(self, arg_str='', **kwargs):
+        quiet = kwargs.pop("quiet", self.script_quiet)
+        for line in self.execute(arg_str, **kwargs):
             if not quiet:
                 self.flush(line)
-        return "\n".join(self.buf)
+        return self.output
 
-    def execute(self, arg_str='', **process_kwargs):
+    def execute(self, arg_str='', **kwargs):
         """runs the passed in arguments and returns an iterator on the output of
         running command"""
         cmd = "{} {} {}".format(self.cmd_prefix, self.script, arg_str)
 
         # we will allow overriding of these values
-        process_kwargs.setdefault("stderr", subprocess.STDOUT)
+        kwargs.setdefault("stderr", subprocess.STDOUT)
 
         # we will not allow these to be overridden via kwargs
-        process_kwargs["shell"] = True
-        process_kwargs["stdout"] = subprocess.PIPE
-        process_kwargs["cwd"] = self.cwd
-        process_kwargs["env"] = self.env
+        kwargs["shell"] = True
+        kwargs["stdout"] = subprocess.PIPE
+        kwargs["cwd"] = self.cwd
+        kwargs["env"] = self.env
 
         self.buf = deque(maxlen=self.bufsize)
 
         try:
             process = subprocess.Popen(
                 cmd,
-                **process_kwargs
+                **kwargs
             )
 
             # another round of links

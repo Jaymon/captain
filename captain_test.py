@@ -45,16 +45,7 @@ class TestScript(object):
         return self.path
 
     def run(self, arg_str=''):
-#        pwd = os.path.dirname(__file__)
-#         cmd_env = os.environ.copy()
-        #cmd_env['PYTHONPATH'] = pwd + os.pathsep + env.get('PYTHONPATH', '')
-        #c = Captain(self.path, cwd=self.cwd)
         return self.captain.run(arg_str)
-#         r = ""
-#         for line in c.run(arg_str, env=cmd_env):
-#             c.flush(line)
-#             r += line.strip()
-#         return r
 
 
 class EchoTest(TestCase):
