@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import threading
+from collections import deque
 
 
 class Captain(object):
@@ -18,7 +19,7 @@ class Captain(object):
     script_prefix = ""
     """this will be prepended to the passed in script on initialization"""
 
-    script_postfix = ""
+    script_postfix = ".py"
     """this will be appended to the passed in script on initialization"""
 
     cmd_prefix = "python"
@@ -28,17 +29,51 @@ class Captain(object):
     thread_class = threading.Thread
     """the threading class to use if run_async() is called instead of run()"""
 
+    bufsize = 1000
+    """how many lines to buffer of output, set to 0 to suppress all output"""
+
+    @property
+    def env(self):
+        env = getattr(self, "_env", None)
+        if env: return env
+
+        # TODO -- this would have to be updated if this file ever moved
+        pwd = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
+        pythonpath = pwd + os.pathsep + self.cwd
+
+        env = dict(os.environ)
+        if "PYTHONPATH" in env:
+            env["PYTHONPATH"] += os.pathsep + pythonpath
+        else:
+            env["PYTHONPATH"] = pythonpath
+
+        return env
+
+    @env.setter
+    def env(self, v):
+        self._env = v
+
+    @env.deleter
+    def env(self):
+        del self._env
+
+    @property
+    def output(self):
+        try:
+            ret = "\n".join(self.buf)
+        except AttributeError:
+            ret = ""
+
+        return ret
+
     def __init__(self, script, cwd=""):
-        self.cwd = cwd if cwd else os.curdir
+        self.cwd = os.path.realpath(cwd if cwd else os.curdir)
         self.script = script
         if self.script_prefix and not script.startswith(self.script_prefix):
-            self.script = os.path.join(self.script_prefix, script)
+            self.script = os.path.join(self.script_prefix.rstrip("/"), script)
 
         if self.script_postfix and not self.script.endswith(self.script_postfix):
             self.script += self.script_postfix
-
-        #if not self.script.endswith('.py'):
-        #    self.script += '.py'
 
     def flush(self, line):
         """flush the line to stdout"""
@@ -56,14 +91,16 @@ class Captain(object):
         self.async_thread = self.thread_class(target=target)
         self.async_thread.start()
 
-    def check_run(self, *args, **kwargs):
-        """runs the command and returns all the output"""
-        ret = ""
-        for line in self.run(*args, **kwargs):
-            ret += line
-        return ret
+    def run(self, *args, **kwargs):
+        quiet = kwargs.pop("quiet", True)
+        for line in self.execute(*args, **kwargs):
+            if not quiet:
+                self.flush(line)
+        return "\n".join(self.buf)
 
-    def run(self, arg_str='', **process_kwargs):
+    def execute(self, arg_str='', **process_kwargs):
+        """runs the passed in arguments and returns an iterator on the output of
+        running command"""
         cmd = "{} {} {}".format(self.cmd_prefix, self.script, arg_str)
 
         # we will allow overriding of these values
@@ -73,6 +110,9 @@ class Captain(object):
         process_kwargs["shell"] = True
         process_kwargs["stdout"] = subprocess.PIPE
         process_kwargs["cwd"] = self.cwd
+        process_kwargs["env"] = self.env
+
+        self.buf = deque(maxlen=self.bufsize)
 
         try:
             process = subprocess.Popen(
@@ -84,16 +124,13 @@ class Captain(object):
             # http://stackoverflow.com/a/17413045/5006 (what I used)
             # http://stackoverflow.com/questions/2715847/
             for line in iter(process.stdout.readline, ""):
+                self.buf.append(line.strip())
                 yield line
-
-            # flush any remaining output
-            #line = process.stdout.read()
-            #yield line
 
             process.wait()
             if process.returncode > 0:
-                raise RuntimeError("{} returned {}".format(cmd, process.returncode))
+                raise RuntimeError("{} returned {} with output: {}".format(cmd, process.returncode, self.output))
 
         except subprocess.CalledProcessError as e:
-            raise RuntimeError("{} returned {}".format(cmd, e.returncode))
+            raise RuntimeError("{} returned {} with output: {}".format(cmd, e.returncode, self.output))
 

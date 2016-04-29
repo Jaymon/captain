@@ -21,6 +21,10 @@ class TestScript(object):
         script_path = cls(*args, **kwargs)
         return script_path.instance
 
+    @property
+    def captain(self):
+        return Captain(self.path, cwd=self.cwd)
+
     def __init__(self, body, fname=''):
         self.body = body
         if not isinstance(body, basestring):
@@ -41,15 +45,16 @@ class TestScript(object):
         return self.path
 
     def run(self, arg_str=''):
-        pwd = os.path.dirname(__file__)
-        cmd_env = os.environ.copy()
-        cmd_env['PYTHONPATH'] = pwd + os.pathsep + cmd_env.get('PYTHONPATH', '')
-        c = Captain(self.path, cwd=self.cwd)
-        r = ""
-        for line in c.run(arg_str, env=cmd_env):
-            c.flush(line)
-            r += line.strip()
-        return r
+#        pwd = os.path.dirname(__file__)
+#         cmd_env = os.environ.copy()
+        #cmd_env['PYTHONPATH'] = pwd + os.pathsep + env.get('PYTHONPATH', '')
+        #c = Captain(self.path, cwd=self.cwd)
+        return self.captain.run(arg_str)
+#         r = ""
+#         for line in c.run(arg_str, env=cmd_env):
+#             c.flush(line)
+#             r += line.strip()
+#         return r
 
 
 class EchoTest(TestCase):
@@ -318,7 +323,9 @@ class CaptainTest(TestCase):
         )
 
         script.path = 'foo'
-        r = script.run()
+        c = script.captain
+        c.script = 'foo'
+        r = c.run()
         self.assertRegexpMatches(r, 'foo/__main__')
 
         script = TestScript(
@@ -334,16 +341,19 @@ class CaptainTest(TestCase):
         )
 
         script.path = 'foo'
+        c = script.captain
+        c.script = 'foo'
         with self.assertRaises(RuntimeError):
-            r = script.run()
+            r = c.run()
 
     def test_import(self):
         script = TestScript([
-            "print '1'",
+            "from __future__ import print_function",
+            "print('1', end='')",
             "import foo.bar",
-            "print '2'",
+            "print('2', end='')",
             "if __name__ == '__main__':",
-            "  print '3'",
+            "  print('3', end='')",
         ])
 
         testdata.create_module("foo.bar", "\n".join([
@@ -627,7 +637,11 @@ class ArgTest(TestCase):
             "exit()"
         ])
 
+        s = script_path.instance
+        parser = s.parser
+
         with self.assertRaises(RuntimeError):
+            # this should fail because final-dir is not a valid argument
             r = script_path.run("--output-file=foobar --final-dir=/tmp --print-lines")
 
         s = script_path.instance
