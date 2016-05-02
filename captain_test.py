@@ -45,7 +45,7 @@ class TestScript(object):
         return self.path
 
     def run(self, arg_str=''):
-        return self.captain.run(arg_str)
+        return self.captain.run(arg_str, quiet=False)
 
 
 class EchoTest(TestCase):
@@ -336,27 +336,6 @@ class CaptainTest(TestCase):
         c.script = 'foo'
         with self.assertRaises(RuntimeError):
             r = c.run()
-
-    def test_import(self):
-        script = TestScript([
-            "from __future__ import print_function",
-            "print('1', end='')",
-            "import foo.bar",
-            "print('2', end='')",
-            "if __name__ == '__main__':",
-            "  print('3', end='')",
-        ])
-
-        testdata.create_module("foo.bar", "\n".join([
-            "import captain",
-            "def main():",
-            "  '''the description for bar'''",
-            "  return 0",
-            "captain.exit()"
-        ]), tmpdir=script.cwd)
-
-        r = script.run()
-        self.assertEqual("123", r)
 
     def test_list(self):
         #raise SkipTest("")
@@ -798,23 +777,154 @@ class ArgTest(TestCase):
 
 
 class ScriptTest(TestCase):
-#     def test_description(self):
-#         script_path = TestScript([
-#             "import captain",
-#             "from captain import echo",
-#             "__version__ = '0.1'",
-#             "def main_foo():",
-#             "  '''description for foo'''",
-#             "  echo.out('foo out')",
-#             "  echo.verbose('foo verbose')",
-#             "def main_bar():",
-#             "  '''description for bar'''",
-#             "  echo.out('bar out')",
-#             "  echo.verbose('bar verbose')",
-#             "captain.exit()",
-#         ])
-#         s = Script(script_path)
-#         pout.v(s.description)
+    def test_stack_import(self):
+        script = TestScript([
+            "from __future__ import print_function",
+            #"print('foo 1', end='')",
+            "print('success 1')",
+            "import foo.bar",
+            "print('success 2')",
+            "if __name__ == '__main__':",
+            "  print('success 3')",
+        ])
+
+        testdata.create_module("foo.bar", "\n".join([
+            "import captain",
+            "def main():",
+            "  '''the description for bar'''",
+            "  return 0",
+            #"if __name__ == '__main__':",
+            #"  captain.exit()"
+            "captain.exit()"
+        ]), tmpdir=script.cwd)
+
+        r = script.run()
+        for x in range(1, 4):
+            self.assertTrue("success {}".format(x) in r)
+
+    def test_stack_single_script(self):
+        script = TestScript([
+            "from captain import exit, echo",
+            "def main():",
+            "    echo.out('success')",
+            "    return 0",
+            "",
+            "if __name__ == '__main__':",
+            "    exit()",
+        ])
+        r = script.run()
+        self.assertTrue("success" in r)
+
+    def test_stack_multi_script(self):
+        script = TestScript([
+            "from captain import exit, echo",
+            "def main():",
+            "    echo.out('success')",
+            "    return 0",
+            "",
+            "def console():",
+            "    exit()",
+            "",
+            "if __name__ == '__main__':",
+            "    console()",
+        ])
+        r = script.run()
+        self.assertTrue("success" in r)
+
+    def test_stack_single_entry_points(self):
+        """there was a bug in captain where multiple levels of calls would cause
+        captain.exit to not pick up that it is a captain script"""
+        module_d = testdata.create_modules({
+            "msmcli": "",
+            "msmcli.__main__": [
+                "from captain import exit as console, echo",
+                "def main():",
+                "    echo.out('success')",
+                "    return 0",
+                "",
+                "if __name__ == '__main__':",
+                "    console()",
+            ],
+        })
+
+        script = TestScript([
+            "#!/usr/bin/python",
+            "import sys",
+            "sys.path.append('{}')".format(module_d),
+            "from msmcli.__main__ import console",
+            "",
+            "def load_entry_point(*args):",
+            "    return console",
+            "",
+            "import pkg_resources",
+            "class GDFake(object):",
+            "    def __call__(self, *args, **kwargs):",
+            "        return self",
+            "    def get_entry_info(self, *args, **kwargs):",
+            "        class o(object):",
+            "            module_name = 'msmcli.__main__'",
+            "        return o()",
+            "pkg_resources.get_distribution = GDFake()",
+            ""
+            "#from pkg_resources import load_entry_point",
+            "",
+            "if __name__ == '__main__':",
+            "    sys.exit(",
+            "        load_entry_point('stockton==0.0.1', 'console_scripts', 'stockton')()",
+            "    )",
+        ])
+
+        r = script.run()
+        self.assertTrue("success" in r)
+
+    def test_stack_multi_entry_points(self):
+        """there was a bug in captain where multiple levels of calls would cause
+        captain.exit to not pick up that it is a captain script"""
+        module_d = testdata.create_modules({
+            "msmcli": "",
+            "msmcli.__main__": [
+                "from captain import exit, echo",
+                "def main():",
+                "    echo.out('success')",
+                "    return 0",
+                "",
+                "def console():",
+                "    exit()",
+                "",
+                "if __name__ == '__main__':",
+                "    console()",
+            ],
+        })
+
+        script = TestScript([
+            "#!/usr/bin/python",
+            "import sys",
+            "sys.path.append('{}')".format(module_d),
+            "from msmcli.__main__ import console",
+            "",
+            "def load_entry_point(*args):",
+            "    return console",
+            "",
+            "import pkg_resources",
+            "class GDFake(object):",
+            "    def __call__(self, *args, **kwargs):",
+            "        return self",
+            "    def get_entry_info(self, *args, **kwargs):",
+            "        class o(object):",
+            "            module_name = 'msmcli.__main__'",
+            "        return o()",
+            "pkg_resources.get_distribution = GDFake()",
+            ""
+            "#from pkg_resources import load_entry_point",
+            "",
+            "if __name__ == '__main__':",
+            "    sys.exit(",
+            "        load_entry_point('stockton==0.0.1', 'console_scripts', 'stockton')()",
+            "    )",
+        ])
+
+        r = script.run()
+        self.assertTrue("success" in r)
 
     def test_can_run_from_cli(self):
         script_path = TestScript([

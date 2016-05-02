@@ -70,7 +70,7 @@ class Captain(object):
         return ret
 
     def __init__(self, script, cwd=""):
-        self.cwd = os.path.realpath(cwd if cwd else os.curdir)
+        self.cwd = os.path.realpath(cwd) if cwd else os.getcwd()
         self.script = script
         if self.script_prefix and not script.startswith(self.script_prefix):
             self.script = os.path.join(self.script_prefix.rstrip("/"), script)
@@ -127,7 +127,7 @@ class Captain(object):
             # http://stackoverflow.com/a/17413045/5006 (what I used)
             # http://stackoverflow.com/questions/2715847/
             for line in iter(process.stdout.readline, ""):
-                self.buf.append(line.strip())
+                self.buf.append(line.rstrip())
                 yield line
 
             process.wait()

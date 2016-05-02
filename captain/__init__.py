@@ -21,45 +21,65 @@ from . import decorators
 from .exception import Error, ParseError, ArgError
 
 
-__version__ = '0.4.7'
+__version__ = '0.4.8'
 
 
 def exit():
 
+    # TODO -- I think this can be greatly simplified if I no longer need to not
+    # exit if the module is imported, ie, they put in __name__ == '__main__'
+
     try:
         # http://stackoverflow.com/a/1095621/5006
-        frame = inspect.stack()[1]
-        loc = frame[4][0].strip()
+        stack = inspect.stack()
+        frame = stack[1]
+        main_mod = sys.modules.get("__main__", None)
+        if main_mod:
 
-        # this might be more portable
-        # sys._getframe().f_back.f_code.co_name
-        # http://stackoverflow.com/questions/2654113/python-how-to-get-the-callers-method-name-in-the-called-method
+            mod = inspect.getmodule(frame[0])
+            if mod is not main_mod:
+                for f in stack[2:]:
+                    fm = inspect.getmodule(f[0])
+                    if fm is not mod:
+                        mod = fm
+                        frame = f
+                        break
 
-        m = re.match("load_entry_point\(([^\)]+)\)", loc)
-        if m:
-            # we are using a setup.py defined console_scripts entry point
+#             pout.b()
+#             for f in stack:
+#                 pout.v(inspect.getmodule(f[0]).__name__, f[4][0].strip())
 
-            dist, group, name = m.group(1).split("', ")
-            from pkg_resources import get_distribution
+            # now we have found what should be the __main__ mod, we bail if it isn't
+            if mod is main_mod:
+                loc = frame[4][0].strip()
 
-            ep = get_distribution(dist.strip("'")).get_entry_info(group.strip("'"), name.strip("'"))
-            calling_mod = sys.modules[ep.module_name]
+                if not re.match("import\s+", loc, re.I):
 
-        else:
-            # we called captain from a normal python script in a directory
-            # either defined through setup.py "scripts" in a package or just
-            # some script
+                    # this might be more portable
+                    # sys._getframe().f_back.f_code.co_name
+                    # http://stackoverflow.com/questions/2654113/python-how-to-get-the-callers-method-name-in-the-called-method
 
-            calling_mod = inspect.getmodule(frame[0])
-            main_mod = sys.modules.get("__main__", None)
-            if not main_mod or not (calling_mod is main_mod):
-                calling_mod = None
+                    m = re.match("load_entry_point\(([^\)]+)\)", loc)
+                    if m:
+                        # we are using a setup.py defined console_scripts entry point
 
-        if calling_mod:
-            s = Script(inspect.getfile(calling_mod), module=calling_mod)
-            raw_args = sys.argv[1:]
-            ret_code = s.run(raw_args)
-            sys.exit(ret_code)
+                        dist, group, name = m.group(1).split("', ")
+                        from pkg_resources import get_distribution
+
+                        ep = get_distribution(dist.strip("'")).get_entry_info(group.strip("'"), name.strip("'"))
+                        calling_mod = sys.modules[ep.module_name]
+
+                    else:
+                        # we called captain from a normal python script in a directory
+                        # either defined through setup.py "scripts" in a package or just
+                        # some script
+                        calling_mod = mod
+
+                    if calling_mod:
+                        s = Script(inspect.getfile(calling_mod), module=calling_mod)
+                        raw_args = sys.argv[1:]
+                        ret_code = s.run(raw_args)
+                        sys.exit(ret_code)
 
     finally:
         del frame
