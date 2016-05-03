@@ -776,7 +776,8 @@ class ArgTest(TestCase):
         self.assertTrue("['e', 'a']" in r)
 
 
-class ScriptTest(TestCase):
+class ExitTest(TestCase):
+    """Various tests to make sure the exit() method is working as expected"""
     def test_stack_import(self):
         script = TestScript([
             "from __future__ import print_function",
@@ -832,8 +833,6 @@ class ScriptTest(TestCase):
         self.assertTrue("success" in r)
 
     def test_stack_single_entry_points(self):
-        """there was a bug in captain where multiple levels of calls would cause
-        captain.exit to not pick up that it is a captain script"""
         module_d = testdata.create_modules({
             "msmcli": "",
             "msmcli.__main__": [
@@ -879,7 +878,8 @@ class ScriptTest(TestCase):
 
     def test_stack_multi_entry_points(self):
         """there was a bug in captain where multiple levels of calls would cause
-        captain.exit to not pick up that it is a captain script"""
+        captain.exit to not pick up that it is a captain script, this only happened
+        from an entry_point script installed with setup.py"""
         module_d = testdata.create_modules({
             "msmcli": "",
             "msmcli.__main__": [
@@ -888,11 +888,11 @@ class ScriptTest(TestCase):
                 "    echo.out('success')",
                 "    return 0",
                 "",
-                "def console():",
+                "def console():", # and console calls captain.exit, this is the multi
                 "    exit()",
                 "",
                 "if __name__ == '__main__':",
-                "    console()",
+                "    console()", # notice main calls console
             ],
         })
 
@@ -926,6 +926,8 @@ class ScriptTest(TestCase):
         r = script.run()
         self.assertTrue("success" in r)
 
+
+class ScriptTest(TestCase):
     def test_can_run_from_cli(self):
         script_path = TestScript([
             "from captain import exit as ex",

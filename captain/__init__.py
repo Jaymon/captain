@@ -25,10 +25,16 @@ __version__ = '0.4.8'
 
 
 def exit():
+    """A stand-in for the normal sys.exit()
 
-    # TODO -- I think this can be greatly simplified if I no longer need to not
-    # exit if the module is imported, ie, they put in __name__ == '__main__'
+    all the magic happens here, when this is called at the end of a script it will
+    figure out all the available commands and arguments that can be passed in,
+    then handle exiting the script and returning the status code. 
 
+    This also acts as a guard against the script being traditionally imported, so
+    even if you have this at the end of the script, it won't actually exit if the
+    script is traditionally imported
+    """
     try:
         # http://stackoverflow.com/a/1095621/5006
         stack = inspect.stack()
