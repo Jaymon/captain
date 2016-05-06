@@ -21,7 +21,7 @@ from . import decorators
 from .exception import Error, ParseError, ArgError
 
 
-__version__ = '0.4.8'
+__version__ = '0.4.9'
 
 
 def exit():
@@ -233,7 +233,7 @@ class ScriptKwarg(object):
                 # we've got a -N type argument
                 self.merge_args([arg_name])
 
-        self.name = longest_name
+        self.name = longest_name.replace('-', '_')
         self.parser_kwargs = {}
         self.merge_kwargs(kwargs)
 

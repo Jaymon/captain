@@ -525,6 +525,19 @@ class ScriptKwargTest(TestCase):
 
 
 class ArgTest(TestCase):
+    def test_arg_normalization(self):
+        script_path = TestScript([
+            "import captain",
+            "@captain.decorators.arg('--foo-bar')",
+            "def main(**kwargs):",
+            "    print kwargs['foo_bar']",
+            "captain.exit()",
+        ])
+
+        r = script_path.run("--foo-bar=1")
+        self.assertEqual('1', r)
+
+
     def test_args_class___call__(self):
         script_path = TestScript([
             "import captain",
