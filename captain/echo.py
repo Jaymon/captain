@@ -350,10 +350,10 @@ def prompt(question, choices=None):
 
     while True:
         if sys.version_info[0] > 2:
-            answer = input("{}: ".format(question))
+            answer = input(question)
 
         else:
-            answer = raw_input("{}: ".format(question))
+            answer = raw_input(question)
 
         if not choices or answer in choices:
             break
