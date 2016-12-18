@@ -52,6 +52,13 @@ class EchoTest(TestCase):
     def setUp(self):
         echo.quiet = False
 
+    def test_no_format(self):
+        echo.out("this should not {fail}")
+
+        v = None
+        with self.assertRaises(KeyError):
+            echo.out("this should {fail}", v)
+
     def test_nolines(self):
         for x in range(100):
             echo.ch(".")

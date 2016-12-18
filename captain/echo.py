@@ -172,7 +172,10 @@ def out(format_msg="", *args, **kwargs):
 
     if format_msg != "":
         if isinstance(format_msg, basestring):
-            s = format_msg.format(*args, **kwargs)
+            if args or kwargs:
+                s = format_msg.format(*args, **kwargs)
+            else:
+                s = format_msg
             stdout.info(s)
 #             width = globals()["width"]
 #             s = textwrap.fill(s, width=width)
