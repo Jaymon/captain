@@ -1,8 +1,12 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals, division, print_function, absolute_import
 import os
 import subprocess
 import sys
 import threading
 from collections import deque
+
+from .compat import *
 
 
 class Captain(object):
@@ -126,9 +130,15 @@ class Captain(object):
             # another round of links
             # http://stackoverflow.com/a/17413045/5006 (what I used)
             # http://stackoverflow.com/questions/2715847/
-            for line in iter(process.stdout.readline, ""):
-                self.buf.append(line.rstrip())
-                yield line
+            if is_py2:
+                for line in iter(process.stdout.readline, ""):
+                    self.buf.append(line.rstrip())
+                    yield line
+            else:
+                for line in iter(process.stdout.readline, b""):
+                    line = line.decode("utf-8")
+                    self.buf.append(line.rstrip())
+                    yield line
 
             process.wait()
             if process.returncode > 0:

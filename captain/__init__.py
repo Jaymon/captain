@@ -1,8 +1,10 @@
+# -*- coding: utf-8 -*-
 """
 some other solutions I considered:
 http://zacharyvoase.com/2009/12/09/django-boss/
 https://github.com/zacharyvoase/django-boss
 """
+from __future__ import unicode_literals, division, print_function, absolute_import
 import os
 import argparse
 import imp
@@ -15,13 +17,15 @@ import inspect
 import types
 import sys
 import collections
+import inspect
 
 from . import echo
 from . import decorators
 from .exception import Error, ParseError, ArgError
+from .compat import *
 
 
-__version__ = '0.4.10'
+__version__ = '0.4.11'
 
 
 def exit():
@@ -116,7 +120,11 @@ class CallbackInspect(object):
         desc = inspect.getdoc(self.callback)
         if not desc:
             cb_method = self.callable
-            desc = inspect.getdoc(cb_method)
+            if is_py2:
+                desc = inspect.getdoc(cb_method)
+            else:
+                # avoid method doc inheritance in py >=3.5
+                desc = cb_method.__doc__
         if not desc: desc = ''
         return desc
 
@@ -133,7 +141,12 @@ class CallbackInspect(object):
 
     @property
     def argspec(self):
-        args, args_name, kwargs_name, args_defaults = inspect.getargspec(self.callable)
+        #args, args_name, kwargs_name, args_defaults = getfullargspec(self.callable)
+        signature = getfullargspec(self.callable)
+        args = signature[0]
+        args_name = signature[1]
+        kwargs_name = signature[2]
+        args_defaults = signature[3]
         if self.is_instance() or self.is_class():
             args = args[1:] # remove self which will always get passed in automatically
 
@@ -145,14 +158,24 @@ class CallbackInspect(object):
         self.callback = callback
 
     def is_class(self):
-        return isinstance(self.callback, type)
+        return inspect.isclass(self.callback)
+        #return isinstance(self.callback, type)
 
     def is_instance(self):
         """return True if callback is an instance of a class"""
+        ret = False
         val = self.callback
         if self.is_class(): return False
-        return isinstance(val, types.InstanceType) or hasattr(val, '__dict__') \
-            and not (hasattr(val, 'func_name') or hasattr(val, 'im_func'))
+
+        ret = not inspect.isfunction(val) and not inspect.ismethod(val)
+#         if is_py2:
+#             ret = isinstance(val, types.InstanceType) or hasattr(val, '__dict__') \
+#                 and not (hasattr(val, 'func_name') or hasattr(val, 'im_func'))
+# 
+#         else:
+#             ret = not inspect.isfunction(val) and not inspect.ismethod(val)
+
+        return ret
 
     def is_function(self):
         """return True if callback is a vanilla plain jane function"""
@@ -707,7 +730,7 @@ class Script(object):
 
         except ArgError as e:
             # https://hg.python.org/cpython/file/2.7/Lib/argparse.py#l2374
-            echo.err("{}: error: {}", parser.prog, e.message)
+            echo.err("{}: error: {}", parser.prog, str(e))
             ret_code = 2
 
         return ret_code
@@ -819,7 +842,7 @@ class Script(object):
         s = set()
 
         # always add the default call, the set will make sure there are no dupes...
-        s.add(u"{}.{}".format(called_module, called_func))
+        s.add("{}.{}".format(called_module, called_func))
 
         if hasattr(ast_tree, 'body'):
             # further down the rabbit hole we go
@@ -840,7 +863,7 @@ class Script(object):
                 # we are in a import ... statement
                 for ast_name in ast_tree.names:
                     if hasattr(ast_name, 'name') and (ast_name.name == called_module):
-                        call = u"{}.{}".format(
+                        call = "{}.{}".format(
                             ast_name.asname if ast_name.asname is not None else ast_name.name,
                             called_func
                         )

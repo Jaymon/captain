@@ -1,4 +1,7 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals, division, print_function, absolute_import
 import argparse
+
 
 class Error(Exception):
     """all captain errors will inherit from this base class"""

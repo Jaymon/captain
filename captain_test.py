@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals, division, print_function, absolute_import
 from unittest import TestCase, SkipTest
 import os
 import subprocess
@@ -8,6 +10,7 @@ import testdata
 from captain import Script, ScriptArg, ScriptKwarg, echo, CallbackInspect, ArgParser
 from captain.client import Captain
 from captain.decorators import arg, args
+from captain.compat import *
 
 
 class TestScript(object):
@@ -293,7 +296,7 @@ class CaptainTest(TestCase):
                 "import captain",
                 "def main():",
                 "  '''the description for foo module'''",
-                "  print 'foo/__init__'",
+                "  print('foo/__init__')",
                 "  return 0",
                 "captain.exit()"
             ],
@@ -313,7 +316,7 @@ class CaptainTest(TestCase):
                 "import captain",
                 "def main():",
                 "  '''the description for foo module'''",
-                "  print 'foo/__main__'",
+                "  print('foo/__main__')",
                 "  return 0",
                 "captain.exit()"
             ],
@@ -372,7 +375,7 @@ class CaptainTest(TestCase):
                 ]),
                 'bar/baz.py': "\n".join([
                     "#!/usr/bin/env python",
-                    "if __name__ == u'__main__': pass"
+                    "if __name__ == '__main__': pass"
                 ]),
                 'mod1/__init__.py': "\n".join([
                     "#!/usr/bin/env python",
@@ -443,13 +446,12 @@ class CaptainTest(TestCase):
         self.assertTrue('bar' in r)
         self.assertTrue('args' in r)
 
-
     def test_run_script(self):
         script = TestScript([
             "#!/usr/bin/env python",
             "import captain",
             "def main(foo, bar=0, *args, **kwargs):",
-            "  print args[0], kwargs['che']",
+            "  print('{} {}'.format(args[0], kwargs['che']))",
             "  return 0",
             "captain.exit()",
         ])
@@ -460,7 +462,7 @@ class CaptainTest(TestCase):
             "#!/usr/bin/env python",
             "import captain",
             "def main(foo, bar=0, *args):",
-            "  print args[0]",
+            "  print(args[0])",
             "  return 0",
             "captain.exit()",
         ])
@@ -471,7 +473,7 @@ class CaptainTest(TestCase):
             "#!/usr/bin/env python",
             "import captain",
             "def main(foo=int, *args):",
-            "  print args[0]",
+            "  print(args[0])",
             "  return 0",
             "captain.exit()",
         ])
@@ -482,7 +484,7 @@ class CaptainTest(TestCase):
             "#!/usr/bin/env python",
             "import captain",
             "def main(foo=int, bar=int):",
-            "  print 'foo'",
+            "  print('foo')",
             "  return 0",
             "captain.exit()",
         ])
@@ -537,7 +539,7 @@ class ArgTest(TestCase):
             "import captain",
             "@captain.decorators.arg('--foo-bar')",
             "def main(**kwargs):",
-            "    print kwargs['foo_bar']",
+            "    print(kwargs['foo_bar'])",
             "captain.exit()",
         ])
 
@@ -574,7 +576,7 @@ class ArgTest(TestCase):
             "import captain",
             "@captain.decorators.arg('foo', nargs=1)",
             "def main(foo):",
-            "    print foo",
+            "    print(foo)",
             "captain.exit()",
         ])
 
@@ -601,7 +603,7 @@ class ArgTest(TestCase):
             "",
             "@arg('--dir', '-d', dest='indir', type=Directory)",
             "def main(indir):",
-            "    print indir",
+            "    print(indir)",
             "    return 0",
             "captain.exit()",
         ])
@@ -648,7 +650,8 @@ class ArgTest(TestCase):
             "@arg('arg', metavar='ARG')",
             "def main(**kargs):",
             "    '''this is the help description'''",
-            "    print args, kwargs",
+            "    print(args)",
+            "    print(kwargs)",
             "    return 0",
         ])
         r = script_path.run('--help')
@@ -663,7 +666,7 @@ class ArgTest(TestCase):
             "@arg('--boom', default='boom')",
             "@arg('a')",
             "def main(foo, bar, che=1, baz=2, *args, **kwargs):",
-            "  print args[0]",
+            "  print(args[0])",
             "  return 0",
             "captain.exit()",
         ])
@@ -1065,37 +1068,37 @@ class ScriptTest(TestCase):
     def test_parse_main_class(self):
         script_path = TestScript([
             "#!/usr/bin/env python",
-            "class FooBar(object):",
-            "  def __call__(self, *args, **kwargs):",
-            "    '''this would be the description'''",
-            "    return 0",
-            "main = FooBar()"
-        ])
-        s = Script(script_path)
-        p = s.parser
-        self.assertEqual('this would be the description', p.description)
-
-        script_path = TestScript([
-            "#!/usr/bin/env python",
-            "class FooBar(object):",
-            "  def __call__(self, *args, **kwargs):",
-            "    '''this would be the description'''",
-            "    return 0",
-            "main = FooBar()"
-        ])
-        s = Script(script_path)
-        p = s.parser
-        self.assertEqual('this would be the description', p.description)
-
-        script_path = TestScript([
-            "#!/usr/bin/env python",
             "class main(object):",
             "  def __call__(self, *args, **kwargs):",
+            #"    ''''''", # py3.5 does inheritance on doc strings unless overridden
             "    return 0"
         ])
         s = Script(script_path)
         p = s.parser
-        self.assertEqual('', p.description)
+
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "class FooBar(object):",
+            "  def __call__(self, *args, **kwargs):",
+            "    '''this would be the description'''",
+            "    return 0",
+            "main = FooBar()"
+        ])
+        s = Script(script_path)
+        p = s.parser
+        self.assertEqual('this would be the description', p.description)
+
+        script_path = TestScript([
+            "#!/usr/bin/env python",
+            "class FooBar(object):",
+            "  def __call__(self, *args, **kwargs):",
+            "    '''this would be the description'''",
+            "    return 0",
+            "main = FooBar()"
+        ])
+        s = Script(script_path)
+        p = s.parser
+        self.assertEqual('this would be the description', p.description)
 
         script_path = TestScript([
             "#!/usr/bin/env python",
@@ -1400,7 +1403,7 @@ class ScriptTest(TestCase):
             else:
                 parser = s.parser
                 args, _ = parser.parse_known_args(test_out.split())
-                for k, v in test_assert.iteritems():
+                for k, v in test_assert.items():
                     self.assertEqual(v, getattr(args, k))
 
         # test whether parser knows it shouldn't fail on unknown args

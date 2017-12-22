@@ -1,15 +1,17 @@
+# -*- coding: utf-8 -*-
 """
 This is handy for captain scripts to be able to route their prints through and it
 will obey the passed in --quiet commmand line argument automatically
 """
-
+from __future__ import unicode_literals, division, print_function, absolute_import
 import sys
 import logging
 import textwrap
-import itertools
 import os
 import re
 from contextlib import contextmanager
+
+from captain.compat import *
 
 
 # configure loggers
@@ -324,13 +326,13 @@ def columns(*columns, **kwargs):
     buf_count = kwargs.get('buf_count', 2)
     row_counts = [0] * len(columns)
 
-    for rows in itertools.izip(*columns):
+    for rows in zip(*columns):
         for i, c in enumerate(rows):
             cl = len(c) 
             if cl > row_counts[i]:
                 row_counts[i] = cl
 
-    for rows in itertools.izip(*columns):
+    for rows in zip(*columns):
         row = [prefix]
         for i, c in enumerate(rows):
             row.append("{}{}".format(c, " " * ((row_counts[i] + buf_count) - len(c))))

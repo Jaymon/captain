@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals, division, print_function, absolute_import
+
 
 def arg(*parser_args, **parser_kwargs):
     def wrap(main):
