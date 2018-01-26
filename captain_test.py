@@ -12,6 +12,7 @@ from captain.client import Captain
 from captain.decorators import arg, args
 from captain.compat import *
 from captain.parse import Parser, ScriptKwarg, CallbackInspect
+from captain import logging
 
 
 class TestScript(object):
@@ -54,8 +55,7 @@ class TestScript(object):
 
 class EchoTest(TestCase):
     def setUp(self):
-        a = Parser()
-        a.configure_logging("")
+        logging.inject_quiet("")
 
     def test_no_format(self):
         echo.out("this should not {fail}")
@@ -197,6 +197,38 @@ class EchoTest(TestCase):
         self.assertFalse("verbose" in r)
         self.assertFalse("out" in r)
 
+    def test_quiet_logging(self):
+        script = TestScript(
+            [
+                "#!/usr/bin/env python",
+                "import sys",
+                "import logging",
+                "logging.basicConfig(",
+                "  format='[%(levelname)s] %(message)s',",
+                "  level=logging.DEBUG, stream=sys.stdout",
+                ")",
+                "logger = logging.getLogger(__name__)",
+                "from captain import echo, exit",
+                "",
+                "def main():",
+                "  logger.debug('debug')",
+                "  logger.info('info')",
+                "  logger.warning('warning')",
+                "  logger.error('error')",
+                "  logger.critical('critical')",
+                "  echo.verbose('verbose')",
+                "  echo.out('out')",
+                "  echo.err('err')",
+                "exit(__name__)",
+            ]
+        )
+
+        r = script.run('--quiet=-C')
+        self.assertRegexpMatches(r, r"^\[CRITICAL]\s+critical\s*$")
+
+        r = script.run('--quiet=-I')
+        self.assertEqual("[INFO] info\nout", r)
+
     def test_ch(self):
         script = TestScript(
             [
@@ -315,7 +347,6 @@ class CallbackInspectTest(TestCase):
 
         p = Parser(callback=MainClass2())
         hm = p.format_help()
-        pout.v(hm)
         for k in ["--foo", "--bar", "--che"]:
             self.assertTrue(k in hm)
 

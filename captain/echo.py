@@ -5,48 +5,13 @@ will obey the passed in --quiet commmand line argument automatically
 """
 from __future__ import unicode_literals, division, print_function, absolute_import
 import sys
-import logging
 import textwrap
 import os
 import re
 from contextlib import contextmanager
 
-from captain.compat import *
-
-
-# configure loggers
-log_formatter = logging.Formatter('%(message)s')
-
-#logger = logging.getLogger(__name__)
-stdout = logging.getLogger('{}.stdout'.format(__name__))
-# if len(stdout.handlers) == 0:
-#     stdout.propagate = False
-#     stdout.setLevel(logging.DEBUG)
-#     log_handler = logging.StreamHandler(stream=sys.stdout)
-#     log_handler.setFormatter(log_formatter)
-#     stdout.addHandler(log_handler)
-
-
-istdout = logging.getLogger('{}.istdout'.format(__name__))
-# if len(istdout.handlers) == 0:
-#     istdout.propagate = False
-#     istdout.setLevel(logging.DEBUG)
-#     log_handler = logging.StreamHandler(stream=InlineStream(sys.stdout))
-#     log_handler.setFormatter(log_formatter)
-#     istdout.addHandler(log_handler)
-
-
-stderr = logging.getLogger('{}.stderr'.format(__name__))
-# if len(stderr.handlers) == 0:
-#     # we want to propogate error messages up through the chain, this allows us to
-#     # do things like attach a logging handler that will do more important things
-#     # with exceptions and the like
-#     #stderr.propagate = True 
-#     stderr.propagate = False
-#     stderr.setLevel(logging.DEBUG)
-#     log_handler = logging.StreamHandler(stream=sys.stderr)
-#     log_handler.setFormatter(log_formatter)
-#     stderr.addHandler(log_handler)
+from .compat import *
+from .logging import stdout, istdout, stderr
 
 
 WIDTH = 80

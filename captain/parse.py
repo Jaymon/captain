@@ -3,13 +3,12 @@ from __future__ import unicode_literals, division, print_function, absolute_impo
 import argparse
 import types
 import re
-import logging
-import logging.config
 import inspect
 import sys
 from collections import defaultdict, Callable
 
 from .compat import *
+from . import logging
 
 
 class CallbackInspect(object):
@@ -607,7 +606,7 @@ class Parser(ArgParser):
         if self.module:
             #if args.quiet is not None:
             #action = self._option_string_actions["--quiet"]
-            self.configure_logging(args.quiet)
+            logging.inject_quiet(args.quiet)
 
         return args, unknown_args
 
@@ -615,118 +614,5 @@ class Parser(ArgParser):
         arg_strings = super(Parser, self)._read_args_from_files(arg_strings)
         arg_strings = self.normalize_quiet_arg(arg_strings)
         return arg_strings
-
-    def configure_logging(self, levels):
-        """see --quiet flag help for what this does"""
-        class InlineStream(object):
-            def __init__(self, stream):
-                self.stream = stream
-
-            def write(self, v):
-                v = v.strip("\n")
-                return self.stream.write(v)
-
-            def __getattr__(self, k):
-                return getattr(self.stream, k)
-
-        class LevelFilter(object):
-            def __init__(self, levels):
-                self.levels = set(levels.upper())
-                self.__level = logging.NOTSET
-            def filter(self, logRecord):
-                #pout.v(logRecord.levelname[0], self.levels)
-                return logRecord.levelname[0].upper() not in self.levels
-
-        try:
-            # https://docs.python.org/2/library/logging.html
-            # https://docs.python.org/2/library/logging.config.html#logging-config-dictschema
-            # https://docs.python.org/2/howto/logging.html
-            # http://stackoverflow.com/questions/8162419/python-logging-specific-level-only
-            d = {
-                'version': 1,
-                'formatters': {
-                    'basic': {
-                        #'format': '[%(levelname).1s|%(filename)s:%(lineno)s] %(message)s',
-                        'format': '[%(levelname).1s] %(message)s',
-                    },
-                    'message': {
-                        'format': '%(message)s'
-                    }
-                },
-                'handlers': {
-                    'stdout': {
-                        'level': 'NOTSET',
-                        'class': 'logging.StreamHandler',
-                        'formatter': 'message',
-                        'filters': ['user'],
-                        'stream': sys.stdout, #'ext://sys.stdout'
-                    },
-                    'istdout': {
-                        'level': 'NOTSET',
-                        'class': 'logging.StreamHandler',
-                        'formatter': 'message',
-                        'filters': ['user'],
-                        'stream': InlineStream(sys.stdout),
-                    },
-                    'stderr': {
-                        'level': 'WARNING',
-                        'class': 'logging.StreamHandler',
-                        'formatter': 'message',
-                        'filters': ['user'],
-                        'stream': sys.stderr, #'ext://sys.stderr'
-                    },
-#                     'log': {
-#                         'level': 'NOTSET',
-#                         'class': 'logging.StreamHandler',
-#                         'formatter': 'basic',
-#                         'filters': ['user'],
-#                         'stream': 'ext://sys.stdout'
-#                     },
-                },
-                'filters': {
-#                     'stdout': {
-#                         '()': LevelFilter,
-#                         'levels': 'DI',
-#                     },
-#                     'stderr': {
-#                         '()': LevelFilter,
-#                         'levels': 'WEC',
-#                     },
-                    'user': {
-                        '()': LevelFilter,
-                        'levels': levels,
-                    },
-                },
-                'root': {
-                    'level': 'NOTSET',
-                    'handlers': ['stdout', 'stderr'],
-                },
-                'loggers': {
-                    'captain.echo.stdout': {
-                        'level': 'NOTSET',
-                        'propagate': False,
-                        'handlers': ['stdout'],
-                    },
-                    'captain.echo.istdout': {
-                        'level': 'NOTSET',
-                        'propagate': False,
-                        'handlers': ['istdout'],
-                    },
-                    'captain.echo.stderr': {
-                        'level': 'WARNING',
-                        'propagate': False,
-                        'handlers': ['stderr'],
-                    },
-#                     'captain.echo': {
-#                         'handlers': ['log'],
-#                     },
-                },
-                'incremental': False,
-                'disable_existing_loggers': False,
-            }
-            logging.config.dictConfig(d)
-
-        except Exception as e:
-            raise
 
 
