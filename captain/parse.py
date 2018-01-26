@@ -603,11 +603,6 @@ class Parser(ArgParser):
         arg_strings = self.normalize_quiet_arg(arg_strings)
         args, unknown_args = super(Parser, self)._parse_known_args(arg_strings, namespace)
 
-        if self.module:
-            #if args.quiet is not None:
-            #action = self._option_string_actions["--quiet"]
-            logging.inject_quiet(args.quiet)
-
         return args, unknown_args
 
     def _read_args_from_files(self, arg_strings):

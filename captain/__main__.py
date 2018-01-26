@@ -53,5 +53,5 @@ def main(path):
 
 
 if __name__ == "__main__":
-    console()
+    console(__name__)
 

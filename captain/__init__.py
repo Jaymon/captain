@@ -7,7 +7,6 @@ https://github.com/zacharyvoase/django-boss
 from __future__ import unicode_literals, division, print_function, absolute_import
 import os
 import imp
-#import codecs
 import re
 import ast
 import inspect
@@ -21,7 +20,7 @@ from .compat import *
 from .parse import ArgParser, Parser
 
 
-__version__ = '0.4.11'
+__version__ = '1.0.0'
 
 
 def discover_if_calling_mod():
@@ -224,9 +223,8 @@ class Script(object):
 
         #pout.v(args, kwargs)
         callback = kwargs.pop("main_callback")
-        kwargs.pop("quiet", None)
-#         echo.quiet = kwargs.pop("quiet", False)
-#         echo.debug = kwargs.pop("verbose", False)
+        levels = kwargs.pop("quiet", "")
+        logging.inject_quiet(levels)
 
         try:
             ret_code = callback(*args, **kwargs)
