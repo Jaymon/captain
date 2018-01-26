@@ -7,10 +7,11 @@ import argparse
 
 import testdata
 
-from captain import Script, ScriptArg, ScriptKwarg, echo, CallbackInspect, ArgParser
+from captain import Script, echo
 from captain.client import Captain
 from captain.decorators import arg, args
 from captain.compat import *
+from captain.parse import Parser, ScriptKwarg, CallbackInspect
 
 
 class TestScript(object):
@@ -53,7 +54,8 @@ class TestScript(object):
 
 class EchoTest(TestCase):
     def setUp(self):
-        echo.quiet = False
+        a = Parser()
+        a.configure_logging("")
 
     def test_no_format(self):
         echo.out("this should not {fail}")
@@ -77,13 +79,6 @@ class EchoTest(TestCase):
         with echo.progress_bar(count) as pbar:
             for x in range(count):
                 pbar.update(x)
-
-    def test_verbose(self):
-        echo.debug = False
-        echo.verbose("verbose should not show")
-
-        echo.debug = True
-        echo.verbose("verbose should show")
 
     def test_quote(self):
         echo.quote("this is the string")
@@ -165,6 +160,61 @@ class EchoTest(TestCase):
 
         r = script.run()
         self.assertEqual(1, r.count("gotcha"))
+
+    def test_quiet(self):
+        """make sure you don't get double echoing when echo is imported before other
+        set up logging"""
+        script = TestScript(
+            [
+                "#!/usr/bin/env python",
+                "from captain import echo, exit",
+                "",
+                "def main():",
+                "  echo.verbose('verbose')",
+                "  echo.out('out')",
+                "  echo.err('err')",
+                "exit(__name__)",
+            ]
+        )
+
+        r = script.run('--quiet=-WE')
+        self.assertTrue("err" in r)
+        self.assertFalse("verbose" in r)
+        self.assertFalse("out" in r)
+
+        r = script.run('')
+        self.assertTrue("err" in r)
+        self.assertTrue("verbose" in r)
+        self.assertTrue("out" in r)
+
+        r = script.run('--quiet=D')
+        self.assertTrue("err" in r)
+        self.assertFalse("verbose" in r)
+        self.assertTrue("out" in r)
+
+        r = script.run('--quiet')
+        self.assertFalse("err" in r)
+        self.assertFalse("verbose" in r)
+        self.assertFalse("out" in r)
+
+    def test_ch(self):
+        script = TestScript(
+            [
+                "#!/usr/bin/env python",
+                "from captain import echo, exit",
+                "",
+                "def main():",
+                "  for x in range(10):",
+                "    echo.ch('.')",
+                "exit(__name__)",
+            ]
+        )
+
+        r = script.run()
+        self.assertEqual("..........", r)
+
+        r = script.run("--quiet")
+        self.assertEqual("", r)
 
 
 class CallbackInspectTest(TestCase):
@@ -263,12 +313,13 @@ class CallbackInspectTest(TestCase):
             @arg("--baz")
             def __call__(self, **kwargs): pass
 
-        p = ArgParser(MainClass2())
+        p = Parser(callback=MainClass2())
         hm = p.format_help()
+        pout.v(hm)
         for k in ["--foo", "--bar", "--che"]:
             self.assertTrue(k in hm)
 
-        p = ArgParser(MainClass3())
+        p = Parser(callback=MainClass3())
         hm = p.format_help()
         for k in ["--foo", "--bar", "--che", "--baz"]:
             self.assertTrue(k in hm)
@@ -534,6 +585,17 @@ class ScriptKwargTest(TestCase):
 
 
 class ArgTest(TestCase):
+#     def test_quiet(self):
+#         script_path = TestScript([
+#             "#!/usr/bin/env python",
+#             "from captain import echo",
+#             "from captain.decorators import arg",
+#             "def main():",
+#             "    echo.out('hello world')",
+#         ])
+#         r = script_path.run('--quiet')
+#         self.assertEqual("", r)
+
     def test_arg_normalization(self):
         script_path = TestScript([
             "import captain",
@@ -564,7 +626,7 @@ class ArgTest(TestCase):
             "    def __call__(self, **kwargs): pass",
             "",
             "main = MainCommand()",
-            "captain.exit()",
+            "captain.exit(__name__)",
         ])
 
         r = script_path.run("--help")
@@ -1210,7 +1272,6 @@ class ScriptTest(TestCase):
         self.assertTrue("{3,4}" in r)
         self.assertTrue("--bar" in r)
 
-
     def test_run_multi_main(self):
         script_path = TestScript([
             "import captain",
@@ -1227,17 +1288,17 @@ class ScriptTest(TestCase):
             "captain.exit()",
         ])
 
-        r = script_path.run("--quiet --verbose foo")
+        r = script_path.run("--quiet foo")
         self.assertEqual("", r)
 
         with self.assertRaises(RuntimeError):
-            r = script_path.run("foo --quiet --verbose")
+            r = script_path.run("foo --quiet")
 
-        r = script_path.run("--verbose foo")
+        r = script_path.run("foo")
         self.assertTrue("foo verbose" in r)
         self.assertTrue("foo out" in r)
 
-        r = script_path.run("--verbose bar")
+        r = script_path.run("bar")
         self.assertTrue("bar verbose" in r)
         self.assertTrue("bar out" in r)
 
@@ -1427,4 +1488,71 @@ class ScriptTest(TestCase):
 
         s = Script(script_path)
         self.assertEqual(desc, s.parser.description)
+
+
+class ParserTest(TestCase):
+    def test_quiet(self):
+        p = Parser(module=self)
+        p.add_argument('args', nargs="*")
+        #rquiet = p._option_string_actions["--quiet"].OPTIONS
+        rargs = ["arg1", "arg2"]
+
+        args = p.parse_args(['-qqq', 'arg1', 'arg2'])
+        self.assertEqual(rargs, args.args)
+        self.assertEqual("EC", args.quiet)
+
+        args = p.parse_args(['-q', 'arg1', 'arg2'])
+        self.assertEqual(rargs, args.args)
+        self.assertEqual("IWEC", args.quiet)
+
+        args = p.parse_args(['--quiet', 'arg1', 'arg2'])
+        self.assertEqual(rargs, args.args)
+        self.assertEqual("DIWEC", args.quiet)
+
+        args = p.parse_args(['--quiet=DIW', 'arg1', 'arg2'])
+        self.assertEqual(rargs, args.args)
+        self.assertEqual("DIW", args.quiet)
+
+        args = p.parse_args(['--quiet', 'DIW', 'arg1', 'arg2'])
+        self.assertEqual(rargs, args.args)
+        self.assertEqual("DIW", args.quiet)
+
+        args = p.parse_args(['-Q', 'DIW', 'arg1', 'arg2'])
+        self.assertEqual(rargs, args.args)
+        self.assertEqual("DIW", args.quiet)
+
+        args = p.parse_args(['--quiet=-EC', 'arg1', 'arg2'])
+        self.assertEqual(rargs, args.args)
+        self.assertEqual(set("DIW"), set(args.quiet))
+
+        args = p.parse_args(['-Q=-C', 'arg1', 'arg2'])
+        self.assertEqual(rargs, args.args)
+        self.assertEqual(set("DIWE"), set(args.quiet))
+
+        args = p.parse_args(['--quiet', '-DW', 'arg1', 'arg2'])
+        self.assertEqual(rargs, args.args)
+        self.assertEqual(set("IEC"), set(args.quiet))
+
+        args = p.parse_args(['--quiet', 'DWarg', 'arg1', 'arg2'])
+        self.assertEqual(["DWarg"] + rargs, args.args)
+        self.assertEqual("DIWEC", args.quiet)
+
+        p = Parser(module=self)
+
+        args = p.parse_args(['--quiet'])
+        self.assertEqual("DIWEC", args.quiet)
+
+        args = p.parse_args(['--quiet', 'DWI'])
+        self.assertEqual("DWI", args.quiet)
+
+        with self.assertRaises(SystemExit):
+            args = p.parse_args(['--quiet', 'DWA'])
+            self.assertEqual("DWI", args.quiet)
+
+        p = Parser(module=self)
+        p.add_argument('-D', action="store_true")
+
+        args = p.parse_args(['--quiet', '-D'])
+        self.assertEqual("DIWEC", args.quiet)
+        self.assertTrue(args.D)
 

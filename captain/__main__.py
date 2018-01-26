@@ -3,7 +3,6 @@ from __future__ import unicode_literals, division, print_function, absolute_impo
 import sys
 import os
 import fnmatch
-import argparse
 
 import captain
 from captain.decorators import arg

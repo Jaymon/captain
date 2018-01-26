@@ -17,43 +17,46 @@ from captain.compat import *
 # configure loggers
 log_formatter = logging.Formatter('%(message)s')
 
+#logger = logging.getLogger(__name__)
 stdout = logging.getLogger('{}.stdout'.format(__name__))
-if len(stdout.handlers) == 0:
-    stdout.propagate = False
-    stdout.setLevel(logging.DEBUG)
-    log_handler = logging.StreamHandler(stream=sys.stdout)
-    log_handler.setFormatter(log_formatter)
-    stdout.addHandler(log_handler)
+# if len(stdout.handlers) == 0:
+#     stdout.propagate = False
+#     stdout.setLevel(logging.DEBUG)
+#     log_handler = logging.StreamHandler(stream=sys.stdout)
+#     log_handler.setFormatter(log_formatter)
+#     stdout.addHandler(log_handler)
+
+
+istdout = logging.getLogger('{}.istdout'.format(__name__))
+# if len(istdout.handlers) == 0:
+#     istdout.propagate = False
+#     istdout.setLevel(logging.DEBUG)
+#     log_handler = logging.StreamHandler(stream=InlineStream(sys.stdout))
+#     log_handler.setFormatter(log_formatter)
+#     istdout.addHandler(log_handler)
+
 
 stderr = logging.getLogger('{}.stderr'.format(__name__))
-if len(stderr.handlers) == 0:
-    # we want to propogate error messages up through the chain, this allows us to
-    # do things like attach a logging handler that will do more important things
-    # with exceptions and the like
-    stderr.propagate = True 
-    stderr.setLevel(logging.DEBUG)
-    log_handler = logging.StreamHandler(stream=sys.stderr)
-    log_handler.setFormatter(log_formatter)
-    stderr.addHandler(log_handler)
+# if len(stderr.handlers) == 0:
+#     # we want to propogate error messages up through the chain, this allows us to
+#     # do things like attach a logging handler that will do more important things
+#     # with exceptions and the like
+#     #stderr.propagate = True 
+#     stderr.propagate = False
+#     stderr.setLevel(logging.DEBUG)
+#     log_handler = logging.StreamHandler(stream=sys.stderr)
+#     log_handler.setFormatter(log_formatter)
+#     stderr.addHandler(log_handler)
 
 
-quiet = False
-"""set this to True to suppress stdout output, stderr will not be affected"""
-
-
-debug = False
-"""set this to true to make verbose function print output"""
-
-
-width = 80
+WIDTH = 80
 """lots of the functions are width constrained, this is the global width they default to"""
 
 
 class Progress(object):
-    def __init__(self, stream, length, quiet, **kwargs):
+    def __init__(self, write_method, length, **kwargs):
         self.length = length
-        self.stream = stream
-        self.quiet = quiet
+        self.write_method = write_method
 
     def get_percentage(self, current):
         fill = float(current) / float(self.length)
@@ -73,15 +76,13 @@ class Progress(object):
         return bar
 
     def update(self, current):
-        if self.quiet: return
         bar = self.get_progress(current)
-        self.stream.write(bar + chr(8) * (len(bar) + 1))
-        self.stream.flush()
+        self.write_method(bar + chr(8) * (len(bar) + 1))
 
 
 class ProgressBar(Progress):
-    def __init__(self, stream, length, width, quiet):
-        super(ProgressBar, self).__init__(stream, length, quiet)
+    def __init__(self, write_method, length, width):
+        super(ProgressBar, self).__init__(write_method, length)
         self.bar_width = width - 11
         self.width = width
 
@@ -110,17 +111,16 @@ def progress(length, **kwargs):
 
     length -- int -- the total size of what you will be updating progress on
     """
-    global quiet
+    quiet = False
     progress_class = kwargs.pop("progress_class", Progress)
-    kwargs["stream"] = sys.stdout
-    kwargs["width"] = kwargs.get("width", globals()["width"])
+    kwargs["write_method"] = istdout.info
+    kwargs["width"] = kwargs.get("width", globals()["WIDTH"])
     kwargs["length"] = length
-    kwargs["quiet"] = quiet
     pbar = progress_class(**kwargs)
     pbar.update(0)
     yield pbar
     pbar.update(length)
-    pbar.stream.write("\n")
+    br()
 
 
 def progress_bar(length, **kwargs):
@@ -147,13 +147,11 @@ def exception(e):
 def err(format_msg, *args, **kwargs):
     '''print format_msg to stderr'''
     exc_info = kwargs.pop("exc_info", False)
-    stderr.info(str(format_msg).format(*args, **kwargs), exc_info=exc_info)
+    stderr.warning(str(format_msg).format(*args, **kwargs), exc_info=exc_info)
 
 
 def ch(c):
-    """print one or more characters without a newline at the end, while this does
-    respect --quiet, it does not use the stdout logger, that's because the loggers
-    automatically add the newline and there's nothing I can easily do about it.
+    """print one or more characters without a newline at the end
 
     example --
         for x in range(1000):
@@ -161,16 +159,14 @@ def ch(c):
 
     c -- string -- the chars that will be output
     """
-    global quiet
-    if quiet: return
     # http://stackoverflow.com/questions/493386/how-to-print-in-python-without-newline-or-space
-    sys.stdout.write(c)
-    sys.stdout.flush()
+    #pout.v(istdout.handlers[0].stream)
+    istdout.info(c)
+
 
 def out(format_msg="", *args, **kwargs):
     '''print format_msg to stdout, taking into account --quiet setting'''
-    global quiet
-    if quiet: return
+    logmethod = kwargs.get("logmethod", stdout.info)
 
     if format_msg != "":
         if isinstance(format_msg, basestring):
@@ -178,28 +174,25 @@ def out(format_msg="", *args, **kwargs):
                 s = format_msg.format(*args, **kwargs)
             else:
                 s = format_msg
-            stdout.info(s)
+            logmethod(s)
 #             width = globals()["width"]
 #             s = textwrap.fill(s, width=width)
 #             stdout.info(s)
 
         else:
-            stdout.info(str(format_msg))
+            logmethod(str(format_msg))
 
     else:
-        stdout.info("")
-
+        logmethod("")
 
 def verbose(format_msg="", *args, **kwargs):
     '''print format_msg to stdout, taking into account --verbose flag'''
-    global debug
-    if not debug: return
+    kwargs["logmethod"] = stdout.debug
     out(format_msg, *args, **kwargs)
-
 
 def hr(width=0):
     """similar to the html horizontal rule in html"""
-    if not width: width = globals()["width"]
+    if not width: width = globals()["WIDTH"]
     bar("_", width=width)
     blank()
 
@@ -217,7 +210,7 @@ def h2(format_msg, *args, **kwargs):
 
 def h3(format_msg, *args, **kwargs):
     wrapper = textwrap.TextWrapper()
-    wrapper.width = globals()["width"]
+    wrapper.width = globals()["WIDTH"]
     wrapper.initial_indent = "* "
     wrapper.subsequent_indent = "* "
     if args or kwargs:
@@ -228,7 +221,7 @@ def h3(format_msg, *args, **kwargs):
     out(h)
 
 
-def blank(count=1): br(count) # DEPRECATED - 2-27-16 - use br
+def blank(count=1): br(count)
 def br(count=1):
     """print out a blank newline"""
     for x in range(count):
@@ -252,7 +245,7 @@ def quote(format_msg, *args, **kwargs):
         msg = format_msg
 
     default_indent = "    "
-    width = globals()["width"]
+    width = globals()["WIDTH"]
     width -= len(default_indent) 
 
     wrapper = textwrap.TextWrapper()
@@ -268,7 +261,7 @@ def indent(msg, indent="    "):
 
 
 def bar(sep='*', width=0):
-    if not width: width = globals()["width"]
+    if not width: width = globals()["WIDTH"]
     out(sep * width)
 
 
@@ -291,7 +284,7 @@ def banner(*lines, **kwargs):
     count -- integer -- the line width, defaults to 80
     """
     sep = kwargs.get("sep", "*")
-    count = kwargs.get("width", globals()["width"])
+    count = kwargs.get("width", globals()["WIDTH"])
 
     out(sep * count)
     if lines:
