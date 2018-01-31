@@ -9,6 +9,7 @@ import textwrap
 import os
 import re
 from contextlib import contextmanager
+from collections import Counter
 
 from .compat import *
 from .logging import stdout, istdout, stderr
@@ -262,7 +263,8 @@ def banner(*lines, **kwargs):
         out(sep * count)
 
 
-def columns(*columns, **kwargs):
+def columns(*columns, **kwargs): return table(*columns, **kwargs)
+def table(*columns, **kwargs):
     """
     format columned data so we can easily print it out on a console, this just takes
     columns of data and it will format it into properly aligned columns, it's not
@@ -272,30 +274,58 @@ def columns(*columns, **kwargs):
     other formatting options:
         http://stackoverflow.com/a/8234511/5006
 
-    *columns -- each column is a list of values you want in each row of the column
-    **kwargs --
+    other packages that probably do this way better:
+        https://stackoverflow.com/a/26937531/5006
+
+    :Example:
+        >>> echo.table([(1, 2), (3, 4), (5, 6), (7, 8), (9, 0)])
+        1  2
+        3  4
+        5  6
+        7  8
+        9  0
+        >>> echo.table([1, 3, 5, 7, 9], [2, 4, 6, 8, 0])
+        1  2
+        3  4
+        5  6
+        7  8
+        9  0
+
+    :param *columns: can either be a list of rows or multiple lists representing each
+        column in the table
+    :param **kwargs: dict
         prefix -- string -- what you want before each row (eg, a tab)
         buf_count -- integer -- how many spaces between longest col value and its neighbor
-
-    return -- string
     """
     ret = []
     prefix = kwargs.get('prefix', '')
     buf_count = kwargs.get('buf_count', 2)
-    row_counts = [0] * len(columns)
+    if len(columns) == 1:
+        columns = list(columns[0])
+    else:
+        # without the list the zip iterator gets spent, I'm sure I can make this
+        # better
+        columns = list(zip(*columns))
 
-    for rows in zip(*columns):
-        for i, c in enumerate(rows):
-            cl = len(c) 
+    # we have to go through all the rows and calculate the length of each
+    # column of each row
+    row_counts = Counter()
+    for row in columns:
+        for i, c in enumerate(row):
+            cl = len(str(c))
             if cl > row_counts[i]:
                 row_counts[i] = cl
 
-    for rows in zip(*columns):
-        row = [prefix]
-        for i, c in enumerate(rows):
-            row.append("{}{}".format(c, " " * ((row_counts[i] + buf_count) - len(c))))
+    # build the format string for each row, we use the row_counts found above to
+    # decide how much padding each column should get
+    # https://stackoverflow.com/a/9536084/5006
+    row_format = prefix
+    for i in range(len(row_counts)):
+        row_format += "{:<" + str(row_counts[i] + buf_count) + "}"
 
-        ret.append("".join(row).rstrip())
+    # actually go through and format each row
+    for row in columns:
+        ret.append(row_format.format(*row))
 
     out(os.linesep.join(ret))
 
