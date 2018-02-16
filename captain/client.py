@@ -40,29 +40,30 @@ class Captain(object):
     """how many lines to buffer of output, set to 0 to suppress all output"""
 
     @property
-    def env(self):
-        env = getattr(self, "_env", None)
-        if env: return env
+    def environ(self):
+        environ = getattr(self, "_environ", None)
+        if environ: return environ
 
-        # TODO -- this would have to be updated if this file ever moved
+        # NOTE -- this would have to be updated if this file ever moved
         pwd = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
         pythonpath = pwd + os.pathsep + self.cwd
 
-        env = dict(os.environ)
-        if "PYTHONPATH" in env:
-            env["PYTHONPATH"] += os.pathsep + pythonpath
+        environ = dict(os.environ)
+        if "PYTHONPATH" in environ:
+            environ["PYTHONPATH"] += os.pathsep + pythonpath
         else:
-            env["PYTHONPATH"] = pythonpath
+            environ["PYTHONPATH"] = pythonpath
 
-        return env
+        self._environ = environ
+        return environ
 
-    @env.setter
-    def env(self, v):
-        self._env = v
+    @environ.setter
+    def environ(self, v):
+        self._environ = v
 
-    @env.deleter
-    def env(self):
-        del self._env
+    @environ.deleter
+    def environ(self):
+        del self._environ
 
     @property
     def output(self):
@@ -110,6 +111,13 @@ class Captain(object):
         running command"""
         cmd = "{} {} {}".format(self.cmd_prefix, self.script, arg_str)
 
+        # any kwargs with all capital letters should be considered environment
+        # variables
+        environ = self.environ
+        for k in list(kwargs.keys()):
+            if k.isupper():
+                environ[k] = kwargs.pop(k)
+
         # we will allow overriding of these values
         kwargs.setdefault("stderr", subprocess.STDOUT)
 
@@ -117,7 +125,7 @@ class Captain(object):
         kwargs["shell"] = True
         kwargs["stdout"] = subprocess.PIPE
         kwargs["cwd"] = self.cwd
-        kwargs["env"] = self.env
+        kwargs["env"] = environ
 
         self.buf = deque(maxlen=self.bufsize)
 
@@ -146,4 +154,24 @@ class Captain(object):
 
         except subprocess.CalledProcessError as e:
             raise RuntimeError("{} returned {} with output: {}".format(cmd, e.returncode, self.output))
+
+
+class ModuleClient(Captain):
+    """This sets the client up so you can just pass the module name and have everything
+    just work"""
+    script_quiet = False
+
+    def __init__(self, module_name, cwd=""):
+        self.cmd_prefix = "python -m {}".format(module_name)
+        super(ModuleClient, self).__init__("", cwd=cwd)
+
+
+class ScriptClient(Captain):
+    """This will add the .py to a script so you don't have to"""
+    script_quiet = False
+
+    script_postfix = ".py"
+
+    def __init__(self, script, cwd=""):
+        super(ScriptClient, self).__init__(script, cwd=cwd)
 

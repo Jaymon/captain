@@ -12,7 +12,11 @@ from captain.client import Captain
 from captain.decorators import arg, args
 from captain.compat import *
 from captain.parse import Parser, ScriptKwarg, CallbackInspect
-from captain import logging
+from captain import logging, environ
+
+
+def setUpModule():
+    environ.QUIET_DEFAULT = ""
 
 
 class TestScript(object):
@@ -49,8 +53,10 @@ class TestScript(object):
     def __str__(self):
         return self.path
 
-    def run(self, arg_str=''):
-        return self.captain.run(arg_str, quiet=False)
+    def run(self, arg_str='', **kwargs):
+        cap = self.captain
+        kwargs.setdefault("CAPTAIN_QUIET_DEFAULT", environ.QUIET_DEFAULT)
+        return cap.run(arg_str, quiet=False, **kwargs)
 
 
 class EchoTest(TestCase):
@@ -238,6 +244,52 @@ class EchoTest(TestCase):
 
         r = script.run('--quiet=-I')
         self.assertEqual("[INFO] info\nout", r)
+
+    def test_quiet_default(self):
+        script = TestScript(
+            [
+                "#!/usr/bin/env python",
+                "import sys",
+                "import logging",
+                "logging.basicConfig(",
+                "  format='[%(levelname)s] %(message)s',",
+                "  level=logging.DEBUG, stream=sys.stdout",
+                ")",
+                "logger = logging.getLogger(__name__)",
+                "from captain import echo, exit",
+                "",
+                "def main():",
+                "  logger.debug('debug')",
+                "  logger.info('info')",
+                "  logger.warning('warning')",
+                "  logger.error('error')",
+                "  logger.critical('critical')",
+                "  echo.verbose('verbose')",
+                "  echo.out('out')",
+                "  echo.err('err')",
+                "exit(__name__)",
+            ]
+        )
+
+        r = script.run(CAPTAIN_QUIET_DEFAULT="D")
+        self.assertFalse("debug" in r)
+        self.assertFalse("verbose" in r)
+
+        r = script.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="D")
+        self.assertTrue("debug" in r)
+        self.assertTrue("verbose" in r)
+
+        r = script.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="DI")
+        self.assertTrue("debug" in r)
+        self.assertFalse("info" in r)
+        self.assertFalse("out" in r)
+
+        r = script.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="")
+        self.assertTrue("debug" in r)
+        self.assertTrue("info" in r)
+        self.assertTrue("warning" in r)
+        self.assertTrue("error" in r)
+        self.assertTrue("critical" in r)
 
     def test_ch(self):
         script = TestScript(

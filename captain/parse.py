@@ -9,6 +9,7 @@ from collections import defaultdict, Callable
 
 from .compat import *
 from . import logging
+from . import environ
 
 
 class CallbackInspect(object):
@@ -310,6 +311,7 @@ class QuietAction(argparse.Action):
         'Selectively turn off [D]ebug, [I]nfo, [W]arning, [E]rror, or [C]ritical, ',
         '(--quiet=DI means suppress Debug and Info), ',
         'use - to invert (--quiet=-EW means suppress everything but Error and warning)',
+        'use + to change default (--quiet=+D means remove D from default value)',
     ])
 
     HELP_Q_LOWER = ''.join([
@@ -327,7 +329,7 @@ class QuietAction(argparse.Action):
 
         else:
             kwargs["const"] = self.OPTIONS
-            kwargs["default"] = ''
+            kwargs["default"] = environ.QUIET_DEFAULT
 
         super(QuietAction, self).__init__(option_strings, self.DEST, **kwargs)
 
@@ -342,9 +344,14 @@ class QuietAction(argparse.Action):
 
         else:
             if values.startswith("-"):
-                # if we had a subtract, then just remove those from being suppressed
+                # if we have a subtract then just remove those from being suppressed
                 # so -E would only show errors
                 values = "".join(set(self.OPTIONS) - set(values[1:].upper()))
+
+            elif values.startswith("+"):
+                # if we have an addition then just remove those from default
+                # so if default="D" then +D would leave default=""
+                values = "".join(set(self.default) - set(values[1:].upper()))
 
         setattr(namespace, self.dest, values)
 
