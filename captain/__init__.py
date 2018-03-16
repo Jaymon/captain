@@ -20,7 +20,7 @@ from .compat import *
 from .parse import ArgParser, Parser
 
 
-__version__ = '2.0.0'
+__version__ = '2.0.1'
 
 
 def discover_if_calling_mod():
@@ -294,14 +294,14 @@ class Script(object):
                         mains.add(ns.id)
 
             if hasattr(n, 'names'):
-                ns = n.names[0]
-                if hasattr(ns, 'name'):
-                    if regex.match(ns.name):
-                        mains.add(ns.name)
+                for ns in n.names:
+                    if hasattr(ns, 'name'):
+                        if regex.match(ns.name):
+                            mains.add(ns.name)
 
-                if getattr(ns, 'asname', None):
-                    if regex.match(ns.asname):
-                        mains.add(ns.asname)
+                    if getattr(ns, 'asname', None):
+                        if regex.match(ns.asname):
+                            mains.add(ns.asname)
 
         if len(mains) > 0:
             module = self.module

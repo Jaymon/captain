@@ -956,6 +956,28 @@ class ArgTest(TestCase):
 
 class ExitTest(TestCase):
     """Various tests to make sure the exit() method is working as expected"""
+    def test_submodule_main(self):
+        script = TestScript([
+            "from __future__ import print_function",
+            "from captain import exit",
+            "from che import main_foo, main_bar",
+            #"from che import main_bar",
+            "if __name__ == '__main__':",
+            "  exit(__name__)",
+        ])
+
+        modpath = testdata.create_module("che", [
+            "from __future__ import print_function",
+            "def main_foo(): print('foo ran')",
+            "def main_bar(): print('bar ran')",
+        ], tmpdir=script.cwd)
+
+        r = script.run("foo")
+        self.assertTrue("foo ran" in r)
+
+        r = script.run("bar")
+        self.assertTrue("bar ran" in r)
+
     def test_stack_import(self):
         script = TestScript([
             "from __future__ import print_function",
