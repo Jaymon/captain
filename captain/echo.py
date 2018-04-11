@@ -151,10 +151,12 @@ def out(format_msg="", *args, **kwargs):
     else:
         logmethod("")
 
+
 def verbose(format_msg="", *args, **kwargs):
     '''print format_msg to stdout, taking into account --verbose flag'''
     kwargs["logmethod"] = stdout.debug
     out(format_msg, *args, **kwargs)
+
 
 def hr(width=0):
     """similar to the html horizontal rule in html"""
@@ -187,11 +189,11 @@ def h3(format_msg, *args, **kwargs):
     out(h)
 
 
-def blank(count=1): br(count)
 def br(count=1):
     """print out a blank newline"""
     for x in range(count):
         out("")
+blank = br
 
 
 def ul(*lines):
@@ -263,7 +265,6 @@ def banner(*lines, **kwargs):
         out(sep * count)
 
 
-def columns(*columns, **kwargs): return table(*columns, **kwargs)
 def table(*columns, **kwargs):
     """
     format columned data so we can easily print it out on a console, this just takes
@@ -328,6 +329,7 @@ def table(*columns, **kwargs):
         ret.append(row_format.format(*row))
 
     out(os.linesep.join(ret))
+columns = table
 
 
 def prompt(question, choices=None):

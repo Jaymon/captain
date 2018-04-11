@@ -110,6 +110,7 @@ class Captain(object):
         """runs the passed in arguments and returns an iterator on the output of
         running command"""
         cmd = "{} {} {}".format(self.cmd_prefix, self.script, arg_str)
+        expected_ret_code = kwargs.pop('code', 0)
 
         # any kwargs with all capital letters should be considered environment
         # variables
@@ -135,25 +136,32 @@ class Captain(object):
                 **kwargs
             )
 
+            for line in iter(process.stdout.readline, b""):
+                line = line.decode("utf-8").rstrip()
+                self.buf.append(line)
+                yield line
+
             # another round of links
             # http://stackoverflow.com/a/17413045/5006 (what I used)
             # http://stackoverflow.com/questions/2715847/
-            if is_py2:
-                for line in iter(process.stdout.readline, ""):
-                    self.buf.append(line.rstrip())
-                    yield line
-            else:
-                for line in iter(process.stdout.readline, b""):
-                    line = line.decode("utf-8")
-                    self.buf.append(line.rstrip())
-                    yield line
+#             if is_py2:
+#                 for line in iter(process.stdout.readline, ""):
+#                     self.buf.append(line.rstrip())
+#                     yield line
+#             else:
+#                 for line in iter(process.stdout.readline, b""):
+#                     line = line.decode("utf-8")
+#                     self.buf.append(line.rstrip())
+#                     yield line
 
             process.wait()
-            if process.returncode > 0:
-                raise RuntimeError("{} returned {} with output: {}".format(cmd, process.returncode, self.output))
+            if process.returncode != expected_ret_code:
+                if process.returncode > 0:
+                    raise RuntimeError("{} returned {} with output: {}".format(cmd, process.returncode, self.output))
 
         except subprocess.CalledProcessError as e:
-            raise RuntimeError("{} returned {} with output: {}".format(cmd, e.returncode, self.output))
+            if e.returncode != expected_ret_code:
+                raise RuntimeError("{} returned {} with output: {}".format(cmd, e.returncode, self.output))
 
 
 class ModuleClient(Captain):

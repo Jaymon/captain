@@ -419,6 +419,40 @@ class CallbackInspectTest(TestCase):
 
 
 class CaptainTest(TestCase):
+    def test_stop(self):
+
+        script = TestScript([
+            "#!/usr/bin/env python",
+            "import captain",
+            "def main():",
+            "  raise captain.Stop(0)",
+            "captain.exit()"
+        ])
+        r = script.run()
+        self.assertEqual("", r)
+
+        script = TestScript([
+            "#!/usr/bin/env python",
+            "import captain",
+            "def main():",
+            "  captain.echo.out('foo')",
+            "  raise captain.Stop(1, 'stderr stop')",
+            "captain.exit()"
+        ])
+        r = script.run("--quiet=-W", code=1)
+        self.assertEqual("stderr stop", r)
+
+        script = TestScript([
+            "#!/usr/bin/env python",
+            "import captain",
+            "def main():",
+            "  captain.echo.err('foo')",
+            "  raise captain.Stop(0, 'stdout stop')",
+            "captain.exit()"
+        ])
+        r = script.run("--quiet=-I")
+        self.assertEqual("stdout stop", r)
+
     def test_raised_exception(self):
         """I want to make sure exception handling is handled correctly"""
         script = TestScript([

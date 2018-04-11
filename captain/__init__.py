@@ -15,12 +15,13 @@ import collections
 
 from . import echo
 from . import decorators
-from .exception import Error, ParseError, ArgError
+from .exception import Error, ParseError, ArgError, Stop
 from .compat import *
 from .parse import ArgParser, Parser
+from .decorators import arg, args
 
 
-__version__ = '2.0.1'
+__version__ = '2.0.2'
 
 
 def discover_if_calling_mod():
@@ -105,7 +106,18 @@ def exit(mod_name=""):
     if calling_mod:
         s = Script(inspect.getfile(calling_mod), module=calling_mod)
         raw_args = sys.argv[1:]
-        ret_code = s.run(raw_args)
+        try:
+            ret_code = s.run(raw_args)
+
+        except Stop as e:
+            ret_code = e.code
+            msg = str(e)
+            if msg:
+                if ret_code != 0:
+                    echo.err(msg)
+                else:
+                    echo.out(msg)
+
         sys.exit(ret_code)
 
 
