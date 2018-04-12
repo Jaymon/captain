@@ -619,3 +619,40 @@ class Parser(ArgParser):
         return arg_strings
 
 
+class UnknownParser(dict):
+    """handle parsing any extra args that are passed from ArgParser.parse_known_args """
+    def __init__(self, args):
+        """
+        :param args: list, the list of extra args returned from parse_known_args
+        :returns: dict, key is the arg name (* for non positional args) and value is
+            a list of found arguments (so --foo 1 --foo 2 is supported). The value is
+            always a list
+        """
+        d = defaultdict(list)
+        i = 0
+        length = len(args)
+        while i < length:
+            if args[i].startswith("-"):
+                s = args[i].lstrip("-")
+                bits = s.split("=", 1)
+                if len(bits) > 1:
+                    key = bits[0]
+                    val = bits[1].strip("\"'")
+                    d[key].append(val)
+
+                else:
+                    if i + 1 < length:
+                        if args[i + 1].startswith("-"):
+                            d[s].append(True)
+
+                        else:
+                            d[s].append(args[i + 1])
+                            i += 1
+
+            else:
+                d["*"].append(args[i])
+
+            i += 1
+
+        super(UnknownParser, self).__init__(d)
+
