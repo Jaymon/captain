@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-some other solutions I considered:
-http://zacharyvoase.com/2009/12/09/django-boss/
-https://github.com/zacharyvoase/django-boss
-"""
 from __future__ import unicode_literals, division, print_function, absolute_import
 import os
 import imp

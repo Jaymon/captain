@@ -19,6 +19,7 @@ class Captain(object):
     package? That way there would be one canonical place for running a Captain script.
     And there were high fives all around
     """
+    encoding = "utf-8"
 
     script_prefix = ""
     """this will be prepended to the passed in script on initialization"""
@@ -128,6 +129,7 @@ class Captain(object):
         kwargs["cwd"] = self.cwd
         kwargs["env"] = environ
 
+        process = None
         self.buf = deque(maxlen=self.bufsize)
 
         try:
@@ -136,32 +138,34 @@ class Captain(object):
                 **kwargs
             )
 
-            for line in iter(process.stdout.readline, b""):
-                line = line.decode("utf-8").rstrip()
-                self.buf.append(line)
-                yield line
-
             # another round of links
             # http://stackoverflow.com/a/17413045/5006 (what I used)
             # http://stackoverflow.com/questions/2715847/
-#             if is_py2:
-#                 for line in iter(process.stdout.readline, ""):
-#                     self.buf.append(line.rstrip())
-#                     yield line
-#             else:
-#                 for line in iter(process.stdout.readline, b""):
-#                     line = line.decode("utf-8")
-#                     self.buf.append(line.rstrip())
-#                     yield line
+            for line in iter(process.stdout.readline, b""):
+                line = line.decode(self.encoding)
+                self.buf.append(line.rstrip())
+                yield line
 
             process.wait()
             if process.returncode != expected_ret_code:
                 if process.returncode > 0:
-                    raise RuntimeError("{} returned {} with output: {}".format(cmd, process.returncode, self.output))
+                    raise RuntimeError("{} returned {} with output: {}".format(
+                        cmd,
+                        process.returncode,
+                        self.output
+                    ))
 
         except subprocess.CalledProcessError as e:
             if e.returncode != expected_ret_code:
-                raise RuntimeError("{} returned {} with output: {}".format(cmd, e.returncode, self.output))
+                raise RuntimeError("{} returned {} with output: {}".format(
+                    cmd,
+                    e.returncode,
+                    self.output
+                ))
+
+        finally:
+            if process:
+                process.stdout.close()
 
 
 class ModuleClient(Captain):

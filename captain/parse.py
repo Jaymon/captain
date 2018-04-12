@@ -6,6 +6,7 @@ import re
 import inspect
 import sys
 from collections import defaultdict, Callable
+import textwrap
 
 from .compat import *
 from . import logging
@@ -34,14 +35,26 @@ class CallbackInspect(object):
 
     @property
     def desc(self):
+        hashbang_regex = re.compile(r"^#!.*")
         desc = inspect.getdoc(self.callback)
+        if not desc:
+            desc = inspect.getcomments(self.callback)
+            if desc:
+                desc = hashbang_regex.sub("", desc).strip()
+
         if not desc:
             cb_method = self.callable
             if is_py2:
                 desc = inspect.getdoc(cb_method)
+                if not desc:
+                    desc = inspect.getcomments(cb_method)
+                    if desc:
+                        desc = hashbang_regex.sub("", desc).strip()
+
             else:
                 # avoid method doc inheritance in py >=3.5
                 desc = cb_method.__doc__
+
         if not desc: desc = ''
         return desc
 
@@ -357,6 +370,34 @@ class QuietAction(argparse.Action):
         setattr(namespace, self.dest, values)
 
 
+class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
+    """The problem I had was ArgumentDefaultsHelpFormatter would give me the default
+    values but it would strip newlines from the text, while RawTextHelpFormatter
+    would keep the newlines but not give default values and messed up formatting
+    of the arguments, so this gives me defaults and also formats most everything
+    """
+    def _fill_text(self, text, width, indent):
+        """Overridden to not get rid of newlines
+
+        https://github.com/python/cpython/blob/2.7/Lib/argparse.py#L620"""
+        lines = []
+        for line in text.splitlines(False):
+            if line:
+                # https://docs.python.org/2/library/textwrap.html
+                lines.extend(textwrap.wrap(
+                    line.strip(),
+                    width,
+                    initial_indent=indent,
+                    subsequent_indent=indent
+                ))
+
+            else:
+                lines.append(line)
+
+        text = "\n".join(lines)
+        return text
+
+
 class ArgParser(argparse.ArgumentParser):
 
     def __init__(self, callback=None, **kwargs):
@@ -372,7 +413,9 @@ class ArgParser(argparse.ArgumentParser):
         # https://hg.python.org/cpython/file/2.7/Lib/argparse.py
         # https://docs.python.org/2/library/argparse.html#formatter-class
         # http://stackoverflow.com/questions/12151306/argparse-way-to-include-default-values-in-help
-        kwargs.setdefault("formatter_class", argparse.ArgumentDefaultsHelpFormatter)
+        #kwargs.setdefault("formatter_class", argparse.ArgumentDefaultsHelpFormatter)
+        #kwargs.setdefault("formatter_class", argparse.RawTextHelpFormatter)
+        kwargs.setdefault("formatter_class", HelpFormatter)
 
         super(ArgParser, self).__init__(**kwargs)
 

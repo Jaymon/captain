@@ -11,7 +11,7 @@ from captain import Script, echo
 from captain.client import Captain
 from captain.decorators import arg, args
 from captain.compat import *
-from captain.parse import Parser, ScriptKwarg, CallbackInspect
+from captain.parse import Parser, ScriptKwarg, CallbackInspect, UnknownParser
 from captain import logging, environ
 
 
@@ -841,11 +841,10 @@ class ArgTest(TestCase):
 
         r = script_path.run("")
 
-    def test_help(self):
+    def test_help_1(self):
         script_path = TestScript([
             "#!/usr/bin/env python",
-            "from captain import echo",
-            "from captain.decorators import arg ",
+            "from captain import echo, exit, arg",
             "@arg('--foo', '-f')",
             "@arg('arg', metavar='ARG')",
             "def main(**kargs):",
@@ -853,8 +852,22 @@ class ArgTest(TestCase):
             "    print(args)",
             "    print(kwargs)",
             "    return 0",
+            "exit(__name__)",
         ])
         r = script_path.run('--help')
+
+    def test_help_2(self):
+        script_path = TestScript([
+            "from captain import exit",
+            "def main():",
+            "    '''line 1",
+            "",
+            "    line 3'''",
+            "    return 0",
+            "exit(__name__)",
+        ])
+        r = script_path.run('--help')
+        self.assertTrue("line 1\n\nline 3" in r)
 
     def test_decorator(self):
         script_path = TestScript([
@@ -868,7 +881,7 @@ class ArgTest(TestCase):
             "def main(foo, bar, che=1, baz=2, *args, **kwargs):",
             "  print(args[0])",
             "  return 0",
-            "captain.exit()",
+            "captain.exit(__name__)",
         ])
         s = script_path.instance
         parser = s.parser
@@ -1717,7 +1730,6 @@ class ParserTest(TestCase):
         self.assertTrue(args.D)
 
 
-from captain.parse import UnknownParser
 class UnknownParserTest(TestCase):
     def test_extra_args(self):
         extra_args = [
