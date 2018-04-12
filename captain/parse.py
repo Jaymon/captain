@@ -188,7 +188,8 @@ class ScriptKwarg(object):
         if kwargs:
             self.parser_kwargs.update(kwargs)
 
-        self.parser_kwargs['dest'] = self.name
+        #self.parser_kwargs['dest'] = self.name
+        self.parser_kwargs.setdefault('dest', self.name)
 
         # special handling of any passed in values
         if 'default' in kwargs:

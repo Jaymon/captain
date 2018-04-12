@@ -712,16 +712,27 @@ class ScriptKwargTest(TestCase):
 
 
 class ArgTest(TestCase):
-#     def test_quiet(self):
-#         script_path = TestScript([
-#             "#!/usr/bin/env python",
-#             "from captain import echo",
-#             "from captain.decorators import arg",
-#             "def main():",
-#             "    echo.out('hello world')",
-#         ])
-#         r = script_path.run('--quiet')
-#         self.assertEqual("", r)
+    def test_dest(self):
+        """https://github.com/Jaymon/captain/issues/40"""
+        script_path = TestScript([
+            "from captain import arg, exit",
+            '@arg("--out", dest="stream", help="this should be in stream variable")',
+            "def main(stream, **kwargs):",
+            "    print(stream)",
+            "exit()",
+        ])
+        r = script_path.run("--out=stream")
+        self.assertEqual("stream", r)
+
+        script_path = TestScript([
+            "from captain import arg, exit",
+            '@arg("--out", dest="stream", help="this should be in stream variable")',
+            "def main(**kwargs):",
+            "    print(kwargs['stream'])",
+            "exit()",
+        ])
+        r = script_path.run("--out=stream")
+        self.assertEqual("stream", r)
 
     def test_arg_normalization(self):
         script_path = TestScript([
