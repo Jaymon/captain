@@ -105,7 +105,12 @@ class EchoTest(TestCase):
 
     def test_progress_bar(self):
         count = 100
-        with echo.progress_bar(count) as pbar:
+        with echo.progress_bar(count, char="#") as pbar:
+            for x in range(count):
+                pbar.update(x)
+
+        # https://github.com/Jaymon/captain/issues/27
+        with echo.progress_bar(count, char="\u2588") as pbar:
             for x in range(count):
                 pbar.update(x)
 

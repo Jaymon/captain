@@ -79,17 +79,18 @@ class Progress(object):
 
 
 class ProgressBar(Progress):
-    def __init__(self, write_method, length, width):
+    def __init__(self, write_method, length, width, char="\u2588"):
         super(ProgressBar, self).__init__(write_method, length)
         self.bar_width = width - 11
         self.width = width
+        self.char = char
 
     def get_progress(self, current):
         # http://stackoverflow.com/a/21008062/5006
         fill = float(current) / float(self.length)
         bar_length = int(self.bar_width * fill)
         bar = "[{}{}]{: >10}".format(
-            "#" * bar_length,
+            self.char * bar_length,
             " " * (self.bar_width - bar_length),
             self.get_percentage(current)
         )

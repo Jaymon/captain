@@ -3,6 +3,7 @@ from __future__ import unicode_literals, division, print_function, absolute_impo
 import sys
 import os
 import fnmatch
+from codecs import open
 
 import captain
 from captain.decorators import arg
@@ -21,6 +22,18 @@ def main(path):
         for f in fnmatch.filter(files, '*.py'):
             try:
                 filepath = os.path.join(root_dir, f)
+
+                # super edge case, this makes sure the python script won't start
+                # an interactive console session which would cause the session
+                # to start and not allow the for loop to complete
+                with open(filepath, encoding="UTF-8") as fp:
+                    body = fp.read()
+                    is_console = "InteractiveConsole" in body
+                    is_console = is_console or "code" in body
+                    is_console = is_console and "interact(" in body
+                    if is_console:
+                        continue
+
                 s = captain.Script(filepath)
                 if s.can_run_from_cli():
                     rel_filepath = s.call_path(basepath)
