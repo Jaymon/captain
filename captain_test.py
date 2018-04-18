@@ -63,6 +63,19 @@ class EchoTest(TestCase):
     def setUp(self):
         logging.inject_quiet("")
 
+    def test_increment(self):
+        """https://github.com/Jaymon/captain/issues/41"""
+        for x in echo.increment(range(5)):
+            echo.out(x)
+
+    def test_prefix(self):
+        for i, x in enumerate(["a", "b", "c", "d"], 1):
+            with echo.prefix("{}. ", i):
+                echo.out(testdata.get_words(1))
+                with echo.prefix("{}. ", x):
+                    echo.out(testdata.get_words(1))
+                echo.out(testdata.get_words(1))
+
     def test_table(self):
         one = [1, 3, 5, 7, 9]
         two = [2, 4, 6, 8, 0]
@@ -712,6 +725,22 @@ class ScriptKwargTest(TestCase):
 
 
 class ArgTest(TestCase):
+#     def test_inheritance(self):
+#         """https://github.com/Jaymon/captain/issues/29"""
+#         script_path = TestScript([
+#             "from captain import arg, args, exit",
+#             "",
+#             "class Foo(int): pass",
+#             "@arg('--foo', type=Foo)",
+#             "def main_one(foo): pass",
+#             "",
+#             "@args(main_one)",
+#             "@arg('--foo', default='')",
+#             "def main_two(**kwargs): print(type(kwargs['foo']))",
+#             "exit()",
+#         ])
+#         r = script_path.run("two --foo=2")
+
     def test_dest(self):
         """https://github.com/Jaymon/captain/issues/40"""
         script_path = TestScript([

@@ -35,6 +35,9 @@ class CallbackInspect(object):
 
     @property
     def desc(self):
+        # TODO -- consolidate this to a class that extends str that will try doc
+        # and then move to comments if doc fails, that will greatly simplify
+        # this method
         hashbang_regex = re.compile(r"^#!.*")
         desc = inspect.getdoc(self.callback)
         if not desc:
@@ -449,6 +452,9 @@ class ArgParser(argparse.ArgumentParser):
         return parents
 
     def parse_callback_args(self, raw_args):
+        """This is the method that is called from Script.run(), this is the insertion
+        point for parsing all the arguments though on init this will find all args it
+        can, so this method pulls already found args from class variables"""
         args = []
         arg_info = self.arg_info
         kwargs = dict(arg_info['optional'])
@@ -457,6 +463,8 @@ class ArgParser(argparse.ArgumentParser):
         unknown_args = getattr(self, "unknown_args", False)
         if unknown_args:
             parsed_args, parsed_unknown_args = self.parse_known_args(raw_args)
+
+            # TODO -- can this be moved to UnknownParser?
 
             # **kwargs have to be in --key=val form
             # http://stackoverflow.com/a/12807809/5006

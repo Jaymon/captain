@@ -114,6 +114,9 @@ def exit(mod_name=""):
                     echo.out(msg)
 
         sys.exit(ret_code)
+Captain = exit # https://github.com/Jaymon/captain/issues/28
+console = exit
+cli = exit
 
 
 class Script(object):

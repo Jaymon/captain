@@ -19,6 +19,38 @@ WIDTH = 80
 """lots of the functions are width constrained, this is the global width they default to"""
 
 
+class Prefix(object):
+    """This prefix is used by the out() function to put something before the string
+    passed into out()"""
+    current = ""
+    """holds the current prefix"""
+
+    def __init__(self, format_msg, *args, **kwargs):
+        self.previous = self.get()
+        self(format_msg, *args, **kwargs)
+
+    def __call__(self, format_msg, *args, **kwargs):
+        s = str(format_msg)
+        if args or kwargs:
+            s = format_msg.format(*args, **kwargs)
+        type(self).current = s
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        self(self.previous)
+        return
+
+    @classmethod
+    def has(cls):
+        return bool(cls.current)
+
+    @classmethod
+    def get(cls):
+        return cls.current
+
+
 class Progress(object):
     def __init__(self, write_method, length, **kwargs):
         self.length = length
@@ -105,6 +137,37 @@ def progress_bar(length, **kwargs):
     return progress(length, **kwargs)
 
 
+def increment(itr, n=1, format_msg="{}. "):
+    """Similar to enumerate but will set format_msg.format(n) into the prefix on
+    each iteration
+
+    :Example:
+        for v in increment(["foo", "bar"]):
+            echo.out(v) # 1. foo\n2. bar
+
+    :param itr: iterator, any iterator you want to set a numeric prefix on on every
+        iteration
+    :param n: integer, the starting integer for the numeric prefix
+    :param format_msg: string, this will basically do: format_msg.format(n) so there
+        should only be one set of curly brackets
+    :returns: yield generator
+    """
+    for i, v in enumerate(itr, n):
+        with prefix(format_msg, i):
+            yield v
+incr=increment
+
+
+def prefix(format_msg, *args, **kwargs):
+    """Return a prefix instance
+
+    :Example:
+        with echo.prefix("foo "):
+            echo.out("bar") # "foo bar"
+    """
+    return Prefix(format_msg, *args, **kwargs)
+
+
 def exception(e):
     '''print an exception message to stderr (this does not honor quiet)'''
     stderr.exception(e)
@@ -135,6 +198,12 @@ def out(format_msg="", *args, **kwargs):
     logmethod = kwargs.get("logmethod", stdout.info)
 
     if format_msg != "":
+        if Prefix.has():
+            if isinstance(format_msg, basestring):
+                format_msg = Prefix.get() + format_msg
+            else:
+                format_msg = Prefix.get() + str(format_msg)
+
         if isinstance(format_msg, basestring):
             if args or kwargs:
                 s = format_msg.format(*args, **kwargs)
