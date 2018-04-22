@@ -383,7 +383,10 @@ def table(*columns, **kwargs):
     row_counts = Counter()
     for row in columns:
         for i, c in enumerate(row):
-            cl = len(str(c))
+            if isinstance(c, basestring):
+                cl = len(c)
+            else:
+                cl = len(str(c))
             if cl > row_counts[i]:
                 row_counts[i] = cl
 
@@ -395,8 +398,12 @@ def table(*columns, **kwargs):
         row_format += "{:<" + str(row_counts[i] + buf_count) + "}"
 
     # actually go through and format each row
+    def tostr(c):
+        if isinstance(c, basestring): return c
+        return str(c)
+
     for row in columns:
-        ret.append(row_format.format(*row))
+        ret.append(row_format.format(*map(tostr, row)))
 
     out(os.linesep.join(ret))
 columns = table

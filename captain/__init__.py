@@ -16,7 +16,7 @@ from .parse import ArgParser, Parser
 from .decorators import arg, args
 
 
-__version__ = '2.0.2'
+__version__ = '2.0.3'
 
 
 def discover_if_calling_mod():

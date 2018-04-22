@@ -76,7 +76,7 @@ class EchoTest(TestCase):
                     echo.out(testdata.get_words(1))
                 echo.out(testdata.get_words(1))
 
-    def test_table(self):
+    def test_table_1(self):
         one = [1, 3, 5, 7, 9]
         two = [2, 4, 6, 8, 0]
         echo.table(one, two)
@@ -85,6 +85,13 @@ class EchoTest(TestCase):
         echo.table(it)
 
         echo.table(range(20), range(20))
+
+    def test_table_unicode(self):
+        l = [(1, testdata.get_unicode_words()), (2, testdata.get_unicode_words())]
+        echo.table(l)
+
+        l = [(1, [testdata.get_unicode_words()]), (2, [testdata.get_unicode_words()])]
+        echo.table(l)
 
     def test_no_format(self):
         echo.out("this should not {fail}")
