@@ -251,6 +251,10 @@ def h3(format_msg, *args, **kwargs):
     wrapper.width = globals()["WIDTH"]
     wrapper.initial_indent = "* "
     wrapper.subsequent_indent = "* "
+
+    if not isinstance(format_msg, basestring):
+        format_msg = str(format_msg)
+
     if args or kwargs:
         h = wrapper.fill(format_msg.format(*args, **kwargs))
     else:
