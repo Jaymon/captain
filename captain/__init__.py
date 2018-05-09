@@ -16,7 +16,7 @@ from .parse import ArgParser, Parser
 from .decorators import arg, args
 
 
-__version__ = '2.0.3'
+__version__ = '2.0.4'
 
 
 def discover_if_calling_mod():
@@ -231,10 +231,10 @@ class Script(object):
         parser = self.parser
         args, kwargs = parser.parse_callback_args(raw_args)
 
-        #pout.v(args, kwargs)
         callback = kwargs.pop("main_callback")
-        levels = kwargs.pop("quiet", "")
-        logging.inject_quiet(levels)
+        if parser.has_injected_quiet():
+            levels = kwargs.pop("quiet_inject", "")
+            logging.inject_quiet(levels)
 
         try:
             ret_code = callback(*args, **kwargs)

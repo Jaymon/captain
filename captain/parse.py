@@ -322,7 +322,7 @@ class QuietAction(argparse.Action):
 
     OPTIONS = "DIWEC"
 
-    DEST = "quiet"
+    DEST = "quiet_inject"
 
     HELP_QUIET = ''.join([
         'Selectively turn off [D]ebug, [I]nfo, [W]arning, [E]rror, or [C]ritical, ',
@@ -501,6 +501,8 @@ class ArgParser(argparse.ArgumentParser):
         return cbi.desc
 
     def find_args(self):
+        """when a new parser is created this is the method that is called from its
+        __init__ method to find all the arguments"""
         arg_info = self.arg_info
         main = self.callback
         cbi = CallbackInspect(main)
@@ -591,28 +593,49 @@ class Parser(ArgParser):
 
     def __init__(self, module=None, *args, **kwargs):
         super(Parser, self).__init__(*args, **kwargs)
+        self.quiet_flags = []
 
         # only parent parsers will have the module
         self.module = module
         if module:
             version = getattr(module, "__version__", "")
             if version:
+                actions = []
+                for action in ["-V", "--version"]:
+                    if action not in self._option_string_actions:
+                        actions.append(action)
+                if actions:
+                    kwargs = dict(
+                        action='version',
+                        version="%(prog)s {}".format(version)
+                    )
+                    self.add_argument(*actions, **kwargs)
+
+            actions = []
+            for action in ['--quiet', '-Q']:
+                if action not in self._option_string_actions:
+                    actions.append(action)
+            if actions:
+                self.quiet_flags = actions
+                kwargs = dict(
+                    action=QuietAction,
+                    help=QuietAction.HELP_QUIET,
+                )
                 self.add_argument(
-                    "-V", "--version",
-                    action='version',
-                    version="%(prog)s {}".format(version)
+                    *actions, **kwargs
+#                     action=QuietAction,
+#                     help=QuietAction.HELP_QUIET,
                 )
 
-            self.add_argument(
-                '--quiet', '-Q',
-                action=QuietAction,
-                help=QuietAction.HELP_QUIET,
-            )
-            self.add_argument(
-                "-q",
-                action=QuietAction,
-                help=QuietAction.HELP_Q_LOWER,
-            )
+            if '-q' not in self._option_string_actions:
+                self.add_argument(
+                    "-q",
+                    action=QuietAction,
+                    help=QuietAction.HELP_Q_LOWER,
+                )
+
+    def has_injected_quiet(self):
+        return len(self.quiet_flags) > 0
 
     def normalize_quiet_arg(self, arg_strings):
         """This is a hack to allow `--quiet` and `--quiet DI` to work correctly,
@@ -623,7 +646,9 @@ class Parser(ArgParser):
         :param arg_strings: list, the raw arguments
         :returns: list, the arg_strings changed if needed
         """
-        action = self._option_string_actions.get("--quiet")
+        if not self.has_injected_quiet(): return arg_strings
+
+        action = self._option_string_actions.get(self.quiet_flags[0])
         if action:
             count = len(arg_strings)
             new_args = []
@@ -655,7 +680,6 @@ class Parser(ArgParser):
 
             arg_strings = new_args
 
-        #pout.v(arg_strings)
         return arg_strings
 
     def _parse_known_args(self, arg_strings, namespace):

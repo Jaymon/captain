@@ -86,6 +86,21 @@ class EchoTest(TestCase):
 
         echo.table(range(20), range(20))
 
+    def test_table_headers(self):
+        it = ((1, 2), (3, 4))
+
+        echo.table(it, headers=["foo", "bar"])
+
+        with self.assertRaises(IndexError):
+            echo.table(it, headers=["foo", "bar", "che"])
+
+    def test_table_widths(self):
+        widths = [5]
+        echo.table([(1, 2)], widths=widths)
+        echo.table([(3, 4)], widths=widths)
+        widths = [0, 5]
+        echo.table([(5, 6)], widths=widths)
+
     def test_table_unicode(self):
         l = [(1, testdata.get_unicode_words()), (2, testdata.get_unicode_words())]
         echo.table(l)
@@ -202,7 +217,7 @@ class EchoTest(TestCase):
         r = script.run()
         self.assertEqual(1, r.count("gotcha"))
 
-    def test_quiet(self):
+    def test_quiet_1(self):
         """make sure you don't get double echoing when echo is imported before other
         set up logging"""
         script = TestScript(
@@ -237,6 +252,41 @@ class EchoTest(TestCase):
         self.assertFalse("err" in r)
         self.assertFalse("verbose" in r)
         self.assertFalse("out" in r)
+
+    def test_quiet_override(self):
+        script = TestScript(
+            [
+                "#!/usr/bin/env python",
+                "from captain import echo, exit, arg",
+                "",
+                "@arg('--quiet', '-Q', '-q', action='store_true', help='override quiet')",
+                "def main(quiet):",
+                "  echo.out(quiet)",
+                "exit(__name__)",
+            ]
+        )
+        r = script.run('--help')
+        self.assertTrue("override quiet" in r)
+        self.assertNotRegexpMatches(r, r"-Q\s+QUIET")
+
+        r = script.run('--quiet')
+        self.assertEqual("True", r)
+
+        script = TestScript(
+            [
+                "#!/usr/bin/env python",
+                "from captain import echo, exit, arg",
+                "",
+                "@arg('--quiet', action='store_true', help='override quiet')",
+                "def main(quiet):",
+                "  pass",
+                "exit(__name__)",
+            ]
+        )
+
+        r = script.run('--help')
+        self.assertRegexpMatches(r, r"--quiet\s+override\s+quiet")
+        self.assertRegexpMatches(r, r"-Q\s+QUIET")
 
     def test_quiet_logging(self):
         script = TestScript(
@@ -1023,7 +1073,7 @@ class ArgTest(TestCase):
         ])
         s = script_path.instance
 
-        dests = set(["help", "max_count", "recv_timeout", "max_unsync_count", "quiet", "verbose"])
+        dests = set(["help", "max_count", "recv_timeout", "max_unsync_count", "quiet_inject", "verbose"])
         parser = s.parser
         for a in parser._actions:
             self.assertTrue(a.dest in dests)
@@ -1713,61 +1763,61 @@ class ParserTest(TestCase):
 
         args = p.parse_args(['-qqq', 'arg1', 'arg2'])
         self.assertEqual(rargs, args.args)
-        self.assertEqual("EC", args.quiet)
+        self.assertEqual("EC", args.quiet_inject)
 
         args = p.parse_args(['-q', 'arg1', 'arg2'])
         self.assertEqual(rargs, args.args)
-        self.assertEqual("IWEC", args.quiet)
+        self.assertEqual("IWEC", args.quiet_inject)
 
         args = p.parse_args(['--quiet', 'arg1', 'arg2'])
         self.assertEqual(rargs, args.args)
-        self.assertEqual("DIWEC", args.quiet)
+        self.assertEqual("DIWEC", args.quiet_inject)
 
         args = p.parse_args(['--quiet=DIW', 'arg1', 'arg2'])
         self.assertEqual(rargs, args.args)
-        self.assertEqual("DIW", args.quiet)
+        self.assertEqual("DIW", args.quiet_inject)
 
         args = p.parse_args(['--quiet', 'DIW', 'arg1', 'arg2'])
         self.assertEqual(rargs, args.args)
-        self.assertEqual("DIW", args.quiet)
+        self.assertEqual("DIW", args.quiet_inject)
 
         args = p.parse_args(['-Q', 'DIW', 'arg1', 'arg2'])
         self.assertEqual(rargs, args.args)
-        self.assertEqual("DIW", args.quiet)
+        self.assertEqual("DIW", args.quiet_inject)
 
         args = p.parse_args(['--quiet=-EC', 'arg1', 'arg2'])
         self.assertEqual(rargs, args.args)
-        self.assertEqual(set("DIW"), set(args.quiet))
+        self.assertEqual(set("DIW"), set(args.quiet_inject))
 
         args = p.parse_args(['-Q=-C', 'arg1', 'arg2'])
         self.assertEqual(rargs, args.args)
-        self.assertEqual(set("DIWE"), set(args.quiet))
+        self.assertEqual(set("DIWE"), set(args.quiet_inject))
 
         args = p.parse_args(['--quiet', '-DW', 'arg1', 'arg2'])
         self.assertEqual(rargs, args.args)
-        self.assertEqual(set("IEC"), set(args.quiet))
+        self.assertEqual(set("IEC"), set(args.quiet_inject))
 
         args = p.parse_args(['--quiet', 'DWarg', 'arg1', 'arg2'])
         self.assertEqual(["DWarg"] + rargs, args.args)
-        self.assertEqual("DIWEC", args.quiet)
+        self.assertEqual("DIWEC", args.quiet_inject)
 
         p = Parser(module=self)
 
         args = p.parse_args(['--quiet'])
-        self.assertEqual("DIWEC", args.quiet)
+        self.assertEqual("DIWEC", args.quiet_inject)
 
         args = p.parse_args(['--quiet', 'DWI'])
-        self.assertEqual("DWI", args.quiet)
+        self.assertEqual("DWI", args.quiet_inject)
 
         with self.assertRaises(SystemExit):
             args = p.parse_args(['--quiet', 'DWA'])
-            self.assertEqual("DWI", args.quiet)
+            self.assertEqual("DWI", args.quiet_inject)
 
         p = Parser(module=self)
         p.add_argument('-D', action="store_true")
 
         args = p.parse_args(['--quiet', '-D'])
-        self.assertEqual("DIWEC", args.quiet)
+        self.assertEqual("DIWEC", args.quiet_inject)
         self.assertTrue(args.D)
 
 

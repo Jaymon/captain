@@ -339,6 +339,17 @@ def banner(*lines, **kwargs):
         out(sep * count)
 
 
+def row(row, **kwargs):
+    """This is more of a specialty version of table that just prints one row
+
+    this is handy for when you are iterating through data and don't want to print
+    it all at the end but would rather print it one row at a time
+
+    :param row: list, the columns of the row you want to print
+    :param **kwargs: dict, all the options in table()
+    """
+    return table([row], **kwargs)
+
 def table(*columns, **kwargs):
     """
     format columned data so we can easily print it out on a console, this just takes
@@ -371,6 +382,11 @@ def table(*columns, **kwargs):
     :param **kwargs: dict
         prefix -- string -- what you want before each row (eg, a tab)
         buf_count -- integer -- how many spaces between longest col value and its neighbor
+        headers -- list -- the headers you want, must match column count
+        widths -- list -- the widths of each column you want to use, this doesn't have
+            to match column count, so you can do something like [0, 5] to set the
+            width of the second column
+        width -- int -- similar to widths except it will set this value for all columns
     """
     ret = []
     prefix = kwargs.get('prefix', '')
@@ -382,9 +398,18 @@ def table(*columns, **kwargs):
         # better
         columns = list(zip(*columns))
 
+    headers = kwargs.get("headers", [])
+    if headers:
+        columns.insert(0, headers)
+
     # we have to go through all the rows and calculate the length of each
     # column of each row
+    widths = kwargs.get("widths", [])
     row_counts = Counter()
+    for i in range(len(widths)):
+        row_counts[i] = int(widths[i])
+
+    width = int(kwargs.get("width", 0))
     for row in columns:
         for i, c in enumerate(row):
             if isinstance(c, basestring):
@@ -394,20 +419,37 @@ def table(*columns, **kwargs):
             if cl > row_counts[i]:
                 row_counts[i] = cl
 
-    # build the format string for each row, we use the row_counts found above to
-    # decide how much padding each column should get
-    # https://stackoverflow.com/a/9536084/5006
-    row_format = prefix
-    for i in range(len(row_counts)):
-        row_format += "{:<" + str(row_counts[i] + buf_count) + "}"
+    width = int(kwargs.get("width", 0))
+    if width:
+        for i in row_counts:
+            if row_counts[i] < width:
+                row_counts[i] = width
 
     # actually go through and format each row
-    def tostr(c):
+    def colstr(c):
         if isinstance(c, basestring): return c
         return str(c)
 
+    def rowstr(row, prefix, row_counts):
+        row_format = prefix
+        cols = list(map(colstr, row))
+        for i in range(len(row_counts)):
+            c = cols[i]
+            # build the format string for each row, we use the row_counts found
+            # above to decide how much padding each column should get
+            # https://stackoverflow.com/a/9536084/5006
+            if re.match(r"^\d+(?:\.\d+)?$", c):
+                if i == 0:
+                    row_format += "{:>" + str(row_counts[i]) + "}"
+                else:
+                    row_format += "{:>" + str(row_counts[i] + buf_count) + "}"
+            else:
+                row_format += "{:<" + str(row_counts[i] + buf_count) + "}"
+
+        return row_format.format(*cols)
+
     for row in columns:
-        ret.append(row_format.format(*map(tostr, row)))
+        ret.append(rowstr(row, prefix, row_counts))
 
     out(os.linesep.join(ret))
 columns = table
