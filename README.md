@@ -2,7 +2,6 @@
 
 Easy python cli scripts for people that just want get things done.
 
-Captain was lovingly crafted for [First Opinion](http://firstopinionapp.com) and powers all our command line scripts.
 
 ## Usage
 
@@ -15,7 +14,7 @@ A valid `captain` cli script needs just two things:
         return 0
     ```
 
-2. Calling exit using `captain.exit()`
+2. Calling exit using `captain.exit(__name__)`
 
     ```python
     import captain
@@ -23,7 +22,7 @@ A valid `captain` cli script needs just two things:
     def main(foo, bar):
         return 0
 
-    captain.exit()
+    captain.exit(__name__)
     ```
 
 That's it! Whatever arguments you define in the `main` function will be options on the command line. A captain script is called just like any other python command line script, so to run the above example you could do:
@@ -48,7 +47,7 @@ def main(*args, **kwargs):
     echo.out(args)
     echo.out(kwargs)
 
-exit()
+exit(__name__)
 ```
 
 Would print a help string like this:
@@ -113,7 +112,7 @@ def main(foo=False, bar=0, *args):
     '''fancy script description'''
     return 0
 
-captain.exit()
+captain.exit(__name__)
 ```
 
 
@@ -132,7 +131,7 @@ def main_foo():
 def main_bar():
     pass
 
-captain.exit()
+captain.exit(__name__)
 ```
 
 So `foo` could be called using:
@@ -152,12 +151,13 @@ If you want a script from you package to be usable using both `python -m example
 ```python
 # example/__main__.py
 
-from captain import exit as console
+from captain import exit
 
 def main():
     pass
 
-console()
+def console():
+    exit(__name__)
 ```
 
 And then in your `setup.py` script you can add:
