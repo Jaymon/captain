@@ -177,7 +177,7 @@ class ScriptKwarg(object):
             if len(longest_name) < len(arg_name):
                 longest_name = arg_name.lstrip("-")
 
-            if len(arg_name) > 2:
+            if len(arg_name) >= 2:
                 arg_name = arg_name.lstrip("-")
                 self.merge_args([
                     '--{}'.format(arg_name),

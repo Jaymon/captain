@@ -187,3 +187,7 @@ Use pip:
 
     $ pip install captain
 
+For latest and greatest:
+
+    $ pip install --upgrade "git+https://github.com/Jaymon/captain#egg=captain"
+

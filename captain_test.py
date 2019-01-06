@@ -803,6 +803,30 @@ class ArgTest(TestCase):
 #         ])
 #         r = script_path.run("two --foo=2")
 
+    def test_arg_length(self):
+        """https://github.com/Jaymon/captain/issues/49"""
+        script_path = TestScript([
+            "from captain import arg, exit",
+            '@arg("--ts", type=int)',
+            "def main(ts):",
+            "    print(ts)",
+            "exit()",
+        ])
+        r = script_path.run("--ts=1")
+        self.assertEqual("1", r)
+
+        script_path = TestScript([
+            "from captain import arg, exit",
+            '@arg("--ts", type=int)',
+            '@arg("--fb", type=int)',
+            "def main(ts, fb):",
+            "    print(ts)",
+            "    print(fb)",
+            "exit()",
+        ])
+        r = script_path.run("--ts=1 --fb=3")
+        self.assertEqual("1\n3", r)
+
     def test_dest(self):
         """https://github.com/Jaymon/captain/issues/40"""
         script_path = TestScript([
