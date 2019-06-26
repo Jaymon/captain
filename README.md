@@ -156,8 +156,13 @@ from captain import exit
 def main():
     pass
 
+# hook for setup.py entry_points
 def console():
     exit(__name__)
+    
+# hook for python -m MODULE call
+if __name__ == "__main__":
+    console()
 ```
 
 And then in your `setup.py` script you can add:

@@ -6,7 +6,6 @@ import re
 import ast
 import inspect
 import sys
-import collections
 
 from . import echo
 from . import decorators
@@ -16,67 +15,115 @@ from .parse import ArgParser, Parser
 from .decorators import arg, args
 
 
-__version__ = '2.0.5'
+__version__ = '3.0.0'
 
 
-def discover_if_calling_mod():
-    calling_mod = None
-    try:
-        # http://stackoverflow.com/a/1095621/5006
-        stack = inspect.stack()
-        frame = stack[2]
-        main_mod = sys.modules.get("__main__", None)
-        if main_mod:
-
-            mod = inspect.getmodule(frame[0])
-            if mod is not main_mod:
-                for f in stack[2:]:
-                    fm = inspect.getmodule(f[0])
-                    if fm is not mod:
-                        mod = fm
-                        frame = f
-                        break
-
+# def find_script():
+#     ret = None
+# 
+#     # http://stackoverflow.com/a/1095621/5006
+#     stack = inspect.stack()
+#     for f in reversed(stack):
+#         try:
+#             path = f[1]
+#             mod = sys.modules[f[0].f_globals["__name__"]]
 #             pout.b()
-#             for f in stack:
-#                 pout.v(inspect.getmodule(f[0]).__name__, f[4][0].strip())
+#             pout.v(path, mod.__name__)
+#             s = Script(path, module=mod)
+#             if s.callbacks:
+#                 ret = s
+#                 break
+# 
+#         except ParseError:
+#             pass
+# 
+#     if not ret:
+# 
+#         pout.v(sys.modules["__main__"])
+# 
+#         loc = stack[-1][4][0].strip()
+#         pout.v(loc, stack[-1][0].f_code.co_name)
+# 
+#         if not re.match("import\s+", loc, re.I):
+# 
+#             # this might be more portable
+#             # sys._getframe().f_back.f_code.co_name
+#             # http://stackoverflow.com/questions/2654113/
+# 
+#             m = re.match("load_entry_point\(([^\)]+)\)", loc)
+#             if m:
+#                 # we are using a setup.py defined console_scripts entry point
+# 
+#                 dist, group, name = m.group(1).split("', ")
+#                 from pkg_resources import get_distribution
+# 
+#                 ep = get_distribution(dist.strip("'")).get_entry_info(
+#                     group.strip("'"),
+#                     name.strip("'")
+#                 )
+#                 calling_mod = sys.modules[ep.module_name]
+# 
+#     return ret
 
-            # now we have found what should be the __main__ mod, we bail if it isn't
-            if mod is main_mod:
-                loc = frame[4][0].strip()
 
-                if not re.match("import\s+", loc, re.I):
+# def discover_if_calling_mod():
+#     calling_mod = None
+#     try:
+#         # http://stackoverflow.com/a/1095621/5006
+#         stack = inspect.stack()
+#         frame = stack[2]
+#         main_mod = sys.modules.get("__main__", None)
+#         if main_mod:
+# 
+#             mod = inspect.getmodule(frame[0])
+#             if mod is not main_mod:
+#                 for f in stack[2:]:
+#                     fm = inspect.getmodule(f[0])
+#                     if fm is not mod:
+#                         mod = fm
+#                         frame = f
+#                         break
+# 
+# #             pout.b()
+# #             for f in stack:
+# #                 pout.v(inspect.getmodule(f[0]).__name__, f[4][0].strip())
+# 
+#             # now we have found what should be the __main__ mod, we bail if it isn't
+#             if mod is main_mod:
+#                 loc = frame[4][0].strip()
+# 
+#                 if not re.match("import\s+", loc, re.I):
+# 
+#                     # this might be more portable
+#                     # sys._getframe().f_back.f_code.co_name
+#                     # http://stackoverflow.com/questions/2654113/
+# 
+#                     m = re.match("load_entry_point\(([^\)]+)\)", loc)
+#                     if m:
+#                         # we are using a setup.py defined console_scripts entry point
+# 
+#                         dist, group, name = m.group(1).split("', ")
+#                         from pkg_resources import get_distribution
+# 
+#                         ep = get_distribution(dist.strip("'")).get_entry_info(
+#                             group.strip("'"),
+#                             name.strip("'")
+#                         )
+#                         calling_mod = sys.modules[ep.module_name]
+# 
+#                     else:
+#                         # we called captain from a normal python script in a directory
+#                         # either defined through setup.py "scripts" in a package or just
+#                         # some script
+#                         calling_mod = mod
+# 
+#     finally:
+#         del frame
+# 
+#     return calling_mod
 
-                    # this might be more portable
-                    # sys._getframe().f_back.f_code.co_name
-                    # http://stackoverflow.com/questions/2654113/
 
-                    m = re.match("load_entry_point\(([^\)]+)\)", loc)
-                    if m:
-                        # we are using a setup.py defined console_scripts entry point
-
-                        dist, group, name = m.group(1).split("', ")
-                        from pkg_resources import get_distribution
-
-                        ep = get_distribution(dist.strip("'")).get_entry_info(
-                            group.strip("'"),
-                            name.strip("'")
-                        )
-                        calling_mod = sys.modules[ep.module_name]
-
-                    else:
-                        # we called captain from a normal python script in a directory
-                        # either defined through setup.py "scripts" in a package or just
-                        # some script
-                        calling_mod = mod
-
-    finally:
-        del frame
-
-    return calling_mod
-
-
-def exit(mod_name=""):
+def exit(mod_name):
     """A stand-in for the normal sys.exit()
 
     all the magic happens here, when this is called at the end of a script it will
@@ -92,28 +139,22 @@ def exit(mod_name=""):
     even if you have this at the end of the script, it won't actually exit if the
     script is traditionally imported
     """
-    if mod_name and mod_name == "__main__":
-        calling_mod = sys.modules.get("__main__", None)
+    mod = sys.modules.get(mod_name, None)
+    s = Script(inspect.getfile(mod), module=mod)
+    raw_args = sys.argv[1:]
+    try:
+        ret_code = s.run(raw_args)
 
-    else:
-        calling_mod = discover_if_calling_mod()
+    except Stop as e:
+        ret_code = e.code
+        msg = str(e)
+        if msg:
+            if ret_code != 0:
+                echo.err(msg)
+            else:
+                echo.out(msg)
 
-    if calling_mod:
-        s = Script(inspect.getfile(calling_mod), module=calling_mod)
-        raw_args = sys.argv[1:]
-        try:
-            ret_code = s.run(raw_args)
-
-        except Stop as e:
-            ret_code = e.code
-            msg = str(e)
-            if msg:
-                if ret_code != 0:
-                    echo.err(msg)
-                else:
-                    echo.out(msg)
-
-        sys.exit(ret_code)
+    sys.exit(ret_code)
 Captain = exit # https://github.com/Jaymon/captain/issues/28
 console = exit
 cli = exit
@@ -332,7 +373,7 @@ class Script(object):
         ast_tree = ast.parse(self.body, self.path)
         calls = self._find_calls(ast_tree, __name__, "exit")
         for call in calls:
-            if re.search("{}\(".format(re.escape(call)), self.body):
+            if re.search(r"{}\(".format(re.escape(call)), self.body):
                 ret = True
                 break
 
@@ -358,7 +399,7 @@ class Script(object):
 
         if hasattr(ast_tree, 'body'):
             # further down the rabbit hole we go
-            if isinstance(ast_tree.body, collections.Iterable):
+            if isinstance(ast_tree.body, Iterable):
                 for ast_body in ast_tree.body:
                     s.update(self._find_calls(ast_body, called_module, called_func))
 

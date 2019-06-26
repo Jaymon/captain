@@ -455,26 +455,79 @@ def table(*columns, **kwargs):
 columns = table
 
 
-def prompt(question, choices=None):
+def prompt(question, choices=None, ignore_case=True):
     """echo a prompt to the user and wait for an answer
 
-    question -- string -- the prompt for the user
-    choices -- list -- if given, only exit when prompt matches one of the choices
-    return -- string -- the answer that was given by the user
-    """
+    :Example:
+        answer = echo.prompt("Is this ok?", choices={"y": ["yes", "y"], "n": ["no", "n"]})
 
-    if not re.match("\s$", question):
-        question = "{}: ".format(question)
+    :param question: string, the prompt for the user
+    :param choices: list|dict, if given, only exit when prompt matches one of the choices
+    :param ignore_case: boolean, True if answer case doesn't matter
+    :returns: string, the answer that was given by the user
+    """
+    if choices:
+        if isinstance(choices, Mapping):
+            if ignore_case:
+                for k in list(choices.keys()):
+                    choices[k] = set(v.lower() for v in choices[k])
+
+        else: # choices is a Sequence
+            d = {}
+            for v in choices:
+                d[v] = set([v.lower() if ignore_case else v])
+            choices = d
+
+    m = re.search(r"(\s*)$", question)
+    whitespace = m.group(1)
+    if not whitespace:
+        whitespace = " "
+
+    question = question.rstrip()
+
+    if choices:
+        question = "{} ({}){}".format(question, "|".join(choices.keys()), whitespace)
+
+    else:
+        question = "{}{}".format(question, whitespace)
+
+
+#     m = re.search(r"[a-zA-Z0-9](\s*)$", question)
+#     if m:
+#         whitespace = m.group(1)
+#         if not whitespace:
+#             whitespace = " "
+# 
+#         question = question.rstrip()
+# 
+#         if choices:
+#             question = "{}? ({}){}".format(question, "|".join(choices.keys()), whitespace)
+#         else:
+#             question = "{}:{}".format(question, whitespace)
+
+    #if not re.match(r"\s$", question):
+    #    question = "{}: ".format(question)
 
     while True:
-        if sys.version_info[0] > 2:
-            answer = input(question)
+        answer = input(question)
+
+        if choices:
+            if ignore_case:
+                answer = answer.lower()
+
+            found = False
+            for k, v in choices.items():
+                if answer in v:
+                    answer = k
+                    found = True
+                    break
+
+            if found:
+                break
 
         else:
-            answer = raw_input(question)
-
-        if not choices or answer in choices:
             break
+
 
     return answer
 

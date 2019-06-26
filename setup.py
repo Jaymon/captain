@@ -9,26 +9,37 @@ from codecs import open
 
 
 name = "captain"
-with open(os.path.join(name, "__init__.py"), encoding='utf-8') as f:
-    version = re.search("^__version__\s*=\s*[\'\"]([^\'\"]+)", f.read(), flags=re.I | re.M).group(1)
+kwargs = {"name": name}
 
-long_description = ""
-if os.path.isfile('README.rst'):
-    with open('README.rst', encoding='utf-8') as f:
-        long_description = f.read()
+def read(path):
+    if os.path.isfile(path):
+        with open(path, encoding='utf-8') as f:
+            return f.read()
+    return ""
+
+
+vpath = os.path.join(name, "__init__.py")
+if os.path.isfile(vpath):
+    kwargs["packages"] = find_packages()
+else:
+    vpath = "{}.py".format(name)
+    kwargs["py_modules"] = [name]
+version = re.search(r"^__version__\s*=\s*[\'\"]([^\'\"]+)", read(vpath), flags=re.I | re.M).group(1)
+
+
+kwargs["long_description"] = read('README.rst')
+
 
 setup(
-    name=name,
     version=version,
     description='python cli scripts for humans',
-    long_description=long_description,
+    keywords="cli console",
     author='Jay Marcyes',
-    author_email='jay@firstopinionapp.com',
-    url='http://github.com/firstopinion/{}'.format(name),
-    packages=find_packages(),
+    author_email='jay@marcyes.com',
+    url='http://github.com/jaymon/{}'.format(name),
     license="MIT",
     classifiers=[ # https://pypi.python.org/pypi?:action=list_classifiers
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
@@ -40,8 +51,9 @@ setup(
             '{} = {}.__main__:console'.format(name, name),
         ],
     },
-#     scripts=[
-#         '{}/bin/captain'.format(name)
-#     ]
+    **kwargs
 )
+
+
+
 

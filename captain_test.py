@@ -63,6 +63,46 @@ class EchoTest(TestCase):
     def setUp(self):
         logging.inject_quiet("")
 
+    def test_prompt_prompt(self):
+        class MockInput(object):
+            def __call__(self, question):
+                self.question = question
+                return "yes"
+
+        m = MockInput()
+        mecho = testdata.patch(echo, input=m)
+
+        mecho.prompt("Is this ok?", choices={"y": ["yes", "y"], "n": ["no", "n"]})
+        self.assertEqual("Is this ok? (y|n) ", m.question)
+
+        mecho.prompt("Is this ok?\n", choices={"y": ["yes", "y"], "n": ["no", "n"]})
+        self.assertEqual("Is this ok? (y|n)\n", m.question)
+
+        mecho.prompt("Is this ok")
+        self.assertEqual("Is this ok ", m.question)
+
+        mecho.prompt("Is this ok\n")
+        self.assertEqual("Is this ok\n", m.question)
+
+    def test_prompt_answer(self):
+        class MockInput(object):
+            def __init__(self, v):
+                self.v = v
+            def __call__(self, *args, **kwargs):
+                return self.v
+
+        mecho = testdata.patch(echo, input=MockInput("Yes"))
+        answer = mecho.prompt("Is this ok?", choices={"y": ["yes", "y"], "n": ["no", "n"]})
+        self.assertEqual("y", answer)
+
+        mecho = testdata.patch(echo, input=MockInput("no"))
+        answer = mecho.prompt("Is this ok?", choices={"y": ["yes", "y"], "n": ["no", "n"]})
+        self.assertEqual("n", answer)
+
+        mecho = testdata.patch(echo, input=MockInput("n"))
+        answer = mecho.prompt("Is this ok?", choices=["y", "n"])
+        self.assertEqual("n", answer)
+
     def test_increment(self):
         """https://github.com/Jaymon/captain/issues/41"""
         for x in echo.increment(range(5)):
@@ -210,7 +250,8 @@ class EchoTest(TestCase):
                 "def main():",
                 "  echo.out('gotcha')",
                 "  return 0",
-                "captain.exit()",
+                "if __name__ == '__main__':",
+                "    captain.exit(__name__)",
             ]
         )
 
@@ -229,7 +270,8 @@ class EchoTest(TestCase):
                 "  echo.verbose('verbose')",
                 "  echo.out('out')",
                 "  echo.err('err')",
-                "exit(__name__)",
+                "if __name__ == '__main__':",
+                "    exit(__name__)",
             ]
         )
 
@@ -262,7 +304,8 @@ class EchoTest(TestCase):
                 "@arg('--quiet', '-Q', '-q', action='store_true', help='override quiet')",
                 "def main(quiet):",
                 "  echo.out(quiet)",
-                "exit(__name__)",
+                "if __name__ == '__main__':",
+                "    exit(__name__)",
             ]
         )
         r = script.run('--help')
@@ -280,7 +323,8 @@ class EchoTest(TestCase):
                 "@arg('--quiet', action='store_true', help='override quiet')",
                 "def main(quiet):",
                 "  pass",
-                "exit(__name__)",
+                "if __name__ == '__main__':",
+                "    exit(__name__)",
             ]
         )
 
@@ -310,7 +354,8 @@ class EchoTest(TestCase):
                 "  echo.verbose('verbose')",
                 "  echo.out('out')",
                 "  echo.err('err')",
-                "exit(__name__)",
+                "if __name__ == '__main__':",
+                "    exit(__name__)",
             ]
         )
 
@@ -342,7 +387,8 @@ class EchoTest(TestCase):
                 "  echo.verbose('verbose')",
                 "  echo.out('out')",
                 "  echo.err('err')",
-                "exit(__name__)",
+                "if __name__ == '__main__':",
+                "    exit(__name__)",
             ]
         )
 
@@ -375,7 +421,8 @@ class EchoTest(TestCase):
                 "def main():",
                 "  for x in range(10):",
                 "    echo.ch('.')",
-                "exit(__name__)",
+                "if __name__ == '__main__':",
+                "    exit(__name__)",
             ]
         )
 
@@ -501,7 +548,8 @@ class CaptainTest(TestCase):
             "import captain",
             "def main():",
             "  raise captain.Stop(0)",
-            "captain.exit()"
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)"
         ])
         r = script.run()
         self.assertEqual("", r)
@@ -512,7 +560,8 @@ class CaptainTest(TestCase):
             "def main():",
             "  captain.echo.out('foo')",
             "  raise captain.Stop(1, 'stderr stop')",
-            "captain.exit()"
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)"
         ])
         r = script.run("--quiet=-W", code=1)
         self.assertEqual("stderr stop", r)
@@ -523,7 +572,8 @@ class CaptainTest(TestCase):
             "def main():",
             "  captain.echo.err('foo')",
             "  raise captain.Stop(0, 'stdout stop')",
-            "captain.exit()"
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)"
         ])
         r = script.run("--quiet=-I")
         self.assertEqual("stdout stop", r)
@@ -536,7 +586,8 @@ class CaptainTest(TestCase):
             "def main():",
             "  raise ValueError('boom_error')",
             "  return 0",
-            "captain.exit()"
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)"
         ])
 
         with self.assertRaisesRegexp(RuntimeError, 'returned 1') as e:
@@ -551,7 +602,8 @@ class CaptainTest(TestCase):
                 "  '''the description for foo module'''",
                 "  print('foo/__init__')",
                 "  return 0",
-                "captain.exit()"
+                "if __name__ == '__main__':",
+                "    captain.exit(__name__)"
             ],
             'foo/__init__.py'
         )
@@ -571,7 +623,8 @@ class CaptainTest(TestCase):
                 "  '''the description for foo module'''",
                 "  print('foo/__main__')",
                 "  return 0",
-                "captain.exit()"
+                "if __name__ == '__main__':",
+                "    captain.exit(__name__)"
             ],
             'foo/__main__.py'
         )
@@ -589,7 +642,8 @@ class CaptainTest(TestCase):
                 "def main():",
                 "  '''the description for foo module'''",
                 "  return 0",
-                "captain.exit()"
+                "if __name__ == '__main__':",
+                "    captain.exit(__name__)"
             ],
             'foo/bar.py'
         )
@@ -613,13 +667,15 @@ class CaptainTest(TestCase):
                     "def main():",
                     "  '''the description for bar'''",
                     "  return 0",
-                    "captain.exit()"
+                    "if __name__ == '__main__':",
+                    "    captain.exit(__name__)"
                 ]),
                 'che.py': "\n".join([
                     "#!/usr/bin/env python",
                     "import captain",
                     "def main(): return 0",
-                    "captain.exit()"
+                    "if __name__ == '__main__':",
+                    "    captain.exit(__name__)"
                 ]),
                 'bar/boo.py': "\n".join([
                     "def main():",
@@ -636,7 +692,8 @@ class CaptainTest(TestCase):
                     "def main():",
                     "  '''the description for mod1'''",
                     "  return 0",
-                    "captain.exit()"
+                    "if __name__ == '__main__':",
+                    "    captain.exit(__name__)"
                 ]),
                 'mod2/__main__.py': "\n".join([
                     "#!/usr/bin/env python",
@@ -644,7 +701,8 @@ class CaptainTest(TestCase):
                     "def main():",
                     "  '''the description for mod1'''",
                     "  return 0",
-                    "captain.exit()"
+                    "if __name__ == '__main__':",
+                    "    captain.exit(__name__)"
                 ]),
                 'mod3/multi.py': "\n".join([
                     "import captain",
@@ -657,7 +715,8 @@ class CaptainTest(TestCase):
                     "def main_multi3():",
                     "  '''the 3 description'''",
                     "  pass",
-                    "captain.exit()"
+                    "if __name__ == '__main__':",
+                    "    captain.exit(__name__)"
                 ]),
             },
             cwd
@@ -691,7 +750,8 @@ class CaptainTest(TestCase):
             "import captain",
             "def main(foo=int, bar=0, *args, **kwargs):",
             "  return 0",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
         r = script.run("--help")
         self.assertTrue(os.path.basename(script.path) in r)
@@ -706,7 +766,8 @@ class CaptainTest(TestCase):
             "def main(foo, bar=0, *args, **kwargs):",
             "  print('{} {}'.format(args[0], kwargs['che']))",
             "  return 0",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
         r = script.run("--foo=1 --che=oh_yeah awesome")
         self.assertEqual('awesome oh_yeah', r)
@@ -717,7 +778,8 @@ class CaptainTest(TestCase):
             "def main(foo, bar=0, *args):",
             "  print(args[0])",
             "  return 0",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
         r = script.run("--foo=1 awesome")
         self.assertEqual('awesome', r)
@@ -728,7 +790,8 @@ class CaptainTest(TestCase):
             "def main(foo=int, *args):",
             "  print(args[0])",
             "  return 0",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
         r = script.run("--foo=1 awesome")
         self.assertEqual('awesome', r)
@@ -739,7 +802,8 @@ class CaptainTest(TestCase):
             "def main(foo=int, bar=int):",
             "  print('foo')",
             "  return 0",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
         r = script.run("--foo=1 --bar=2")
         self.assertEqual('foo', r)
@@ -810,7 +874,8 @@ class ArgTest(TestCase):
             '@arg("--ts", type=int)',
             "def main(ts):",
             "    print(ts)",
-            "exit()",
+            "if __name__ == '__main__':",
+            "    exit(__name__)",
         ])
         r = script_path.run("--ts=1")
         self.assertEqual("1", r)
@@ -822,7 +887,8 @@ class ArgTest(TestCase):
             "def main(ts, fb):",
             "    print(ts)",
             "    print(fb)",
-            "exit()",
+            "if __name__ == '__main__':",
+            "    exit(__name__)",
         ])
         r = script_path.run("--ts=1 --fb=3")
         self.assertEqual("1\n3", r)
@@ -834,7 +900,8 @@ class ArgTest(TestCase):
             '@arg("--out", dest="stream", help="this should be in stream variable")',
             "def main(stream, **kwargs):",
             "    print(stream)",
-            "exit()",
+            "if __name__ == '__main__':",
+            "    exit(__name__)",
         ])
         r = script_path.run("--out=stream")
         self.assertEqual("stream", r)
@@ -844,7 +911,8 @@ class ArgTest(TestCase):
             '@arg("--out", dest="stream", help="this should be in stream variable")',
             "def main(**kwargs):",
             "    print(kwargs['stream'])",
-            "exit()",
+            "if __name__ == '__main__':",
+            "    exit(__name__)",
         ])
         r = script_path.run("--out=stream")
         self.assertEqual("stream", r)
@@ -855,7 +923,8 @@ class ArgTest(TestCase):
             "@captain.decorators.arg('--foo-bar')",
             "def main(**kwargs):",
             "    print(kwargs['foo_bar'])",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
 
         r = script_path.run("--foo-bar=1")
@@ -879,7 +948,8 @@ class ArgTest(TestCase):
             "    def __call__(self, **kwargs): pass",
             "",
             "main = MainCommand()",
-            "captain.exit(__name__)",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
 
         r = script_path.run("--help")
@@ -892,7 +962,8 @@ class ArgTest(TestCase):
             "@captain.decorators.arg('foo', nargs=1)",
             "def main(foo):",
             "    print(foo)",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
 
         with self.assertRaises(RuntimeError):
@@ -920,7 +991,8 @@ class ArgTest(TestCase):
             "def main(indir):",
             "    print(indir)",
             "    return 0",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
 
         r = script_path.run("--dir=/tmp")
@@ -941,7 +1013,9 @@ class ArgTest(TestCase):
             "            self, output_file, output_dir, print_lines, no_zip_output",
             "        )",
             "main = BahPleaseWork()",
-            "exit()"
+            #"exit()"
+            "if __name__ == '__main__':",
+            "    exit(__name__)"
         ])
 
         s = script_path.instance
@@ -967,7 +1041,8 @@ class ArgTest(TestCase):
             "    print(args)",
             "    print(kwargs)",
             "    return 0",
-            "exit(__name__)",
+            "if __name__ == '__main__':",
+            "    exit(__name__)",
         ])
         r = script_path.run('--help')
 
@@ -979,7 +1054,8 @@ class ArgTest(TestCase):
             "",
             "    line 3'''",
             "    return 0",
-            "exit(__name__)",
+            "if __name__ == '__main__':",
+            "    exit(__name__)",
         ])
         r = script_path.run('--help')
         self.assertTrue("line 1\n\nline 3" in r)
@@ -996,7 +1072,8 @@ class ArgTest(TestCase):
             "def main(foo, bar, che=1, baz=2, *args, **kwargs):",
             "  print(args[0])",
             "  return 0",
-            "captain.exit(__name__)",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
         s = script_path.instance
         parser = s.parser
@@ -1033,7 +1110,8 @@ class ArgTest(TestCase):
             "def main(**kwargs):",
             "    echo.out(kwargs)",
             "    return 0",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
         s = script_path.instance
         parser = s.parser
@@ -1060,7 +1138,8 @@ class ArgTest(TestCase):
             '@arg("--foo", type=int, dest="max_foo", default=5)',
             "def main(max_foo):",
             "    echo.out(max_foo)",
-            "captain.exit()"
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)"
         ])
         r = script_path.run('')
         self.assertEqual("5", r)
@@ -1076,7 +1155,8 @@ class ArgTest(TestCase):
             "def main(count):",
             "    echo.out('foo')",
             "    return 0",
-            "captain.exit()"
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)"
         ])
         with self.assertRaises(RuntimeError):
             r = script_path.run('')
@@ -1093,7 +1173,8 @@ class ArgTest(TestCase):
             '@arg("--unsync-count", type=int, dest="max_unsync_count", default=5)',
             "def main(max_count, recv_timeout, max_unsync_count=5):",
             "    return 0",
-            "captain.exit()"
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)"
         ])
         s = script_path.instance
 
@@ -1121,7 +1202,8 @@ class ArgTest(TestCase):
             "    echo.out(a_t)",
             "    echo.out(p_e)",
             "    return 0",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
         r = script_path.run('--p-e=d')
         self.assertTrue("['e', 'a']" in r)
@@ -1136,7 +1218,7 @@ class ExitTest(TestCase):
             "from che import main_foo, main_bar",
             #"from che import main_bar",
             "if __name__ == '__main__':",
-            "  exit(__name__)",
+            "    exit(__name__)",
         ])
 
         modpath = testdata.create_module("che", [
@@ -1169,7 +1251,8 @@ class ExitTest(TestCase):
             "  return 0",
             #"if __name__ == '__main__':",
             #"  captain.exit()"
-            "captain.exit()"
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)"
         ]), tmpdir=script.cwd)
 
         r = script.run()
@@ -1184,7 +1267,7 @@ class ExitTest(TestCase):
             "    return 0",
             "",
             "if __name__ == '__main__':",
-            "    exit()",
+            "    exit(__name__)",
         ])
         r = script.run()
         self.assertTrue("success" in r)
@@ -1197,7 +1280,7 @@ class ExitTest(TestCase):
             "    return 0",
             "",
             "def console():",
-            "    exit()",
+            "    exit(__name__)",
             "",
             "if __name__ == '__main__':",
             "    console()",
@@ -1205,49 +1288,113 @@ class ExitTest(TestCase):
         r = script.run()
         self.assertTrue("success" in r)
 
-    def test_stack_single_entry_points(self):
-        module_d = testdata.create_modules({
-            "msmcli": "",
-            "msmcli.__main__": [
-                "from captain import exit as console, echo",
-                "def main():",
-                "    echo.out('success')",
-                "    return 0",
-                "",
-                "if __name__ == '__main__':",
-                "    console()",
-            ],
-        })
 
-        script = TestScript([
-            "#!/usr/bin/python",
-            "import sys",
-            "sys.path.append('{}')".format(module_d),
-            "from msmcli.__main__ import console",
+class EntryPointTest(TestCase):
+    """A test case that will test all the different ways we can enter into a captain
+    script so I can easily test them and make sure they work across changes"""
+#     def test_python37_script_direct(self):
+#         """https://github.com/Jaymon/transcribe/issues/2"""
+#         m = testdata.create_module(contents=[
+#             "from captain import exit as console, echo",
+#             "",
+#             "def main(): echo.out('success')",
+#         ])
+# 
+#         contents = [
+#             "#!{}".format(testdata.get_interpreter()),
+#             "# -*- coding: utf-8 -*-",
+#             "import re",
+#             "import sys",
+#             "",
+#             "sys.path.insert(0, '{}')".format(m.directory),
+#             "",
+#             "from {} import console".format(m),
+#             "",
+#             "if __name__ == '__main__':",
+#             "    sys.argv[0] = re.sub(r'(-script\\.pyw?|\\.exe)?$', '', sys.argv[0])",
+#             "    sys.exit(console())",
+#         ]
+# 
+#         ts = TestScript(contents)
+#         r = ts.run()
+#         #self.assertTrue(r.endswith("success"))
+#         pout.v(r)
+#         #s = ts.instance
+
+    def test_python37_script_wrapper(self):
+        """https://github.com/Jaymon/transcribe/issues/2"""
+        m = testdata.create_module(contents=[
+            "from captain import exit, echo",
             "",
-            "def load_entry_point(*args):",
-            "    return console",
+            "def main(): echo.out('success')",
             "",
-            "import pkg_resources",
-            "class GDFake(object):",
-            "    def __call__(self, *args, **kwargs):",
-            "        return self",
-            "    def get_entry_info(self, *args, **kwargs):",
-            "        class o(object):",
-            "            module_name = 'msmcli.__main__'",
-            "        return o()",
-            "pkg_resources.get_distribution = GDFake()",
-            ""
-            "#from pkg_resources import load_entry_point",
-            "",
-            "if __name__ == '__main__':",
-            "    sys.exit(",
-            "        load_entry_point('stockton==0.0.1', 'console_scripts', 'stockton')()",
-            "    )",
+            "def console():",
+            "    exit(__name__)",
         ])
 
-        r = script.run()
-        self.assertTrue("success" in r)
+        contents = [
+            "#!{}".format(testdata.get_interpreter()),
+            "# -*- coding: utf-8 -*-",
+            "import re",
+            "import sys",
+            "",
+            "sys.path.insert(0, '{}')".format(m.directory),
+            "",
+            "from {} import console".format(m),
+            "",
+            "if __name__ == '__main__':",
+            "    sys.argv[0] = re.sub(r'(-script\\.pyw?|\\.exe)?$', '', sys.argv[0])",
+            "    sys.exit(console())",
+        ]
+
+        ts = TestScript(contents)
+        r = ts.run()
+        self.assertTrue(r.endswith("success"))
+
+#     def test_stack_single_entry_points(self):
+#         module_d = testdata.create_modules({
+#             "msmcli": "",
+#             "msmcli.__main__": [
+#                 "from captain import exit as console, echo",
+#                 "def main():",
+#                 "    echo.out('success')",
+#                 "    return 0",
+#                 "",
+#                 "if __name__ == '__main__':",
+#                 "    console()",
+#             ],
+#         })
+# 
+#         script = TestScript([
+#             "#!/usr/bin/python",
+#             "import sys",
+#             "sys.path.append('{}')".format(module_d),
+#             "from msmcli.__main__ import console",
+#             "",
+#             "def load_entry_point(*args):",
+#             "    return console",
+#             "",
+#             "import pkg_resources",
+#             "class GDFake(object):",
+#             "    def __call__(self, *args, **kwargs):",
+#             "        return self",
+#             "    def get_entry_info(self, *args, **kwargs):",
+#             "        class o(object):",
+#             "            module_name = 'msmcli.__main__'",
+#             "        return o()",
+#             "pkg_resources.get_distribution = GDFake()",
+#             ""
+#             "#from pkg_resources import load_entry_point",
+#             "",
+#             "if __name__ == '__main__':",
+#             "    sys.exit(",
+#             "        load_entry_point('msmcli==0.0.1', 'console_scripts', 'msmcli')()",
+#             "    )",
+#         ])
+# 
+#         r = script.run()
+#         pout.v(r)
+#         self.assertTrue("success" in r)
 
     def test_stack_multi_entry_points(self):
         """there was a bug in captain where multiple levels of calls would cause
@@ -1262,7 +1409,7 @@ class ExitTest(TestCase):
                 "    return 0",
                 "",
                 "def console():", # and console calls captain.exit, this is the multi
-                "    exit()",
+                "    exit(__name__)",
                 "",
                 "if __name__ == '__main__':",
                 "    console()", # notice main calls console
@@ -1297,7 +1444,36 @@ class ExitTest(TestCase):
         ])
 
         r = script.run()
-        self.assertTrue("success" in r)
+        self.assertTrue(r.endswith("success"))
+
+    def test_normal_script(self):
+        """https://github.com/Jaymon/transcribe/issues/2"""
+        contents = [
+            "from captain import exit, echo",
+            "",
+            "def main(): echo.out('success')",
+            "",
+            "exit(__name__)",
+        ]
+
+        ts = TestScript(contents)
+        r = ts.run()
+        self.assertTrue(r.endswith("success"))
+
+    def test_main_script(self):
+        """https://github.com/Jaymon/transcribe/issues/2"""
+        contents = [
+            "from captain import exit, echo",
+            "",
+            "def main(): echo.out('success')",
+            "",
+            "if __name__ == '__main__':",
+            "    exit(__name__)",
+        ]
+
+        ts = TestScript(contents)
+        r = ts.run()
+        self.assertTrue(r.endswith("success"))
 
 
 class ScriptTest(TestCase):
@@ -1305,7 +1481,8 @@ class ScriptTest(TestCase):
         script_path = TestScript([
             "from captain import exit as ex",
             "def main(): pass",
-            "ex()",
+            "if __name__ == '__main__':",
+            "    ex()",
         ])
         s = Script(script_path)
         self.assertTrue(s.can_run_from_cli())
@@ -1313,7 +1490,8 @@ class ScriptTest(TestCase):
         script_path = TestScript([
             "import captain as admiral",
             "def main(): pass",
-            "admiral.exit()",
+            "if __name__ == '__main__':",
+            "    admiral.exit(__name__)",
         ])
         s = Script(script_path)
         self.assertTrue(s.can_run_from_cli())
@@ -1322,7 +1500,8 @@ class ScriptTest(TestCase):
         script_path = TestScript([
             "from captain import exit",
             "def main(): pass",
-            "exit()",
+            "if __name__ == '__main__':",
+            "    exit(__name__)",
         ])
         s = Script(script_path)
         self.assertTrue(s.can_run_from_cli())
@@ -1343,7 +1522,8 @@ class ScriptTest(TestCase):
         script_path = TestScript([
             "import captain",
             "def main(): pass",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
         s = Script(script_path)
         self.assertTrue(s.can_run_from_cli())
@@ -1355,7 +1535,8 @@ class ScriptTest(TestCase):
             "import captain",
             "@captain.decorators.arg('-V', '--version', action='version', version='0.1')",
             "def main(): pass",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
         r = script.run("--version")
         self.assertTrue("0.1" in r)
@@ -1365,7 +1546,8 @@ class ScriptTest(TestCase):
             "import captain",
             "__version__ = '0.1.1'",
             "def main_bar(): return 0",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
         r = script_path.run("-V")
         self.assertTrue("0.1.1" in r)
@@ -1381,7 +1563,8 @@ class ScriptTest(TestCase):
             "@args(main_foo)",
             "@arg('--three', default=True)",
             "def main_bar(*args, **kwargs): return 0",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
         r = script_path.run("bar --help")
         self.assertTrue("--one" in r)
@@ -1514,7 +1697,8 @@ class ScriptTest(TestCase):
             "def main_four(foo):",
             "  echo.out(foo)",
             "",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
 
         with self.assertRaises(RuntimeError):
@@ -1553,7 +1737,8 @@ class ScriptTest(TestCase):
             "  echo.out(foo)",
             "  echo.out(bar)",
             "",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
 
         r = script_path.run("three --help")
@@ -1573,7 +1758,8 @@ class ScriptTest(TestCase):
             "  '''description for bar'''",
             "  echo.out('bar out')",
             "  echo.verbose('bar verbose')",
-            "captain.exit()",
+            "if __name__ == '__main__':",
+            "    captain.exit(__name__)",
         ])
 
         r = script_path.run("--quiet foo")
@@ -1628,7 +1814,8 @@ class ScriptTest(TestCase):
             "def main(foo=0, bar=0):",
             "  if not foo and not bar:",
             "    raise ArgError('either foo or bar is needed')",
-            "exit()",
+            "if __name__ == '__main__':",
+            "    exit(__name__)",
         ])
         s = Script(script_path)
         r = s.run([])
@@ -1636,7 +1823,6 @@ class ScriptTest(TestCase):
 
         r = s.run(["--bar=5"])
         self.assertEqual(0, r)
-
 
     def test_scripts(self):
         with self.assertRaises(IOError):
@@ -1704,7 +1890,8 @@ class ScriptTest(TestCase):
                 "import captain",
                 "def main({}):".format(test_in),
                 "  return 0",
-                "captain.exit()",
+                "if __name__ == '__main__':",
+                "    captain.exit(__name__)",
             ])
 
             with self.assertRaises(RuntimeError):
@@ -1741,7 +1928,8 @@ class ScriptTest(TestCase):
                 "",
                 "def main({}):".format(test_in),
                 "  return 0",
-                "captain.exit()",
+                "if __name__ == '__main__':",
+                "    captain.exit(__name__)",
             ])
 
             s = Script(script_path)
