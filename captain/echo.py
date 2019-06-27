@@ -441,10 +441,7 @@ def table(*columns, **kwargs):
             # above to decide how much padding each column should get
             # https://stackoverflow.com/a/9536084/5006
             if re.match(r"^\d+(?:\.\d+)?$", c):
-                if i == 0:
-                    row_format += "{:>" + str(row_counts[i]) + "}"
-                else:
-                    row_format += "{:>" + str(row_counts[i] + buf_count) + "}"
+                row_format += "{:>" + str(row_counts[i]) + "}"
             else:
                 row_format += "{:<" + str(row_counts[i] + buf_count) + "}"
 

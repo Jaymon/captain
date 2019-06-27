@@ -143,6 +143,11 @@ class EchoTest(TestCase):
 
         echo.table(range(20), range(20))
 
+    def test_table_alignment(self):
+        """https://github.com/Jaymon/captain/issues/52"""
+        it = (("fooo_type", 0), ("fooooooo_name", "barrrrrr Chee Bazzzz"))
+        echo.table(it)
+
     def test_table_headers(self):
         it = ((1, 2), (3, 4))
 
