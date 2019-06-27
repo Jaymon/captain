@@ -63,6 +63,12 @@ class EchoTest(TestCase):
     def setUp(self):
         logging.inject_quiet("")
 
+    def test_err(self):
+
+        with testdata.capture() as r:
+            echo.err("foo")
+        self.assertEqual("foo\n", str(r.stderr))
+
     def test_prompt_prompt(self):
         class MockInput(object):
             def __call__(self, question):

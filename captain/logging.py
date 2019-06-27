@@ -22,17 +22,23 @@ log_formatter = Formatter('%(message)s')
 log_handler = StreamHandler(stream=sys.stdout)
 log_handler.setFormatter(log_formatter)
 
+
 stderr = getLogger('captain.echo.stderr')
 if len(stderr.handlers) == 0:
     stderr.propagate = False
     stderr.setLevel(DEBUG)
-    stderr.addHandler(log_handler)
+    errlh = StreamHandler(stream=sys.stderr)
+    errlh.setFormatter(log_formatter)
+    stderr.addHandler(errlh)
+
 
 stdout = getLogger('captain.echo.stdout')
 if len(stdout.handlers) == 0:
     stdout.propagate = False
     stdout.setLevel(DEBUG)
+
     stdout.addHandler(log_handler)
+
 
 istdout = getLogger('captain.echo.istdout')
 if len(istdout.handlers) == 0:
