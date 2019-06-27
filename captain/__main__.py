@@ -5,6 +5,7 @@ import os
 import fnmatch
 from codecs import open
 
+from captain.compat import *
 import captain
 from captain.decorators import arg
 from captain import echo, __version__
@@ -61,7 +62,7 @@ def main(path):
                 #echo.exception(e)
                 #echo.err("Failed to parse {} because {}", f, e.message)
                 echo.err("Failed to parse {}", f)
-                echo.verbose(e.message)
+                echo.verbose(String(e))
                 echo.br()
 
 

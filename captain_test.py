@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
-from unittest import TestCase, SkipTest
 import os
 import subprocess
 import argparse
 
 import testdata
+from testdata.test import TestCase, SkipTest
 
 from captain import Script, echo
-from captain.client import Captain
+#from captain.client import Captain
 from captain.decorators import arg, args
 from captain.compat import *
 from captain.parse import Parser, ScriptKwarg, CallbackInspect, UnknownParser
@@ -32,7 +32,8 @@ class TestScript(object):
 
     @property
     def captain(self):
-        return Captain(self.path, cwd=self.cwd)
+        #return Captain(self.path, cwd=self.cwd)
+        return testdata.FileCommand(self.path, cwd=self.cwd)
 
     def __init__(self, body, fname=''):
         self.body = body
@@ -146,15 +147,56 @@ class EchoTest(TestCase):
     def test_table_alignment(self):
         """https://github.com/Jaymon/captain/issues/52"""
         it = (("fooo_type", 0), ("fooooooo_name", "barrrrrr Chee Bazzzz"))
-        echo.table(it)
+        echo.table(it, headers=["left", "right"])
+
+    def test_table_dict(self):
+        d = {
+            "foo": [1, 2, 3, 4],
+            "bar": [5, 6, 7],
+            "che": [8, 9, 10, 11, 12],
+        }
+
+        with testdata.capture(loggers=False) as r1:
+            echo.table(d)
+
+        with testdata.capture(loggers=False) as r2:
+            echo.table_from_dict(d)
+
+        self.assertEqual(r1, r2)
+
+    def test_table_rows(self):
+        it = [
+            [1, 5, 8],
+            [2, 6, 9],
+            [3, 7, 10],
+            [4, "", 11],
+            ["", "", 12],
+        ]
+
+        with testdata.capture(loggers=False) as r1:
+            echo.table(it, headers=["foo", "bar", "che"])
+
+        with testdata.capture(loggers=False) as r2:
+            echo.table_from_rows(*it, headers=["foo", "bar", "che"])
+
+        self.assertEqual(r1, r2)
+
+    def test_table_columns(self):
+        it = [[1, 2, 3, 4], [5, 6, 7], [8, 9, 10, 11, 12]]
+
+        with testdata.capture(loggers=False) as r1:
+            echo.table(*it, headers=["foo", "bar", "che"])
+
+        with testdata.capture(loggers=False) as r2:
+            echo.table_from_columns(*it, headers=["foo", "bar", "che"])
+
+        self.assertEqual(r1, r2)
 
     def test_table_headers(self):
         it = ((1, 2), (3, 4))
 
         echo.table(it, headers=["foo", "bar"])
-
-        with self.assertRaises(IndexError):
-            echo.table(it, headers=["foo", "bar", "che"])
+        echo.table(it, headers=["foo", "bar", "che"])
 
     def test_table_widths(self):
         widths = [5]
@@ -618,7 +660,6 @@ class CaptainTest(TestCase):
     def test_init_module(self):
         script = TestScript(
             [
-                "#!/usr/bin/env python",
                 "import captain",
                 "def main():",
                 "  '''the description for foo module'''",
@@ -629,17 +670,15 @@ class CaptainTest(TestCase):
             ],
             'foo/__init__.py'
         )
-
-        script.path = 'foo'
+        c = testdata.ModuleCommand("foo", cwd=script.cwd)
         with self.assertRaises(RuntimeError):
-            r = script.run()
+            r = c.run()
         # __init__ worked with old captain, but new captain that doesn't have a
         # cap script runner, it doesn't work
         #self.assertRegexpMatches(r, 'foo/__init__')
 
-        script = TestScript(
-            [
-                "#!/usr/bin/env python",
+        m = testdata.create_modules({
+            "foo.__main__": [
                 "import captain",
                 "def main():",
                 "  '''the description for foo module'''",
@@ -648,18 +687,13 @@ class CaptainTest(TestCase):
                 "if __name__ == '__main__':",
                 "    captain.exit(__name__)"
             ],
-            'foo/__main__.py'
-        )
+        })
+        c2 = testdata.ModuleCommand("foo", cwd=m.path)
+        r = c2.run()
+        self.assertRegex(r, 'foo/__main__')
 
-        script.path = 'foo'
-        c = script.captain
-        c.script = 'foo'
-        r = c.run()
-        self.assertRegexpMatches(r, 'foo/__main__')
-
-        script = TestScript(
-            [
-                "#!/usr/bin/env python",
+        m = testdata.create_modules({
+            "foo.bar": [
                 "import captain",
                 "def main():",
                 "  '''the description for foo module'''",
@@ -667,14 +701,10 @@ class CaptainTest(TestCase):
                 "if __name__ == '__main__':",
                 "    captain.exit(__name__)"
             ],
-            'foo/bar.py'
-        )
-
-        script.path = 'foo'
-        c = script.captain
-        c.script = 'foo'
+        })
+        c3 = testdata.ModuleCommand("foo", cwd=m.path)
         with self.assertRaises(RuntimeError):
-            r = c.run()
+            r = c3.run()
 
     def test_list(self):
         #raise SkipTest("")
@@ -748,9 +778,12 @@ class CaptainTest(TestCase):
         #c = Captain(, cwd=self.cwd)
         #c.cmd_prefix = "captain"
 
-        script.cwd = os.getcwd()
-        script.path = "captain/__main__.py"
-        r = script.run(cwd)
+        c = testdata.ModuleCommand("captain", cwd=os.getcwd())
+        r = c.run(cwd)
+
+        #script.cwd = os.getcwd()
+        #script.path = "captain/__main__.py"
+        #r = script.run(cwd)
 
         self.assertTrue('che.py' in r)
         self.assertTrue('foo/bar.py' in r)
@@ -1799,7 +1832,7 @@ class ScriptTest(TestCase):
         self.assertTrue("bar out" in r)
 
         r = script_path.run("--help")
-        self.assertTrue("{foo,bar}" in r)
+        self.assertTrue("{foo,bar}" in r or "{bar,foo}" in r)
 
         with self.assertRaises(RuntimeError):
             r = script_path.run()

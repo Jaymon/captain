@@ -379,79 +379,146 @@ def table(*columns, **kwargs):
         7  8
         9  0
 
-    :param *columns: can either be a list of rows or multiple lists representing each
-        column in the table
+    :param *columns: dict|list of lists| *lists, can either be a list of rows or
+        multiple lists representing each column in the table, or a dict where the
+        keys are the headers and the values are the columns corresponding to that
+        header
     :param **kwargs: dict
         prefix -- string -- what you want before each row (eg, a tab)
-        buf_count -- integer -- how many spaces between longest col value and its neighbor
+        #buf_count -- integer -- how many spaces between longest col value and its neighbor
         headers -- list -- the headers you want, must match column count
         widths -- list -- the widths of each column you want to use, this doesn't have
             to match column count, so you can do something like [0, 5] to set the
-            width of the second column
-        width -- int -- similar to widths except it will set this value for all columns
+            minimum width of the second column to 5
+        width -- int -- similar to widths except it will set this minimum value for all columns
+        column_delim -- string -- what goes between each column, defaults to " | "
+        header_delim -- string, what goes between headers and content rows
     """
     ret = []
-    prefix = kwargs.get('prefix', '')
-    buf_count = kwargs.get('buf_count', 2)
-    if len(columns) == 1:
-        columns = list(columns[0])
-    else:
-        # without the list the zip iterator gets spent, I'm sure I can make this
-        # better
-        columns = list(zip(*columns))
 
     headers = kwargs.get("headers", [])
+    prefix = kwargs.get('prefix', '')
+    #buf_count = kwargs.get('buf_count', 2)
+    column_delim = kwargs.get("column_delim", " | ")
+    header_delim = kwargs.get("header_delim", "-")
+    if len(columns) == 1:
+        # input is a list of rows or dict of columns
+        if isinstance(columns[0], Mapping):
+            # columns are a dict, so keys will be headers and values will be
+            # the columns
+            headers = list(columns[0].keys())
+            columns = list(zip_longest(*columns[0].values(), fillvalue=""))
+        else:
+            # columns are a list of rows
+            columns = list(columns[0])
+    else:
+        # input is a bunch of columns
+        # without the list the zip iterator gets spent
+        columns = list(zip_longest(*columns, fillvalue=""))
+
     if headers:
         columns.insert(0, headers)
 
-    # we have to go through all the rows and calculate the length of each
+    # columns should now consist of a list of lists where each list is a row in
+    # the table, so len(columns) would give the number of rows and
+    # len(columns[0]) would give the number of columns
+
+
+    # we have to go through all the rows and calculate the max width of each
     # column of each row
+    width = int(kwargs.get("width", 0))
     widths = kwargs.get("widths", [])
     row_counts = Counter()
     for i in range(len(widths)):
         row_counts[i] = int(widths[i])
 
-    width = int(kwargs.get("width", 0))
     for row in columns:
         for i, c in enumerate(row):
-            if isinstance(c, basestring):
-                cl = len(c)
-            else:
-                cl = len(str(c))
-            if cl > row_counts[i]:
-                row_counts[i] = cl
+            row_counts[i] = max(row_counts[i], len(String(c)), width)
 
-    width = int(kwargs.get("width", 0))
-    if width:
-        for i in row_counts:
-            if row_counts[i] < width:
-                row_counts[i] = width
-
-    # actually go through and format each row
-    def colstr(c):
-        if isinstance(c, basestring): return c
-        return str(c)
-
-    def rowstr(row, prefix, row_counts):
-        row_format = prefix
-        cols = list(map(colstr, row))
+    def rowstr(row, prefix, row_counts, column_delim):
+        row_format = prefix + column_delim
+        cols = list(map(String, row))
         for i in range(len(row_counts)):
+            if len(cols) > i:
+                cols.append("")
+
             c = cols[i]
             # build the format string for each row, we use the row_counts found
             # above to decide how much padding each column should get
             # https://stackoverflow.com/a/9536084/5006
-            if re.match(r"^\d+(?:\.\d+)?$", c):
-                row_format += "{:>" + str(row_counts[i]) + "}"
+            if not c or re.match(r"^\d+(?:\.\,\d+)?$", c):
+                # right align digits
+                #row_format += "{:>" + str(row_counts[i]) + "}" + (" " * buf_count)
+                row_format += "{:>" + str(row_counts[i]) + "}" + column_delim
+                #row_format += "{:>" + str(row_counts[i] + (buf_count if i > 0 else 0)) + "}"
+                #row_format += "{:>" + str(row_counts[i]) + "}"
             else:
-                row_format += "{:<" + str(row_counts[i] + buf_count) + "}"
+                # left align
+                #row_format += "{:<" + str(row_counts[i] + buf_count) + "}"
+                #row_format += "{:<" + str(row_counts[i]) + "}" + (" " * buf_count)
+                row_format += "{:<" + str(row_counts[i]) + "}" + column_delim
 
-        return row_format.format(*cols)
+        return row_format.strip().format(*cols)
+
+    if headers:
+        # we pop the headers from the columns because we had to put it into the
+        # columns so we could correctly calculate widths
+        ret.append(rowstr(columns.pop(0), prefix, row_counts, column_delim))
+
+        # we need to figure out exactly how long the table is
+        delim_count = (sum(row_counts.values()) + (len(column_delim) * (len(row_counts) + 1)))
+        delim_count -= (len(column_delim) - len(column_delim.lstrip())) # left side of table
+        delim_count -= (len(column_delim) - len(column_delim.rstrip())) # right side of table
+        ret.append(prefix + (header_delim * delim_count))
 
     for row in columns:
-        ret.append(rowstr(row, prefix, row_counts))
+        ret.append(rowstr(row, prefix, row_counts, column_delim))
 
     out(os.linesep.join(ret))
 columns = table
+
+
+def table_from_dict(d, **kwargs):
+    """makes a table from a dict
+
+    :param d: dict, keys are headers, values are columns
+    :param **kwargs: see table()
+    """
+    return table(d, **kwargs)
+dict_table = table_from_dict
+table_dict = table_from_dict
+
+
+def table_from_rows(*rows, **kwargs):
+    """makes a table from the passed in rows
+
+    :param *rows: list, each passed in list will be one row
+    :param **kwargs: see table()
+    """
+    return table(rows, **kwargs)
+rows_table = table_from_rows
+row_table = table_from_rows
+table_rows = table_from_rows
+table_row = table_from_rows
+
+
+def table_from_columns(*columns, **kwargs):
+    """makes a table from the passed in columns
+
+    :param *rows: list, each passed in list will be one column
+    :param **kwargs: see table()
+    """
+    return table(*columns, **kwargs)
+table_from_cols = table_from_columns
+columns_table = table_from_columns
+column_table = table_from_columns
+col_table = table_from_columns
+cols_table = table_from_columns
+table_columns = table_from_columns
+table_column = table_from_columns
+table_col = table_from_columns
+table_cols = table_from_columns
 
 
 @contextmanager
