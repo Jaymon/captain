@@ -268,6 +268,7 @@ def br(count=1):
     for x in range(count):
         out("")
 blank = br
+newline = br
 
 
 def ul(*lines):
