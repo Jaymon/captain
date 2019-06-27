@@ -455,7 +455,7 @@ def table(*columns, **kwargs):
 columns = table
 
 
-def prompt(question, choices=None, ignore_case=True):
+def prompt(question, choices=None, type=lambda v: v.lower()):
     """echo a prompt to the user and wait for an answer
 
     :Example:
@@ -464,18 +464,23 @@ def prompt(question, choices=None, ignore_case=True):
     :param question: string, the prompt for the user
     :param choices: list|dict, if given, only exit when prompt matches one of the choices
     :param ignore_case: boolean, True if answer case doesn't matter
+    :param type: callable, any answer will be ran through this as type(answer)
     :returns: string, the answer that was given by the user
     """
+    if not type:
+        type = lambda: x
+
     if choices:
         if isinstance(choices, Mapping):
-            if ignore_case:
-                for k in list(choices.keys()):
-                    choices[k] = set(v.lower() for v in choices[k])
+            for k in list(choices.keys()):
+                choices[k] = set(type(v) for v in choices[k])
+
+            choices[k].add(type(k))
 
         else: # choices is a Sequence
             d = {}
             for v in choices:
-                d[v] = set([v.lower() if ignore_case else v])
+                d[v] = set([type(v)])
             choices = d
 
     m = re.search(r"(\s*)$", question)
@@ -491,30 +496,10 @@ def prompt(question, choices=None, ignore_case=True):
     else:
         question = "{}{}".format(question, whitespace)
 
-
-#     m = re.search(r"[a-zA-Z0-9](\s*)$", question)
-#     if m:
-#         whitespace = m.group(1)
-#         if not whitespace:
-#             whitespace = " "
-# 
-#         question = question.rstrip()
-# 
-#         if choices:
-#             question = "{}? ({}){}".format(question, "|".join(choices.keys()), whitespace)
-#         else:
-#             question = "{}:{}".format(question, whitespace)
-
-    #if not re.match(r"\s$", question):
-    #    question = "{}: ".format(question)
-
     while True:
-        answer = input(question)
+        answer = type(input(question))
 
         if choices:
-            if ignore_case:
-                answer = answer.lower()
-
             found = False
             for k, v in choices.items():
                 if answer in v:

@@ -103,6 +103,10 @@ class EchoTest(TestCase):
         answer = mecho.prompt("Is this ok?", choices=["y", "n"])
         self.assertEqual("n", answer)
 
+        mecho = testdata.patch(echo, input=MockInput("n"))
+        answer = mecho.prompt("Is this ok?", choices={"y": ["yes"], "n": ["no"]})
+        self.assertEqual("n", answer)
+
     def test_increment(self):
         """https://github.com/Jaymon/captain/issues/41"""
         for x in echo.increment(range(5)):
