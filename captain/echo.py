@@ -10,6 +10,7 @@ import os
 import re
 from contextlib import contextmanager
 from collections import Counter
+import time
 
 from .compat import *
 from .logging import stdout, istdout, stderr
@@ -454,6 +455,25 @@ def table(*columns, **kwargs):
 
     out(os.linesep.join(ret))
 columns = table
+
+
+@contextmanager
+def profile(msg=""):
+    """context manager to print out how long it ran
+
+    :Example:
+        with echo.profile():
+            # do stuff
+
+    :param msg: string, the message you want to display with the elapsed time
+    """
+    start = time.time()
+    yield
+    stop = time.time()
+    elapsed = round(abs(stop - start) * 1000.0, 1)
+    if msg:
+        msg = msg.rstrip() + " "
+    out("{}{:.1f} ms", msg, elapsed)
 
 
 def prompt(question, choices=None, type=lambda v: v.lower()):

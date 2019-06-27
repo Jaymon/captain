@@ -64,10 +64,17 @@ class EchoTest(TestCase):
         logging.inject_quiet("")
 
     def test_err(self):
-
+        """https://github.com/Jaymon/captain/issues/44"""
         with testdata.capture() as r:
             echo.err("foo")
         self.assertEqual("foo\n", str(r.stderr))
+
+    def test_profile(self):
+        with echo.profile():
+            echo.out("profile 1")
+
+        with echo.profile("ran in"):
+            echo.out("profile 2")
 
     def test_prompt_prompt(self):
         class MockInput(object):
