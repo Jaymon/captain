@@ -266,7 +266,7 @@ class Script(object):
         """return True if this script can be run from the command line"""
         ret = False
         ast_tree = ast.parse(self.body, self.path)
-        calls = self._find_calls(ast_tree, __name__, "exit")
+        calls = self._find_calls(ast_tree, __name__, exit)
         for call in calls:
             if re.search(r"{}\(".format(re.escape(call)), self.body):
                 ret = True
@@ -289,8 +289,13 @@ class Script(object):
         ''' 
         s = set()
 
-        # always add the default call, the set will make sure there are no dupes...
-        s.add("{}.{}".format(called_module, called_func))
+        called_func_names = set()
+        for k, f in inspect.getmembers(sys.modules[called_module]):
+            if f is called_func:
+                called_func_names.add(k)
+
+                # always add the default call, the set will make sure there are no dupes...
+                s.add("{}.{}".format(called_module, k))
 
         if hasattr(ast_tree, 'body'):
             # further down the rabbit hole we go
@@ -304,18 +309,19 @@ class Script(object):
                 # we are in a from ... import ... statement
                 if ast_tree.module == called_module:
                     for ast_name in ast_tree.names:
-                        if ast_name.name == called_func:
+                        if ast_name.name in called_func_names:
                             s.add(unicode(ast_name.asname if ast_name.asname is not None else ast_name.name))
 
             else:
                 # we are in a import ... statement
                 for ast_name in ast_tree.names:
                     if hasattr(ast_name, 'name') and (ast_name.name == called_module):
-                        call = "{}.{}".format(
-                            ast_name.asname if ast_name.asname is not None else ast_name.name,
-                            called_func
-                        )
-                        s.add(call)
+                        for n in called_func_names:
+                            call = "{}.{}".format(
+                                ast_name.asname if ast_name.asname is not None else ast_name.name,
+                                n
+                            )
+                            s.add(call)
 
         return s
 

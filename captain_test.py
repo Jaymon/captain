@@ -1343,6 +1343,18 @@ class ExitTest(TestCase):
         r = script.run()
         self.assertTrue("success" in r)
 
+    def test_exit_aliases(self):
+        for n in ["exit", "Captain", "console", "cli"]:
+            script = TestScript([
+                "from captain import {}".format(n),
+                "def main(): pass",
+                "if __name__ == '__main__':",
+                "    {}()".format(n),
+            ])
+            r = script.instance
+            self.assertTrue(r.can_run_from_cli())
+
+
 
 class EntryPointTest(TestCase):
     """A test case that will test all the different ways we can enter into a captain
