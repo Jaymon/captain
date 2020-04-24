@@ -212,6 +212,17 @@ class EchoTest(TestCase):
         l = [(1, [testdata.get_unicode_words()]), (2, [testdata.get_unicode_words()])]
         echo.table(l)
 
+    def test_table_none_value(self):
+        """We were getting an error in a script when passing d.items() to the table
+        method with a None value"""
+        d = {
+            "foo": None,
+            "bar": None,
+            "che": None
+        }
+
+        echo.table(d.items())
+
     def test_no_format(self):
         echo.out("this should not {fail}")
 

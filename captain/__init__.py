@@ -15,7 +15,7 @@ from .parse import ArgParser, Parser
 from .decorators import arg, args
 
 
-__version__ = '3.0.0'
+__version__ = '3.0.1'
 
 
 def exit(mod_name):

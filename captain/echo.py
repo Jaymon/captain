@@ -434,7 +434,8 @@ def table(*columns, **kwargs):
 
     for row in columns:
         for i, c in enumerate(row):
-            row_counts[i] = max(row_counts[i], len(String(c)), width)
+            c = "None" if c is None else String(c)
+            row_counts[i] = max(row_counts[i], len(c), width)
 
     def rowstr(row, prefix, row_counts, column_delim):
         row_format = prefix + column_delim
