@@ -2133,3 +2133,12 @@ class UnknownParserTest(TestCase):
         self.assertEqual(["this=that"], d["baz"])
         self.assertEqual([True], d["che"])
 
+    def test_binary(self):
+        extra_args = [
+            b"--foo=1",
+            b"--bar=2"
+        ]
+        d = UnknownParser(extra_args)
+        self.assertEqual(["1"], d["foo"])
+        self.assertEqual(["2"], d["bar"])
+
