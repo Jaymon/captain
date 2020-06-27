@@ -8,13 +8,13 @@ class Error(Exception):
     pass
 
 
-class ParseError(Error):
-    """raised when a captain script encounters a parse error"""
-    pass
+# class ParseError(Error):
+#     """raised when a captain script encounters a parse error"""
+#     pass
 
 
-class ArgError(argparse.ArgumentTypeError):
-    pass
+# class ArgError(argparse.ArgumentTypeError, Error):
+#     pass
 
 
 class Stop(Error):

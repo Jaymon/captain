@@ -1,333 +1,25 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
 import argparse
-import types
-import re
-import inspect
-import sys
-from collections import defaultdict, Callable
 import textwrap
+from collections import defaultdict
+import re
 
 from .compat import *
-from . import logging
 from . import environ
-
-
-class CallbackInspect(object):
-    """Provides some handy helper introspection methods for dealing with the command
-    callback function/method
-
-    for the most part, the main command can either be a function or a class instance
-    with a __call__, but when inheriting args (using the @args decorator) there are
-    actually 2 other types: method and uninstantiated class, this makes sure when
-    data is being pulled out of the callback it uses the proper function/method that
-    will actually be called when the callback is ran
-    """
-    @property
-    def args(self):
-        args = self.get('decorator_args', [])
-        return args
-
-    @property
-    def inherit_args(self):
-        args = self.get('inherit_args', [])
-        return args
-
-    @property
-    def desc(self):
-        # TODO -- consolidate this to a class that extends str that will try doc
-        # and then move to comments if doc fails, that will greatly simplify
-        # this method
-        hashbang_regex = re.compile(r"^#!.*")
-        desc = inspect.getdoc(self.callback)
-        if not desc:
-            desc = inspect.getcomments(self.callback)
-            if desc:
-                desc = hashbang_regex.sub("", desc).strip()
-
-        if not desc:
-            cb_method = self.callable
-            if is_py2:
-                desc = inspect.getdoc(cb_method)
-                if not desc:
-                    desc = inspect.getcomments(cb_method)
-                    if desc:
-                        desc = hashbang_regex.sub("", desc).strip()
-
-            else:
-                # avoid method doc inheritance in py >=3.5
-                desc = cb_method.__doc__
-
-        if not desc: desc = ''
-        return desc
-
-    @property
-    def callable(self):
-        if self.is_instance():
-            ret = self.callback.__call__
-        elif self.is_class():
-            #ret = self.callback.__init__
-            ret = self.callback.__call__
-        else:
-            ret = self.callback
-        return ret
-
-    @property
-    def argspec(self):
-        #args, args_name, kwargs_name, args_defaults = getfullargspec(self.callable)
-        signature = getfullargspec(self.callable)
-        args = signature[0]
-        args_name = signature[1]
-        kwargs_name = signature[2]
-        args_defaults = signature[3]
-        if self.is_instance() or self.is_class():
-            args = args[1:] # remove self which will always get passed in automatically
-
-        if not args: args = []
-        if not args_defaults: args_defaults = []
-        return args, args_name, kwargs_name, args_defaults
-
-    def __init__(self, callback):
-        self.callback = callback
-
-    def is_class(self):
-        return inspect.isclass(self.callback)
-        #return isinstance(self.callback, type)
-
-    def is_instance(self):
-        """return True if callback is an instance of a class"""
-        ret = False
-        val = self.callback
-        if self.is_class(): return False
-
-        ret = not inspect.isfunction(val) and not inspect.ismethod(val)
-#         if is_py2:
-#             ret = isinstance(val, types.InstanceType) or hasattr(val, '__dict__') \
-#                 and not (hasattr(val, 'func_name') or hasattr(val, 'im_func'))
-# 
-#         else:
-#             ret = not inspect.isfunction(val) and not inspect.ismethod(val)
-
-        return ret
-
-    def is_function(self):
-        """return True if callback is a vanilla plain jane function"""
-        if self.is_instance() or self.is_class(): return False
-        return isinstance(self.callback, (Callable, classmethod))
-
-    def get(self, key, default_val=None):
-        if self.is_instance():
-            ret = self.callback.__call__.__dict__.get(key, default_val)
-        elif self.is_class():
-            #ret = self.callback.__init__.__dict__.get(key, default_val)
-            ret = self.callback.__call__.__dict__.get(key, default_val)
-        else:
-            ret = self.callback.__dict__.get(key, default_val)
-
-        return ret
-
-
-class ScriptKwarg(object):
-    @property
-    def required(self):
-        kwargs = self.parser_kwargs
-
-        if 'required' in kwargs:
-            ret = kwargs['required']
-        else:
-            try:
-                self.default
-            except ValueError:
-                ret = True
-            else:
-                ret = False
-
-        return ret
-
-    @property
-    def default(self):
-        r = None
-        r_found = False
-        kwargs = self.parser_kwargs
-        if 'default' in kwargs:
-            r = kwargs['default']
-            r_found = True
-
-        else:
-            if 'action' in kwargs:
-                if kwargs['action'] == 'store_true':
-                    r = False
-                    r_found = True
-
-                elif kwargs['action'] == 'store_false':
-                    r = True
-                    r_found = True
-
-        if not r_found:
-            raise ValueError('no default found')
-
-        return r
-
-    def __init__(self, *arg_names, **kwargs):
-        # find the longest name
-        longest_name = ""
-        self.parser_args = set()
-
-        for arg_name in arg_names:
-            if len(longest_name) < len(arg_name):
-                longest_name = arg_name.lstrip("-")
-
-            if len(arg_name) >= 2:
-                arg_name = arg_name.lstrip("-")
-                self.merge_args([
-                    '--{}'.format(arg_name),
-                    '--{}'.format(arg_name.replace('_', '-')),
-                    '--{}'.format(arg_name.replace('-', '_'))
-                ])
-
-            else:
-                # we've got a -N type argument
-                self.merge_args([arg_name])
-
-        self.name = longest_name.replace('-', '_')
-        self.parser_kwargs = {}
-        self.merge_kwargs(kwargs)
-
-    def merge_args(self, args):
-        if args:
-            self.parser_args.update(set(args))
-
-    def merge_kwargs(self, kwargs):
-        """these kwargs come from the @arg decorator, they are then merged into any
-        keyword arguments that were automatically generated from the main function
-        introspection"""
-        if kwargs:
-            self.parser_kwargs.update(kwargs)
-
-        #self.parser_kwargs['dest'] = self.name
-        self.parser_kwargs.setdefault('dest', self.name)
-
-        # special handling of any passed in values
-        if 'default' in kwargs:
-            # NOTE -- this doesn't use .set_default() because that is meant to
-            # parse from the function definition so it actually has different syntax
-            # than what the .set_default() method does. eg, @arg("--foo", default=[1, 2]) means
-            # that the default value should be an array with 1 and 2 in it, where main(foo=[1, 2])
-            # means foo should be constrained to choices=[1, 2]
-            self.parser_kwargs["default"] = kwargs["default"]
-            self.parser_kwargs["required"] = False
-
-        elif 'action' in kwargs:
-            if kwargs['action'] in set(['store_false', 'store_true']):
-                self.parser_kwargs['required'] = False
-
-            elif kwargs['action'] in set(['version']):
-                self.parser_kwargs.pop('required', False)
-
-        else:
-            self.parser_kwargs.setdefault("required", True)
-
-    def merge_from_list(self, list_args):
-        """find any matching parser_args from list_args and merge them into this
-        instance
-
-        list_args -- list -- an array of (args, kwargs) tuples
-        """
-        def xs(name, parser_args, list_args):
-            """build the generator of matching list_args"""
-            for args, kwargs in list_args:
-                if len(set(args) & parser_args) > 0:
-                    yield args, kwargs
-
-                else:
-                    if 'dest' in kwargs:
-                        if kwargs['dest'] == name:
-                            yield args, kwargs
-
-        for args, kwargs in xs(self.name, self.parser_args, list_args):
-            self.merge_args(args)
-            self.merge_kwargs(kwargs)
-
-    def set_default(self, na):
-        """this is used for introspection from the main() method when there is an
-        argument with a default value, this figures out how to set up the ArgParse
-        arguments"""
-        kwargs = {}
-        if isinstance(na, (type, types.FunctionType)):
-            # if foo=some_func then some_func(foo) will be ran if foo is passed in
-            kwargs['type'] = na
-            kwargs['required'] = True
-            kwargs["default"] = argparse.SUPPRESS
-
-        elif isinstance(na, bool):
-            # if false then passing --foo will set to true, if True then --foo will
-            # set foo to False
-            kwargs['action'] = 'store_false' if na else 'store_true'
-            kwargs['required'] = False
-
-        elif isinstance(na, (int, float, str)):
-            # for things like foo=int, this says that any value of foo is an integer
-            kwargs['type'] = type(na)
-            kwargs['default'] = na
-            kwargs['required'] = False
-
-        elif isinstance(na, (list, set)):
-            # list is strange, [int] would mean we want a list of all integers, if
-            # there is a value in the list: ["foo", "bar"] then it would mean only
-            # those choices are valid
-            na = list(na)
-            kwargs['action'] = 'append'
-            kwargs['required'] = True
-
-            if len(na) > 0:
-                if isinstance(na[0], type):
-                    kwargs['type'] = na[0]
-
-                else:
-                    # we are now reverting this to a choices check
-                    kwargs['action'] = 'store'
-                    l = set()
-                    ltype = None
-                    for elt in na:
-                        vtype = type(elt)
-                        l.add(elt)
-                        if ltype is None:
-                            ltype = vtype
-
-                        else:
-                            if ltype is not vtype:
-                                ltype = str
-
-                    kwargs['choices'] = l
-                    kwargs['type'] = ltype
-
-        #self.merge_kwargs(kwargs)
-        self.parser_kwargs.update(kwargs)
-
-
-class ScriptArg(ScriptKwarg):
-    def __init__(self, *args, **kwargs):
-        super(ScriptArg, self).__init__(*args, **kwargs)
-        self.parser_args = set([self.name])
-        kwargs.setdefault("nargs", "?")
-        self.merge_kwargs(kwargs)
-
-    def merge_kwargs(self, kwargs):
-        super(ScriptArg, self).merge_kwargs(kwargs)
-        self.parser_kwargs.pop("dest")
-        self.parser_kwargs.pop("required")
+from .logging import QuietFilter
 
 
 class QuietAction(argparse.Action):
 
     OPTIONS = "DIWEC"
 
-    DEST = "quiet_inject"
+    DEST = "<QUIET_INJECT>"
 
     HELP_QUIET = ''.join([
         'Selectively turn off [D]ebug, [I]nfo, [W]arning, [E]rror, or [C]ritical, ',
         '(--quiet=DI means suppress Debug and Info), ',
-        'use - to invert (--quiet=-EW means suppress everything but Error and warning)',
+        'use - to invert (--quiet=-EW means suppress everything but Error and warning), ',
         'use + to change default (--quiet=+D means remove D from default value)',
     ])
 
@@ -342,35 +34,139 @@ class QuietAction(argparse.Action):
         if "-q" in option_strings:
             #kwargs["required"] = False
             kwargs["nargs"] = 0
-            kwargs["default"] = None
+            kwargs.pop("default", None)
+            kwargs["help"] = self.HELP_Q_LOWER
+            #kwargs["type"] = QuietFilter
 
         else:
             kwargs["const"] = self.OPTIONS
+
+#             default = environ.QUIET_DEFAULT
+#             if not default:
+#                 default = "-{}".format(self.OPTIONS)
+#             kwargs["default"] = default
+#             pout.v(default)
+
             kwargs["default"] = environ.QUIET_DEFAULT
+
+            kwargs["help"] = self.HELP_QUIET
+            #kwargs["type"] = QuietFilter
+            #kwargs["nargs"] = "?"
 
         super(QuietAction, self).__init__(option_strings, self.DEST, **kwargs)
 
+    def order(self, options):
+        o = []
+        for ch in self.OPTIONS:
+            if ch in options:
+                o.append(ch)
+        return "".join(o)
+
     def __call__(self, parser, namespace, values, option_string=""):
-        #pout.v(namespace, values, option_string)
 
         if option_string.startswith("-q"):
             v = getattr(namespace, self.dest, "")
             if v == "":
                 v = self.OPTIONS
-            values = v[1:]
+            else:
+                v = self.order(set(self.OPTIONS) - set(v.upper()))
+
+            v = "-" + v
+            values = self.get_value(v)
 
         else:
-            if values.startswith("-"):
-                # if we have a subtract then just remove those from being suppressed
-                # so -E would only show errors
-                values = "".join(set(self.OPTIONS) - set(values[1:].upper()))
-
-            elif values.startswith("+"):
-                # if we have an addition then just remove those from default
-                # so if default="D" then +D would leave default=""
-                values = "".join(set(self.default) - set(values[1:].upper()))
+            values = self.get_value(values)
 
         setattr(namespace, self.dest, values)
+
+# 
+# 
+#         if option_string.startswith("-q"):
+#             v = getattr(namespace, self.dest, "")
+#             if v == "":
+#                 v = self.OPTIONS
+#             values = v[1:]
+# 
+#         else:
+#             if values.startswith("-"):
+#                 # if we have a subtract then just remove those from being suppressed
+#                 # so -E would only show errors
+#                 values = "".join(set(self.OPTIONS) - set(values[1:].upper()))
+# 
+#             elif values.startswith("+"):
+#                 # if we have an addition then just remove those from default
+#                 # so if default="D" then +D would leave default=""
+#                 values = "".join(set(self.default) - set(values[1:].upper()))
+# 
+#         pout.v(values)
+#         #print("values: ", values)
+#         setattr(namespace, self.dest, values)
+# 
+#         # this will actually configure the logging
+#         #QuietFilter(values)
+
+    def get_value(self, arg_string):
+        if "-q" in self.option_strings:
+            pout.v(arg_string)
+            arg_string = "-" + arg_string[2:]
+
+        if arg_string.startswith("-"):
+            # if we have a subtract then just remove those from being suppressed
+            # so -E would only show errors
+            arg_string = self.order(set(self.OPTIONS) - set(arg_string[1:].upper()))
+
+        elif arg_string.startswith("+"):
+            # if we have an addition then just remove those from default
+            # so if default="D" then +D would leave default=""
+            arg_string = self.order(set(self.default) - set(arg_string[1:].upper()))
+
+        # this will actually configure the logging
+        return QuietFilter(arg_string)
+        #return arg_string
+
+
+    def parse_args(self, parser, arg_strings):
+        """This is a hack to allow `--quiet` and `--quiet DI` to work correctly,
+        basically it goes through all arg_strings and if it finds --quiet it checks
+        the next argument to see if it is some combination of DIWEC, if it is then
+        it combines it to `--quiet=ARG` and returns the modified arg_strings list
+
+        :param parser: argparse.ArgumentParser instance
+        :param arg_strings: list, the raw arguments
+        :returns: list, the arg_strings changed if needed
+        """
+        if "-q" in self.option_strings: return arg_strings
+
+        count = len(arg_strings)
+        new_args = []
+        i = 0
+        while i < count:
+            arg_string = arg_strings[i]
+            if arg_string in self.option_strings:
+                if (i + 1) < count:
+                    narg_string = arg_strings[i + 1]
+                    if narg_string in parser._option_string_actions:
+                        # make sure a flag like -D isn't mistaken for a
+                        # --quiet value
+                        new_args.append("{}={}".format(arg_string, self.const))
+
+                    elif re.match(r"^\-?[{}]+$".format(self.const), narg_string):
+                        new_args.append("{}={}".format(arg_string, narg_string))
+                        i += 1
+
+                    else:
+                        new_args.append("{}={}".format(arg_string, self.const))
+
+                else:
+                    new_args.append("{}={}".format(arg_string, self.const))
+
+            else:
+                new_args.append(arg_string)
+
+            i += 1
+
+        arg_strings = new_args
+        return arg_strings
 
 
 class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
@@ -378,6 +174,9 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
     values but it would strip newlines from the text, while RawTextHelpFormatter
     would keep the newlines but not give default values and messed up formatting
     of the arguments, so this gives me defaults and also formats most everything
+
+    http://stackoverflow.com/questions/12151306/argparse-way-to-include-default-values-in-help
+    https://docs.python.org/2/library/argparse.html#formatter-class
     """
     def _fill_text(self, text, width, indent):
         """Overridden to not get rid of newlines
@@ -401,297 +200,270 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         return text
 
 
-class ArgParser(argparse.ArgumentParser):
+class ArgumentParser(argparse.ArgumentParser):
 
-    def __init__(self, callback=None, **kwargs):
-        if callback:
-            parents = self.find_parents(callback)
-            if parents:
-                kwargs.setdefault("parents", parents)
+    @classmethod
+    def create_instance(cls, command_class, subcommand_classes=None, **kwargs):
+        subcommand_classes = subcommand_classes or {}
 
-            kwargs.setdefault("description", self.find_desc(callback))
+        common_parser = cls.create_common_instance(**kwargs)
 
+        desc = command_class.reflect().desc if command_class else kwargs.get("default_desc", "")
+        parser = cls(
+            description=desc,
+            parents=[common_parser],
+            conflict_handler="resolve",
+        )
+
+        #parser.add_argument("--quiet", "-Q", action="store_true", help="More verbose logging")
+        #parser.set_defaults(callback=command().handle)
+
+        if command_class:
+            parser.add_handler(command_class)
+            rc = command_class.reflect()
+
+            for pa in rc.parseargs():
+                parser.add_argument(*pa[0], **pa[1])
+
+
+        #common_parser = ArgumentParser(add_help=False)
+        #common_parser.add_argument("--quiet", "-Q", action="store_true", help="More verbose logging")
+
+        if subcommand_classes:
+            # if dest isn't passed in you get "argument None is required" on
+            # error in py2.7
+            subparsers = parser.add_subparsers(dest="<SUBCOMMAND>")
+            #subparsers = parser.add_subparsers()
+            subparsers.required = False if command_class else True
+
+            for subcommand_name, subcommand_class in subcommand_classes.items():
+
+                #rc = ReflectCommand(subcommand_class)
+                rc = subcommand_class.reflect()
+                desc = rc.desc
+                subparser = subparsers.add_parser(
+                    subcommand_name,
+                    parents=[common_parser],
+                    help=desc,
+                    description=desc,
+                    conflict_handler="resolve",
+                )
+                #subparser.set_defaults(callback=subcommand_class().handle)
+                subparser.add_handler(subcommand_class)
+
+                for pa in rc.parseargs():
+                    subparser.add_argument(*pa[0], **pa[1])
+
+        return parser
+
+    @classmethod
+    def create_common_instance(cls, **kwargs):
+        parser = cls(add_help=False)
+
+        # !!! you can't have a normal group and mutually exclusive group
+        #group = parser.add_argument_group('Built-in', 'Captain built-in options')
+
+        version = kwargs.get("version", "")
+        if version:
+            parser.add_argument("--version", "-V", action='version', version="%(prog)s {}".format(version))
+
+        quiet = kwargs.get("quiet", True)
+        if quiet:
+            # https://docs.python.org/3/library/argparse.html#mutual-exclusion
+            me_group = parser.add_mutually_exclusive_group()
+
+            #parser.add_argument("--quiet", "-Q", action="store_true", help="More verbose logging")
+            me_group.add_argument(
+                '--quiet', '-Q',
+                action=QuietAction,
+                #help=QuietAction.HELP_QUIET,
+                #type=QuietFilter,
+            )
+
+            me_group.add_argument(
+                "-q",
+                action=QuietAction,
+                #help=QuietAction.HELP_Q_LOWER,
+                #type=QuietFilter,
+            )
+
+        return parser
+
+    def __init__(self, **kwargs):
         # https://docs.python.org/2/library/argparse.html#conflict-handler
-        kwargs.setdefault("conflict_handler", 'resolve')
-        # https://hg.python.org/cpython/file/2.7/Lib/argparse.py
-        # https://docs.python.org/2/library/argparse.html#formatter-class
-        # http://stackoverflow.com/questions/12151306/argparse-way-to-include-default-values-in-help
-        #kwargs.setdefault("formatter_class", argparse.ArgumentDefaultsHelpFormatter)
-        #kwargs.setdefault("formatter_class", argparse.RawTextHelpFormatter)
+        #kwargs.setdefault("conflict_handler", 'resolve')
+
         kwargs.setdefault("formatter_class", HelpFormatter)
 
-        super(ArgParser, self).__init__(**kwargs)
+        super(ArgumentParser, self).__init__(**kwargs)
 
-        self.arg_info = {
-            'order': [],
-            'required': [],
-            'optional': {},
-            'args': None,
-            'kwargs': None
-        }
+#     def _match_argument(self, action, arg_strings_pattern):
+#         pout.v(type(action), arg_strings_pattern)
+#         nargs_pattern = self._get_nargs_pattern(action)
+#         pout.v(nargs_pattern)
+#         pout.v(action.option_strings)
+#         return super(ArgumentParser, self)._match_argument(action, arg_strings_pattern)
+# 
+#     def _get_values(self, action, arg_strings):
+#         pout.v(type(action), arg_strings)
+#         return super(ArgumentParser, self)._get_values(action, arg_strings)
+# 
+#     def _get_option_tuples(self, option_string):
+#         result = super(ArgumentParser, self)._get_option_tuples(option_string)
+#         pout.v(option_string, result)
+#         return result
+# 
+#     def _parse_optional(self, arg_string):
+#         pout.v(arg_string)
+#         tup = super(ArgumentParser, self)._parse_optional(arg_string)
+#         pout.v(tup)
+#         return tup
+# 
+#     def _match_arguments_partial(self, actions, arg_strings_pattern):
+#         pout.v(actions, arg_strings_pattern)
+#         return super(ArgumentParser, self)._match_arguments_partial(actions, arg_strings_pattern)
+# 
+    def _get_value(self, action, arg_string):
+        """By default, there is no easy way to do something with a value after it
+        is set, regardless of it being set by .default, .const, or an actual passed
+        in value. This gets around that for custom actions by running get_value()
+        if the action has one, it's similar to what we are doing _parse_action_args()
 
-        if callback:
-            self.callback = callback
-            self.set_defaults(main_callback=callback)
-            self.find_args()
-
-    def find_subcommand(self):
-        cmd = ""
-        bits = self.callback.__name__.split("_", 1)
-        if len(bits) > 1:
-            cmd = bits[1]
-        return cmd
-
-    def find_parents(self, callback):
-        parents = []
-        cbi = CallbackInspect(callback)
-        scs = cbi.inherit_args
-        for sc in scs:
-            parser = type(self)(callback=sc, add_help=False)
-            parents.append(parser)
-        return parents
-
-    def parse_callback_args(self, raw_args):
-        """This is the method that is called from Script.run(), this is the insertion
-        point for parsing all the arguments though on init this will find all args it
-        can, so this method pulls already found args from class variables"""
-        args = []
-        arg_info = self.arg_info
-        pout.v(arg_info, raw_args)
-        kwargs = dict(arg_info['optional'])
-
-        parsed_args = []
-        unknown_args = getattr(self, "unknown_args", False)
-        if unknown_args:
-            parsed_args, parsed_unknown_args = self.parse_known_args(raw_args)
-
-            # TODO -- can this be moved to UnknownParser?
-
-            # **kwargs have to be in --key=val form
-            # http://stackoverflow.com/a/12807809/5006
-            d = defaultdict(list)
-            for k, v in ((k.lstrip('-'), v) for k,v in (a.split('=') for a in parsed_unknown_args)):
-                d[k].append(v)
-
-            for k in (k for k in d if len(d[k])==1):
-                d[k] = d[k][0]
-
-            kwargs.update(d)
-
-        else:
-            parsed_args = self.parse_args(raw_args)
-
-        # http://parezcoydigo.wordpress.com/2012/08/04/from-argparse-to-dictionary-in-python-2-7/
-        kwargs.update(vars(parsed_args))
-
-        # because of how args works, we need to make sure the kwargs are put in correct
-        # order to be passed to the function, otherwise our real *args won't make it
-        # to the *args variable
-        for k in arg_info['order']:
-            args.append(kwargs.pop(k))
-
-        # now that we have the correct order, tack the real *args on the end so they
-        # get correctly placed into the function's *args variable
-        if arg_info['args']:
-            args.extend(kwargs.pop(arg_info['args']))
-
-        return args, kwargs
-
-    def find_desc(self, callback):
-        cbi = CallbackInspect(callback)
-        return cbi.desc
-
-    def find_args(self):
-        """when a new parser is created this is the method that is called from its
-        __init__ method to find all the arguments"""
-        arg_info = self.arg_info
-        main = self.callback
-        cbi = CallbackInspect(main)
-        all_arg_names = set()
-        decorator_args = cbi.args
-        args, args_name, kwargs_name, args_defaults = cbi.argspec
-
-        arg_info['order'] = args
-        default_offset = len(args) - len(args_defaults)
-        #pout.v(args, args_name, kwargs_name, args_defaults, default_offset)
-        #pout.v(args, decorator_args)
-
-        # build a list of potential *args, basically, if an arg_name matches exactly
-        # then it is an *arg and we shouldn't mess with it in the function
-        comp_args = set()
-        for da in decorator_args:
-            comp_args.update(da[0])
-
-        for i, arg_name in enumerate(args):
-            if arg_name in comp_args: continue
-
-            a = ScriptKwarg(arg_name)
-
-            # set the default if it is available
-            default_i = i - default_offset
-            if default_i >= 0:
-                na = args_defaults[default_i]
-                a.set_default(na)
-
-            a.merge_from_list(decorator_args)
-
-            if a.required:
-                arg_info['required'].append(a.name)
-
-            else:
-                arg_info['optional'][a.name] = a.default
-
-            #pout.v(a.parser_args, a.parser_kwargs)
-            all_arg_names |= a.parser_args
-
-            # if the callback arg is just a value, respect the parent parser's config
-            if "default" not in a.parser_kwargs \
-            and "action" not in a.parser_kwargs \
-            and "choices" not in a.parser_kwargs:
-                keys = self._option_string_actions.keys()
-                found_arg = False
-                for pa in a.parser_args:
-                    if pa in keys:
-                        found_arg = True
-                        break
-
-                if not found_arg:
-                    self.add_argument(*a.parser_args, **a.parser_kwargs)
-
-            else:
-                # we want to override parent parser
-                self.add_argument(*a.parser_args, **a.parser_kwargs)
-
-        self.unknown_args = False
-        if args_name:
-            a = ScriptArg(args_name, nargs='*')
-            a.merge_from_list(decorator_args)
-            all_arg_names |= a.parser_args
-            self.add_argument(*a.parser_args, **a.parser_kwargs)
-            arg_info['args'] = args_name
-
-        if kwargs_name:
-            self.unknown_args = True
-            arg_info['kwargs'] = kwargs_name
-
-        # pick up any stragglers
-        for da, dkw in decorator_args:
-            if da[0] not in all_arg_names:
-                arg_name = da[0]
-                if arg_name.startswith("-"):
-                    a = ScriptKwarg(*da)
-                else:
-                    a = ScriptArg(*da)
-
-                a.merge_kwargs(dkw)
-                self.add_argument(*a.parser_args, **a.parser_kwargs)
-
-        self.arg_info = arg_info
-
-
-class Parser(ArgParser):
-
-    def __init__(self, module=None, *args, **kwargs):
-        super(Parser, self).__init__(*args, **kwargs)
-        self.quiet_flags = []
-
-        # only parent parsers will have the module
-        self.module = module
-        if module:
-            version = getattr(module, "__version__", "")
-            if version:
-                actions = []
-                for action in ["-V", "--version"]:
-                    if action not in self._option_string_actions:
-                        actions.append(action)
-                if actions:
-                    kwargs = dict(
-                        action='version',
-                        version="%(prog)s {}".format(version)
-                    )
-                    self.add_argument(*actions, **kwargs)
-
-            actions = []
-            for action in ['--quiet', '-Q']:
-                if action not in self._option_string_actions:
-                    actions.append(action)
-            if actions:
-                self.quiet_flags = actions
-                kwargs = dict(
-                    action=QuietAction,
-                    help=QuietAction.HELP_QUIET,
-                )
-                self.add_argument(
-                    *actions, **kwargs
-#                     action=QuietAction,
-#                     help=QuietAction.HELP_QUIET,
-                )
-
-            if '-q' not in self._option_string_actions:
-                self.add_argument(
-                    "-q",
-                    action=QuietAction,
-                    help=QuietAction.HELP_Q_LOWER,
-                )
-
-    def has_injected_quiet(self):
-        return len(self.quiet_flags) > 0
-
-    def normalize_quiet_arg(self, arg_strings):
-        """This is a hack to allow `--quiet` and `--quiet DI` to work correctly,
-        basically it goes through all arg_strings and if it finds --quiet it checks
-        the next argument to see if it is some combination of DIWEC, if it is then
-        it combines it to `--quiet=ARG` and returns the modified arg_strings list
-
-        :param arg_strings: list, the raw arguments
-        :returns: list, the arg_strings changed if needed
+        NOTE -- For some reason this only gets called on default if the value is
+        a String, I have no idea why, but a custom action using this needs to have
+        string default values
         """
-        if not self.has_injected_quiet(): return arg_strings
+        ret = super(ArgumentParser, self)._get_value(action, arg_string)
+        cb = getattr(action, "get_value", None)
+        if cb:
+            ret = cb(ret)
+        return ret
 
-        action = self._option_string_actions.get(self.quiet_flags[0])
-        if action:
-            count = len(arg_strings)
-            new_args = []
-            i = 0
-            while i < count:
-                arg_string = arg_strings[i]
-                if arg_string in action.option_strings:
-                    if (i + 1) < count:
-                        narg_string = arg_strings[i + 1]
-                        if narg_string in self._option_string_actions:
-                            # make sure a flag like -D isn't mistaken for a
-                            # --quiet value
-                            new_args.append("{}={}".format(arg_string, action.const))
-
-                        elif re.match(r"^\-?[{}]+$".format(action.const), narg_string):
-                            new_args.append("{}={}".format(arg_string, narg_string))
-                            i += 1
-
-                        else:
-                            new_args.append("{}={}".format(arg_string, action.const))
-
-                    else:
-                        new_args.append("{}={}".format(arg_string, action.const))
-
-                else:
-                    new_args.append(arg_string)
-
-                i += 1
-
-            arg_strings = new_args
+    def _parse_action_args(self, arg_strings):
+        """There is no easy way to customize the parsing by default, so this is 
+        an attempt to allow customizing, this will go through each action and if
+        that action has a parse_args() method it will run it, the signature for the
+        handle method is parse_args(parser, arg_strings) return arg_string. This gives
+        actions the ability to customize functionality and keeps that customization
+        contained to within the action class."""
+        for flag, action in self._option_string_actions.items():
+            cb = getattr(action, "parse_args", None)
+            if cb:
+                arg_strings = cb(self, arg_strings)
 
         return arg_strings
 
     def _parse_known_args(self, arg_strings, namespace):
-        arg_strings = self.normalize_quiet_arg(arg_strings)
-        args, unknown_args = super(Parser, self)._parse_known_args(arg_strings, namespace)
+        """This and _read_args_from_files() are the two places the arg_strings get
+        set, I tried everything to override parser functionality but there just isn't
+        any other hook, these are the methods I looked at overriding and none of them
+        provided an override opportunity to get me what I needed:
+
+            * _match_argument
+            * _get_values
+            * _get_option_tuples
+            * _parse_optional
+            * _match_arguments_partial
+
+        argparse.ArgumentParser._parse_known_args() calls _read_args_from_files()
+        but only if a condition is met so you can't just override _read_args_from_files()
+        which is a shame, so I have to override both to hook in my overriding functionality
+        and make it possible to manipulate the arg_strings
+        """
+        arg_strings = self._parse_action_args(arg_strings)
+        args, unknown_args = super(ArgumentParser, self)._parse_known_args(arg_strings, namespace)
 
         return args, unknown_args
 
     def _read_args_from_files(self, arg_strings):
-        arg_strings = super(Parser, self)._read_args_from_files(arg_strings)
-        arg_strings = self.normalize_quiet_arg(arg_strings)
+        arg_strings = super(ArgumentParser, self)._read_args_from_files(arg_strings)
+        arg_strings = self._parse_action_args(arg_strings)
         return arg_strings
+
+    def parse_handle_args(self, argv):
+        unknown_args = []
+        unknown_kwargs = {}
+
+        parsed, parsed_unknown = self.parse_known_args(argv)
+
+        if parsed_unknown:
+            unknown_kwargs = UnknownParser(parsed_unknown)
+            unknown_args = unknown_kwargs.pop("*", [])
+
+            if unknown_args and not parsed._has_handle_args:
+                # we parse again to raise the error
+                self.parse_args(argv)
+
+            if unknown_kwargs and not parsed._has_handle_kwargs:
+                # we parse again to raise the error
+                self.parse_args(argv)
+
+        args = []
+        tentative_kwargs = dict(vars(parsed))
+
+        # because of how args works, we need to make sure the kwargs are put in correct
+        # order to be passed to the function, otherwise our real *args won't make it
+        # to the *args variable
+        for name in parsed._handle_signature["names"]:
+            args.append(tentative_kwargs.pop(name))
+
+        args.extend(unknown_args)
+        tentative_kwargs.update(unknown_kwargs)
+
+        #pout.v(tentative_kwargs["<QUIET_INJECT>"])
+        #print("quiet inject: ", tentative_kwargs["<QUIET_INJECT>"])
+
+        # if the default _quiet_inject is set then the action isn't run so we
+        # have to handle the injecting here before we strip the value out
+
+#         for flag, action in self._option_string_actions.items():
+#             pout.v(flag, type(action))
+
+
+#             cb = getattr(action, "parse_args", None)
+#             if cb:
+#                 arg_strings = cb(self, arg_strings)
+
+
+
+
+        kwargs = {}
+        for k, v in tentative_kwargs.items():
+            # we filter out private (start with _) and placeholder (surrounded by <>) keys
+            if not k.startswith("_") and not k.startswith("<"):
+                kwargs[k] = v
+        #kwargs = {k: v for k, v in kwargs.items() if not k.startswith("_")}
+
+        # we want to remove any values from the built-in group since we don't
+        # want to pass those to the handle method
+#         for ga in self._action_groups:
+#             if ga.title.startswith("Built-in"):
+#                 for a in ga._group_actions:
+#                     kwargs.pop(a.dest, None)
+
+        #pout.v(self._action_groups)
+
+        #pout.v(args, kwargs)
+
+        return parsed, args, kwargs
+
+    def add_handler(self, command_class):
+        rc = command_class.reflect()
+        sig = rc.method().signature
+        c = command_class()
+        self.set_defaults(
+            _command_instance=c,
+            _has_handle_args=True if sig["*_name"] else False,
+            _has_handle_kwargs=True if sig["**_name"] else False,
+            _handle_signature=sig,
+        )
+
+    def error(self, message):
+        # compensate for https://bugs.python.org/issue9253#msg186387 in python2
+        if is_py2 and message == "too few arguments":
+            return
+
+        super(ArgumentParser, self).error(message)
 
 
 class UnknownParser(dict):
@@ -730,4 +502,25 @@ class UnknownParser(dict):
             i += 1
 
         super(UnknownParser, self).__init__(d)
+
+    def unwrap(self, ignore_keys=None):
+        """remove list wrapper of any value that has a count of 1
+
+        by default, this returns lists for everything because it has no idea what
+        might have multiple values so it treats everything as if it has multiple values
+        so it can support things like `--foo=1 --foo=2` but that might not be wanted,
+        so this method will return a dict with any value that has a length of one it
+        will remove the list, so `[1]` becomes `1`
+
+        :param ignore_keys: list, keys you don't want to strip of the list even if
+            it only has one element
+        :returns: dict, a dictionary with values unrwapped
+        """
+        ignore_keys = set(ignore_keys or [])
+        ignore_keys.add("*")
+
+        d = {}
+        for k in (k for k in d if (len(d[k]) == 1) and k not in ignore_keys):
+            d[k] = d[k][0]
+        return d
 

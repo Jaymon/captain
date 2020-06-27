@@ -20,7 +20,7 @@ if is_py2:
     # NOTE -- getargspace isn't a full mapping of getfullargspec
     from inspect import getargspec as getfullargspec
 
-    from collections import Iterable, Mapping
+    from collections import Iterable, Mapping, Callable
     import __builtin__ as builtins
 
 
@@ -31,7 +31,7 @@ elif is_py3:
 
     from inspect import getfullargspec
 
-    from collections.abc import Iterable, Mapping
+    from collections.abc import Iterable, Mapping, Callable
     import builtins
     from itertools import zip_longest
 
