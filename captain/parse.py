@@ -457,6 +457,7 @@ class ArgParser(argparse.ArgumentParser):
         can, so this method pulls already found args from class variables"""
         args = []
         arg_info = self.arg_info
+        pout.v(arg_info, raw_args)
         kwargs = dict(arg_info['optional'])
 
         parsed_args = []
@@ -562,17 +563,16 @@ class ArgParser(argparse.ArgumentParser):
                 self.add_argument(*a.parser_args, **a.parser_kwargs)
 
         self.unknown_args = False
-        if self.add_help:
-            if args_name:
-                a = ScriptArg(args_name, nargs='*')
-                a.merge_from_list(decorator_args)
-                all_arg_names |= a.parser_args
-                self.add_argument(*a.parser_args, **a.parser_kwargs)
-                arg_info['args'] = args_name
+        if args_name:
+            a = ScriptArg(args_name, nargs='*')
+            a.merge_from_list(decorator_args)
+            all_arg_names |= a.parser_args
+            self.add_argument(*a.parser_args, **a.parser_kwargs)
+            arg_info['args'] = args_name
 
-            if kwargs_name:
-                self.unknown_args = True
-                arg_info['kwargs'] = kwargs_name
+        if kwargs_name:
+            self.unknown_args = True
+            arg_info['kwargs'] = kwargs_name
 
         # pick up any stragglers
         for da, dkw in decorator_args:
