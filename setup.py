@@ -9,6 +9,7 @@ from codecs import open
 
 name = "captain"
 kwargs = dict(
+    name=name,
     description='python cli scripts for humans',
     keywords="cli console",
     author='Jay Marcyes',
