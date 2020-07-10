@@ -10,33 +10,25 @@ from .compat import *
 
 class ReflectCommand(object):
     """Provides some handy helper introspection methods for dealing with the Command
-    class
-
-    for the most part, the main command can either be a function or a class instance
-    with a __call__, but when inheriting args (using the @args decorator) there are
-    actually 2 other types: method and uninstantiated class, this makes sure when
-    data is being pulled out of the callback it uses the proper function/method that
-    will actually be called when the callback is ran
-    """
+    class"""
     @property
     def desc(self):
-        def get_desc(o):
+        """Get the description for the command
 
+        this will first try and get the comment for the handle() method, if that
+        fails then it will try the Command class, if that fails it will try to get
+        the module's docblock
+        """
+        def get_desc(o):
             desc = ""
             comment_regex = re.compile(r"^\s*#\s*", flags=re.M)
 
-            if is_py2:
-                desc = inspect.getdoc(o)
-                if not desc:
-                    desc = inspect.getcomments(o)
-                    if desc:
-                        desc = comment_regex.sub("", desc).strip()
-                        desc = re.sub(r"^(?:\s*#\s*)?\-\*\-.*", "", desc, flags=re.M).strip()
-                        #desc = re.sub(r"^\s*#!.*$", "", desc, flags=re.M).strip()
-
-            else:
-                # avoid method doc inheritance in py >=3.5
-                desc = o.__doc__
+            desc = inspect.getdoc(o)
+            if not desc:
+                desc = inspect.getcomments(o)
+                if desc:
+                    desc = comment_regex.sub("", desc).strip()
+                    desc = re.sub(r"^(?:\s*#\s*)?\-\*\-.*", "", desc, flags=re.M).strip()
 
             return desc
 
@@ -51,21 +43,6 @@ class ReflectCommand(object):
 
         return desc
 
-#     @property
-#     def callable(self):
-#         if self.is_instance():
-#             ret = self.callback.__call__
-#         elif self.is_class():
-#             #ret = self.callback.__init__
-#             ret = self.callback.__call__
-#         else:
-#             ret = self.callback
-#         return ret
-
-#     @property
-#     def handle_signature(self):
-#         return ReflectMethod(self.command_class.handle).signature
-# 
     def __init__(self, command):
         self.command_class = command if inspect.isclass(command) else command.__class__
 
@@ -73,26 +50,15 @@ class ReflectCommand(object):
         return ReflectMethod(self.command_class.handle)
 
     def parseargs(self):
+        """yield all the ParseArg instances of the arguments defined for this command"""
         for pa in self.method().parseargs():
             yield pa
-
-
-#     def get(self, key, default_val=None):
-#         if self.is_instance():
-#             ret = self.callback.__call__.__dict__.get(key, default_val)
-#         elif self.is_class():
-#             #ret = self.callback.__init__.__dict__.get(key, default_val)
-#             ret = self.callback.__call__.__dict__.get(key, default_val)
-#         else:
-#             ret = self.callback.__dict__.get(key, default_val)
-# 
-#         return ret
 
 
 class ReflectMethod(object):
     @property
     def signature(self):
-        #args, args_name, kwargs_name, args_defaults = getfullargspec(self.callable)
+        """Get the call signature of the reflected method"""
         signature = getfullargspec(self.method)
         args = signature[0][1:] # remove self which will always get passed in automatically
         if not args: args = []
@@ -132,14 +98,14 @@ class ReflectMethod(object):
     def parseargs(self):
         sig = self.signature
 
+        # the values injected via @args decorator
         command_classes = self.inherit_args()
         for command_class in command_classes:
-            pout.b(command_class.__name__)
             for pa in command_class.reflect().method().parseargs():
-                pout.v(pa)
                 pa.merge_signature(sig)
                 yield pa
 
+        # the values injected via @arg decorator
         dargs = self.decorator_args()
         for a, kw in dargs:
             pa = ParseArg(*a, **kw)
@@ -148,7 +114,16 @@ class ReflectMethod(object):
 
 
 class ParseArg(tuple):
+    """This class gets all the *args and **kwargs together to be passed to an
+    argparse.ArgumentParser.add_argument() call, this combines the signature values
+    with the @arg() arguments to get a comprehensive set of values that will be
+    passed to add_argument
 
+    This class is a tuple where self[0] is *args, and self[1] is **kwargs for
+    add_argument(), so the call would be: add_argument(*self[0], **self[1])
+
+    https://docs.python.org/3/library/argparse.html#the-add-argument-method
+    """
     @property
     def args(self):
         return self[0]
@@ -187,11 +162,13 @@ class ParseArg(tuple):
                     self.set_default(sig["defaults"][n])
 
     def set_names(self):
+        """Finad all the possible names for the flag, this normalizes things so
+        --foo-bar is the same as --foo_bar"""
         is_named = self.is_named()
         names = set()
         longest_name = ""
         for n in list(self[0]):
-            ns = n.lstrip("-")
+            ns = n.strip("-")
             if len(longest_name) < len(ns):
                 longest_name = ns
 
@@ -205,14 +182,18 @@ class ParseArg(tuple):
 
         dest = self[1].get("dest", "")
         if dest:
+            self.name = dest
             names.add(dest)
 
-        self.name = dest or longest_name
+        else:
+            self.name = longest_name
+            self[1].setdefault("dest", longest_name.replace('-', '_'))
+
         self.names = names
 
     def set_default(self, val):
-        """this is used for introspection from the main() method when there is an
-        argument with a default value, this figures out how to set up the ArgParse
+        """this is used for introspection from the signature when there is an
+        argument with a default value, this figures out how to set up the add_argument
         arguments"""
         kwargs = {}
         if isinstance(val, (type, types.FunctionType)):
@@ -265,19 +246,4 @@ class ParseArg(tuple):
 
         if kwargs:
             self[1].update(kwargs)
-
-
-#     def __init__(self, v):
-#         super(ParseArg, self).__init__(v)
-#         self.
-
-
-
-
-
-#     def __init__(self, *args, **kwargs):
-#         self.args = list(args)
-#         self.kwargs = kwargs
-# 
-#         return super(ParseArg, self).__init__([self.args, self.kwargs])
 

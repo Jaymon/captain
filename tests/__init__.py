@@ -49,30 +49,34 @@ class FileScript(object):
         if not body:
             body = ""
 
-        header = ""
-
         if not isinstance(body, basestring):
             body = "\n".join(body)
 
-        if "__future__" not in body:
-            header += "\n".join([
-                "# -*- coding: utf-8 -*-",
-                "from __future__ import unicode_literals, division, print_function, absolute_import",
-                "",
-            ])
+        if "header" in kwargs:
+            header = kwargs["header"]
+            if not isinstance(header, basestring):
+                header = "\n".join(header)
+        else:
+            header = ""
+            if "__future__" not in body and "# -*-" not in body:
+                header += "\n".join([
+                    "# -*- coding: utf-8 -*-",
+                    "from __future__ import unicode_literals, division, print_function, absolute_import",
+                    "",
+                ])
 
-        if "from captain" not in body and "import captain" not in body:
-            header += "\n".join([
-                #"#!/usr/bin/env python",
-                #"import sys",
-                #"sys.path.insert(0, '{}')".format(self.cwd),
-                "from captain import Command, handle, arg, args",
-                "import captain",
-                "",
-            ])
+            if "from captain" not in body and "import captain" not in body:
+                header += "\n".join([
+                    #"#!/usr/bin/env python",
+                    #"import sys",
+                    #"sys.path.insert(0, '{}')".format(self.cwd),
+                    "from captain import Command, handle, arg, args",
+                    "import captain",
+                    "",
+                ])
 
-        if "__version__" not in body:
-            header += "\n__version__ = '0.0.1'\n\n"
+            if "__version__" not in body:
+                header += "\n__version__ = '0.0.1'\n\n"
 
         if "class" not in body:
             subcommands = kwargs.pop("subcommands", False)

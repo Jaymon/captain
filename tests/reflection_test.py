@@ -54,11 +54,11 @@ class ReflectCommandTest(TestCase):
         s = FileScript([
             '"""the description on module doc"""',
             "from captain import Command",
-        ])
+            "class Default(Command): pass",
+        ], header="")
 
         cbi = ReflectCommand(s.command())
         self.assertEqual("the description on module doc", cbi.desc)
-
 
         s = FileScript([
             '#!/usr/bin/env python',
@@ -66,7 +66,8 @@ class ReflectCommandTest(TestCase):
             '# the description on module comment',
             "# and the second line",
             "from captain import Command",
-        ])
+            "class Default(Command): pass",
+        ], header="")
 
         cbi = ReflectCommand(s.command())
         self.assertEqual("the description on module comment\nand the second line", cbi.desc)
@@ -94,8 +95,9 @@ class ReflectMethodTest(TestCase):
             "    def handle(self, foo, bar=1, che=3, **kwargs): pass",
         ]).reflect_method()
 
-        pout.v(list(cbi.parseargs()))
-
+        args = list(cbi.parseargs())
+        self.assertEqual("foo", args[0][1]["dest"])
+        self.assertEqual("bang_one", args[1][1]["dest"])
 
 
 class ParseArgTest(TestCase):

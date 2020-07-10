@@ -8,6 +8,8 @@ from .compat import *
 
 
 class InlineStream(io.IOBase):
+    """A default python logger always adds a newline, this stream, when passed to
+    a StreamHandler will strip that added newline"""
     @property
     def stream(self):
         """NOTE -- I do this round about way for testing, if I set the stream
@@ -15,6 +17,9 @@ class InlineStream(io.IOBase):
         return getattr(sys, self.name)
 
     def __init__(self, name):
+        """
+        :param name: string, values are either "stdout" or "stderr"
+        """
         self.name = name
         #self.stream = stream
 
@@ -23,7 +28,15 @@ class InlineStream(io.IOBase):
         if v[-1] == "\n":
             v = v[:-1]
         ret = self.stream.write(v)
-        self.stream.flush()
+
+        try:
+            self.stream.flush()
+
+        except AttributeError:
+            # our wrapped stream doesn't support the full io protocol, flush
+            # isn't mandatory though so no need to propagate the error
+            pass
+
         return ret
         #return sys.stdout.write(v)
 
@@ -33,11 +46,10 @@ class InlineStream(io.IOBase):
 
 # configure our special loggers
 log_formatter = Formatter('%(message)s')
-#log_handler = StreamHandler(stream=sys.stdout)
-#log_handler.setFormatter(log_formatter)
+modname = __name__.split(".")[0]
 
 
-stderr = getLogger('{}.stderr'.format(__name__))
+stderr = getLogger('stderr.{}'.format(modname))
 if len(stderr.handlers) == 0:
     stderr.propagate = False
     stderr.setLevel(DEBUG)
@@ -47,7 +59,7 @@ if len(stderr.handlers) == 0:
     stderr.addHandler(errlh)
 
 
-stdout = getLogger('{}.stdout'.format(__name__))
+stdout = getLogger('stdout.{}'.format(modname))
 if len(stdout.handlers) == 0:
     stdout.propagate = False
     stdout.setLevel(DEBUG)
@@ -55,16 +67,6 @@ if len(stdout.handlers) == 0:
     outlh = StreamHandler(stream=InlineStream("stdout"))
     outlh.setFormatter(log_formatter)
     stdout.addHandler(outlh)
-
-
-# istdout = getLogger('{}.istdout'.format(__name__))
-# if len(istdout.handlers) == 0:
-#     istdout.propagate = False
-#     istdout.setLevel(DEBUG)
-#     log_handler = StreamHandler(stream=InlineStream(sys.stdout))
-#     log_handler.setFormatter(log_formatter)
-#     istdout.addHandler(log_handler)
-# 
 
 
 class LevelFilter(object):
@@ -83,8 +85,6 @@ class LevelFilter(object):
 class QuietFilter(String):
     """see --quiet flag help for what this does"""
     def __new__(cls, levels, **kwargs):
-        #print("QuietFilter.levels: ", levels)
-        #pout.v("QuietFilter.levels: {}".format(levels))
         levels = levels or ""
         loggers = dict(Logger.manager.loggerDict)
         if "root" not in loggers:

@@ -11,7 +11,15 @@ from .logging import QuietFilter
 
 
 class QuietAction(argparse.Action):
+    """Unless overridden, every captain command gets quiet flag support, this 
+    will turn off/on loggers at different levels:
 
+        D - DEBUG
+        I - INFO
+        W - WARNING
+        E - ERROR
+        C - CRITICAL
+    """
     OPTIONS = "DIWEC"
 
     DEST = "<QUIET_INJECT>"
@@ -32,26 +40,14 @@ class QuietAction(argparse.Action):
         self.levels = self.OPTIONS
         kwargs["required"] = False
         if "-q" in option_strings:
-            #kwargs["required"] = False
             kwargs["nargs"] = 0
             kwargs.pop("default", None)
-            kwargs["help"] = self.HELP_Q_LOWER
-            #kwargs["type"] = QuietFilter
+            kwargs.setdefault("help", self.HELP_Q_LOWER)
 
         else:
             kwargs["const"] = self.OPTIONS
-
-#             default = environ.QUIET_DEFAULT
-#             if not default:
-#                 default = "-{}".format(self.OPTIONS)
-#             kwargs["default"] = default
-#             pout.v(default)
-
-            kwargs["default"] = environ.QUIET_DEFAULT
-
-            kwargs["help"] = self.HELP_QUIET
-            #kwargs["type"] = QuietFilter
-            #kwargs["nargs"] = "?"
+            kwargs.setdefault("default", environ.QUIET_DEFAULT)
+            kwargs.setdefault("help", self.HELP_QUIET)
 
         super(QuietAction, self).__init__(option_strings, self.DEST, **kwargs)
 
@@ -79,33 +75,8 @@ class QuietAction(argparse.Action):
 
         setattr(namespace, self.dest, values)
 
-# 
-# 
-#         if option_string.startswith("-q"):
-#             v = getattr(namespace, self.dest, "")
-#             if v == "":
-#                 v = self.OPTIONS
-#             values = v[1:]
-# 
-#         else:
-#             if values.startswith("-"):
-#                 # if we have a subtract then just remove those from being suppressed
-#                 # so -E would only show errors
-#                 values = "".join(set(self.OPTIONS) - set(values[1:].upper()))
-# 
-#             elif values.startswith("+"):
-#                 # if we have an addition then just remove those from default
-#                 # so if default="D" then +D would leave default=""
-#                 values = "".join(set(self.default) - set(values[1:].upper()))
-# 
-#         pout.v(values)
-#         #print("values: ", values)
-#         setattr(namespace, self.dest, values)
-# 
-#         # this will actually configure the logging
-#         #QuietFilter(values)
-
     def get_value(self, arg_string):
+        """Hack only supported by our custom ArgumentParser"""
         if "-q" in self.option_strings:
             pout.v(arg_string)
             arg_string = "-" + arg_string[2:]
@@ -215,19 +186,12 @@ class ArgumentParser(argparse.ArgumentParser):
             conflict_handler="resolve",
         )
 
-        #parser.add_argument("--quiet", "-Q", action="store_true", help="More verbose logging")
-        #parser.set_defaults(callback=command().handle)
-
         if command_class:
             parser.add_handler(command_class)
             rc = command_class.reflect()
 
             for pa in rc.parseargs():
                 parser.add_argument(*pa[0], **pa[1])
-
-
-        #common_parser = ArgumentParser(add_help=False)
-        #common_parser.add_argument("--quiet", "-Q", action="store_true", help="More verbose logging")
 
         if subcommand_classes:
             # if dest isn't passed in you get "argument None is required" on
@@ -272,57 +236,23 @@ class ArgumentParser(argparse.ArgumentParser):
             # https://docs.python.org/3/library/argparse.html#mutual-exclusion
             me_group = parser.add_mutually_exclusive_group()
 
-            #parser.add_argument("--quiet", "-Q", action="store_true", help="More verbose logging")
             me_group.add_argument(
                 '--quiet', '-Q',
                 action=QuietAction,
-                #help=QuietAction.HELP_QUIET,
-                #type=QuietFilter,
             )
 
             me_group.add_argument(
                 "-q",
                 action=QuietAction,
-                #help=QuietAction.HELP_Q_LOWER,
-                #type=QuietFilter,
             )
 
         return parser
 
     def __init__(self, **kwargs):
         # https://docs.python.org/2/library/argparse.html#conflict-handler
-        #kwargs.setdefault("conflict_handler", 'resolve')
-
         kwargs.setdefault("formatter_class", HelpFormatter)
-
         super(ArgumentParser, self).__init__(**kwargs)
 
-#     def _match_argument(self, action, arg_strings_pattern):
-#         pout.v(type(action), arg_strings_pattern)
-#         nargs_pattern = self._get_nargs_pattern(action)
-#         pout.v(nargs_pattern)
-#         pout.v(action.option_strings)
-#         return super(ArgumentParser, self)._match_argument(action, arg_strings_pattern)
-# 
-#     def _get_values(self, action, arg_strings):
-#         pout.v(type(action), arg_strings)
-#         return super(ArgumentParser, self)._get_values(action, arg_strings)
-# 
-#     def _get_option_tuples(self, option_string):
-#         result = super(ArgumentParser, self)._get_option_tuples(option_string)
-#         pout.v(option_string, result)
-#         return result
-# 
-#     def _parse_optional(self, arg_string):
-#         pout.v(arg_string)
-#         tup = super(ArgumentParser, self)._parse_optional(arg_string)
-#         pout.v(tup)
-#         return tup
-# 
-#     def _match_arguments_partial(self, actions, arg_strings_pattern):
-#         pout.v(actions, arg_strings_pattern)
-#         return super(ArgumentParser, self)._match_arguments_partial(actions, arg_strings_pattern)
-# 
     def _get_value(self, action, arg_string):
         """By default, there is no easy way to do something with a value after it
         is set, regardless of it being set by .default, .const, or an actual passed
@@ -372,7 +302,6 @@ class ArgumentParser(argparse.ArgumentParser):
         """
         arg_strings = self._parse_action_args(arg_strings)
         args, unknown_args = super(ArgumentParser, self)._parse_known_args(arg_strings, namespace)
-
         return args, unknown_args
 
     def _read_args_from_files(self, arg_strings):
@@ -381,6 +310,8 @@ class ArgumentParser(argparse.ArgumentParser):
         return arg_strings
 
     def parse_handle_args(self, argv):
+        """This is our hook to parse all the arguments and get the values that will
+        ulimately be passed to the handle() method"""
         unknown_args = []
         unknown_kwargs = {}
 
@@ -391,15 +322,15 @@ class ArgumentParser(argparse.ArgumentParser):
             unknown_args = unknown_kwargs.pop("*", [])
 
             if unknown_args and not parsed._has_handle_args:
-                # we parse again to raise the error
+                # we parse again with the more restrictive parser to raise the error
                 self.parse_args(argv)
 
             if unknown_kwargs and not parsed._has_handle_kwargs:
-                # we parse again to raise the error
+                # we parse again with the more restrictive parser to raise the error
                 self.parse_args(argv)
 
         args = []
-        tentative_kwargs = dict(vars(parsed))
+        tentative_kwargs = dict(vars(parsed)) # convert Namespace instance to dict
 
         # because of how args works, we need to make sure the kwargs are put in correct
         # order to be passed to the function, otherwise our real *args won't make it
@@ -410,40 +341,16 @@ class ArgumentParser(argparse.ArgumentParser):
         args.extend(unknown_args)
         tentative_kwargs.update(unknown_kwargs)
 
-        #pout.v(tentative_kwargs["<QUIET_INJECT>"])
-        #print("quiet inject: ", tentative_kwargs["<QUIET_INJECT>"])
-
-        # if the default _quiet_inject is set then the action isn't run so we
-        # have to handle the injecting here before we strip the value out
-
-#         for flag, action in self._option_string_actions.items():
-#             pout.v(flag, type(action))
-
-
-#             cb = getattr(action, "parse_args", None)
-#             if cb:
-#                 arg_strings = cb(self, arg_strings)
-
-
-
-
+        # we want to remove any values from the built-in group since we don't
+        # want to pass those to the handle method, any value that begins with an 
+        # underscore or is wrapped with <> are stripped from the final args
+        # passed to the handle() method, they will still be available in
+        # self.parsed though
         kwargs = {}
         for k, v in tentative_kwargs.items():
             # we filter out private (start with _) and placeholder (surrounded by <>) keys
             if not k.startswith("_") and not k.startswith("<"):
                 kwargs[k] = v
-        #kwargs = {k: v for k, v in kwargs.items() if not k.startswith("_")}
-
-        # we want to remove any values from the built-in group since we don't
-        # want to pass those to the handle method
-#         for ga in self._action_groups:
-#             if ga.title.startswith("Built-in"):
-#                 for a in ga._group_actions:
-#                     kwargs.pop(a.dest, None)
-
-        #pout.v(self._action_groups)
-
-        #pout.v(args, kwargs)
 
         return parsed, args, kwargs
 
@@ -512,6 +419,9 @@ class UnknownParser(dict):
         so this method will return a dict with any value that has a length of one it
         will remove the list, so `[1]` becomes `1`
 
+        UnknownParse always has array values, let's normalize that so values
+        with only one item contain just that item instead of a list of length 1
+
         :param ignore_keys: list, keys you don't want to strip of the list even if
             it only has one element
         :returns: dict, a dictionary with values unrwapped
@@ -523,4 +433,27 @@ class UnknownParser(dict):
         for k in (k for k in d if (len(d[k]) == 1) and k not in ignore_keys):
             d[k] = d[k][0]
         return d
+
+
+class EnvironParser(UnknownParser):
+    def __init__(self, args):
+        super(EnvironParser, self).__init__(args)
+        for k in list(self.keys()):
+            if not re.match(r"^[A-Z0-9_-]+$", k):
+                del self[k]
+
+
+class Extra(object):
+    def __init__(self, args):
+        self.environ = {} # Environ()
+        self.options = {}
+
+        d = UnknownParser(args)
+        for k, v in d.items():
+            # is this en environment variable?
+            if re.match(r"^[A-Z0-9_-]+$", k):
+                self.environ[k] = v[0] if len(v) == 1 else v
+
+            else:
+                self.options[k] = v[0] if len(v) == 1 else v
 

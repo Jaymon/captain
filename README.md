@@ -81,16 +81,16 @@ from captain import Command
 
 class Default(Command):
     def handle(self, *args, **kwargs):
-		var1 = "print"
+        var1 = "print"
 
-		var2 = "stdout"
-		self.output.out("this will {} to {}", var1, var2)
+        var2 = "stdout"
+        self.output.out("this will {} to {}", var1, var2)
 
-		var2 = "stderr"
-		self.output.err("this will {} to {}", var1, var2)
+        var2 = "stderr"
+        self.output.err("this will {} to {}", var1, var2)
 
-		e = ValueError("this will print with stacktrace and everything")
-		self.output.exception(e)
+        e = ValueError("this will print with stacktrace and everything")
+        self.output.exception(e)
 ```
 
 The `captain.io.Output` class has a lot of nice little helper methods but Captain can also work with modules like [clint](https://github.com/kennethreitz/clint) if you need to do more advanced cli output.

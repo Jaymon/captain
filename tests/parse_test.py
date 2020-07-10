@@ -4,6 +4,10 @@ from __future__ import unicode_literals, division, print_function, absolute_impo
 from captain.compat import *
 
 from . import testdata, TestCase, FileScript, ModuleScript
+from .parse import (
+    UnknownParser,
+    EnvironParser,
+)
 
 
 class ArgumentParserTest(TestCase):
@@ -314,4 +318,26 @@ class UnknownParserTest(TestCase):
         d = UnknownParser(extra_args)
         self.assertEqual(["1"], d["foo"])
         self.assertEqual(["2"], d["bar"])
+
+
+class EnvironParserTest(TestCase):
+    def test___init__(self):
+        unknown_args = [
+            b'--FOO=1',
+            b'--BAR=2'
+        ]
+
+        e = EnvironParser(unknown_args)
+        self.assertEqual("1", e["FOO"])
+        self.assertEqual("2", e["BAR"])
+
+        unknown_args = [
+            b'--FOO=1',
+            b'--FOO=2',
+            b'--BAR=3'
+        ]
+
+        e = EnvironParser(unknown_args)
+        self.assertEqual(["1", "2"], e["FOO"])
+        self.assertEqual("3", e["BAR"])
 

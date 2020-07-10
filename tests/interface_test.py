@@ -9,11 +9,22 @@ class CommandTest(TestCase):
     def test_arguments(self):
         c = FileScript([
             "class Default(Command):",
-            "    def handle(self, *args, **kwargs): pass",
-        ]).command()
+            "    def handle(self, *args, **kwargs):",
+            "        print('args: ', args)",
+            "        print('kwargs: ', kwargs)",
+        ])
 
-        c.arguments
+        r = c.run("0 1 2 3")
+        self.assertTrue("('0', '1', '2', '3')" in r)
+        self.assertTrue("{}" in r)
 
+
+        r = c.run("0 1 2 --foo=3 --bar=4")
+        self.assertTrue("('0', '1', '2')" in r)
+        self.assertTrue("foo" in r)
+        self.assertTrue("'3'" in r)
+        self.assertTrue("bar" in r)
+        self.assertTrue("'4'" in r)
 
 
 class CaptainTest(TestCase):

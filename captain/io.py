@@ -15,15 +15,24 @@ from . import logging
 
 
 class Input(io.IOBase):
+    """An instance of this class will be available in a handle() method using
+    self.input, it allows you to prompt for user input"""
     def __init__(self, stdin=None, **kwargs):
         self.stdin = stdin or input
 
     def polar(self, question):
         """Ask a yes/no question
 
+        :Example:
+            def handle(self):
+                answer = self.input.polar("Are you interested?")
+
         https://en.wikipedia.org/wiki/Yes%E2%80%93no_question
+
+        :param question: string, the string that will take y/n as an answer
+        :returns: boolean, True if yes, False if no
         """
-        return self.prompt(
+        answer = self.prompt(
             question,
             choices={
                 "y": ["yes", "y", "ye", "yeah", "yup"],
@@ -31,6 +40,7 @@ class Input(io.IOBase):
             },
             type=lambda v: v.strip().lower()
         )
+        return True if answer.startswith("y") else False
 
     def yesno(self, question):
         return self.polar(question)
@@ -39,7 +49,14 @@ class Input(io.IOBase):
         """echo a prompt to the user and wait for an answer
 
         :Example:
-            answer = echo.prompt("Is this ok?", choices={"y": ["yes", "y"], "n": ["no", "n"]})
+            def handle(self):
+                answer = self.input.prompt(
+                    "Is this ok?",
+                    choices={
+                        "y": ["yes", "y"],
+                        "n": ["no", "n"]
+                    }
+                )
 
         :param question: string, the prompt for the user
         :param choices: list|dict, if given, only exit when prompt matches one of the choices
@@ -97,7 +114,10 @@ class Input(io.IOBase):
 
 
 class Output(io.IOBase):
-    """This is handy for captain scripts to be able to route their prints through and it
+    """An instance of this class will be available in a handle() method using
+    self.output, it contains handy outputting format methods
+
+    This is handy for captain scripts to be able to route their prints through and it
     will obey the passed in --quiet commmand line argument automatically"""
     def __init__(self, stdout=None, stderr=None, **kwargs):
         self.stdout = stdout or logging.stdout
@@ -117,7 +137,7 @@ class Output(io.IOBase):
             self._prefix = prefix_orig
 
     def indent(self, format_msg="  ", *args, **kwargs):
-        return prefix(format_msg, *args, **kwargs)
+        return self.prefix(format_msg, *args, **kwargs)
 
     def increment(self, itr, n=1, format_msg="{}. "):
         """Similar to enumerate but will set format_msg.format(n) into the prefix on
@@ -176,9 +196,6 @@ class Output(io.IOBase):
         """
         kwargs["progress_class"] = ProgressBar
         return self.progress(length, **kwargs)
-
-
-
 
     @contextmanager
     def profile(self, format_msg="", *args, **kwargs):
@@ -284,11 +301,6 @@ class Output(io.IOBase):
         stream = self.stderr.handlers[0].stream
         logmethod = kwargs.pop("logmethod", self.stderr.info)
         logmethod(s)
-        #import sys
-        #sys.stderr.write(s)
-        #sys.stdout.write(s)
-        #print(s, end="")
-        #stream.stream.write(s)
 
     def inline(self, format_msg, *args, **kwargs):
         """print one or more characters without a newline at the end
@@ -335,11 +347,6 @@ class Output(io.IOBase):
             width=width - len(prefix),
         )
         s = wrapper.fill(s)
-#         lines = []
-#         for line in s.splitlines():
-#             pout.v(len(line))
-#             lines.append(line.ljust(width - 1, " ") + "*")
-#         s = "\n".join(lines)
 
         self.bar(sep=sep, width=width)
         self.write(s)
@@ -373,20 +380,10 @@ class Output(io.IOBase):
                 lines.append(prefix + line)
             s = "\n".join(lines)
 
-#             wrapper = textwrap.TextWrapper(
-#                 initial_indent=prefix,
-#                 subsequent_indent=prefix,
-#                 replace_whitespace=False,
-#                 width=width,
-#             )
-#             s = wrapper.fill(msg)
-
         else:
             s = textwrap.indent(msg, prefix)
 
         self.write(s)
-
-        #self.indent(s, indent=default_indent)
 
     def ul(self, *lines):
         """unordered list"""
@@ -610,50 +607,6 @@ class Output(io.IOBase):
     table_cols = table_from_columns
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class Progress(object):
     def __init__(self, output, length, **kwargs):
         self.length = length
@@ -698,6 +651,4 @@ class ProgressBar(Progress):
             self.get_percentage(current)
         )
         return bar
-
-
 
