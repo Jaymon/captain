@@ -73,7 +73,7 @@ class Captain(object):
             ret_code = c.handle(*args, **kwargs)
 
         except Exception as e:
-            ret_code = c.handle_error(e, ret_code)
+            ret_code = c.handle_error(e)
 
         return ret_code
 
@@ -163,9 +163,10 @@ class Command(BaseCommand):
         )
         raise NotImplementedError("Override handle() in your child class")
 
-    def handle_error(self, e, ret_code):
+    def handle_error(self, e):
         """This is called when an uncaught exception on the Command is raised, it
         can be defined in the child to allow custom handling of uncaught exceptions"""
+        #ret_code = 1
         if isinstance(e, self.Stop):
             ret_code = e.code
             msg = String(e)
@@ -176,7 +177,8 @@ class Command(BaseCommand):
                     self.output.out(msg)
 
         else:
-            self.output.exception(e)
+            raise
+            #self.output.exception(e)
 
         return ret_code
 

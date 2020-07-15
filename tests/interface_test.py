@@ -84,4 +84,20 @@ class CaptainTest(TestCase):
         with self.assertRaises(RuntimeError):
             s.run()
 
+    def test_handle_error(self):
+        s = FileScript([
+            "class Foo(Command):",
+            "    def handle(self, **kwargs):",
+            "        raise ValueError('yadda yadda yadda')"
+            "",
+            "class Bar(Command):",
+            "    def handle(self, **kwargs):",
+            "        raise self.Stop(0, 'stop message')"
+        ])
+
+        with self.assertRaises(RuntimeError):
+            r = s.run("foo")
+
+        r = s.run("bar")
+        self.assertTrue("stop message" in r)
 
