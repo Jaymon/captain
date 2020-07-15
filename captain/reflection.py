@@ -154,9 +154,9 @@ class ParseArg(tuple):
         """
         for n in sig["names"]:
             if n in self.names:
-
-                self.name = n
-                self[1]["dest"] = n
+                if self.is_named():
+                    self.name = n
+                    self[1]["dest"] = n
 
                 if n in sig["defaults"]:
                     self.set_default(sig["defaults"][n])
@@ -180,14 +180,25 @@ class ParseArg(tuple):
                         self[0].append("--{}".format(n2))
                         names.add(n2)
 
+        # we need to compensate for: "ValueError: dest supplied twice for positional argument"
+        # It looks like if there is one arg and it is a positional (eg, no -- prefix)
+        # then it will use that as the dest and you can't set a dest kwarg
+        # https://docs.python.org/3/library/argparse.html#dest
         dest = self[1].get("dest", "")
         if dest:
-            self.name = dest
             names.add(dest)
+            self.name = dest
+            if not is_named:
+                # ok, we have a positional and a dest, that will fail, so let's
+                # do some manipulation
+                self[1].setdefault("metavar", self[0][0])
+                self[0][0] = dest
+                self[1].pop("dest")
 
         else:
+            if is_named:
+                self[1].setdefault("dest", longest_name.replace('-', '_'))
             self.name = longest_name
-            self[1].setdefault("dest", longest_name.replace('-', '_'))
 
         self.names = names
 
