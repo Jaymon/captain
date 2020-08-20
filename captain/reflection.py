@@ -258,3 +258,49 @@ class ParseArg(tuple):
         if kwargs:
             self[1].update(kwargs)
 
+
+class Name(String):
+    def __new__(cls, name):
+        instance = super(Name, cls).__new__(cls, name)
+        return instance
+
+    def splitcamel(self):
+        # https://stackoverflow.com/a/37697078/5006
+        return re.sub('([A-Z][a-z]+)', r' \1', re.sub('([A-Z]+)', r' \1', self)).split()
+
+    def splitdash(self):
+        return self.split("-")
+
+    def splitunderscore(self):
+        return self.split("_")
+
+    def split(self, *args, **kwargs):
+        if args or kwargs:
+            ret = super(Name, self).split(*args, **kwargs)
+
+        else:
+            ret = self.splitunderscore()
+            if len(ret) == 1:
+                ret = self.splitdash()
+                if len(ret) == 1:
+                    ret = self.splitcamel()
+
+        return ret
+
+    def underscore(self):
+        return "_".join(self.split())
+
+    def dash(self):
+        return "-".join(self.split())
+
+    def all(self):
+        s = set()
+        for n in [self, self.underscore(), self.dash()]:
+            s.add(n)
+            s.add(n.lower())
+        return s
+
+    def __iter__(self):
+        for n in self.all():
+            yield n
+

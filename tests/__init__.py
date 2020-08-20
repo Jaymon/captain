@@ -114,9 +114,12 @@ class FileScript(object):
 
         return body
 
-    def command(self, command_name="default"):
+    def command_class(self, command_name="default"):
         cap = self.captain
-        return cap.commands[command_name]()
+        return cap.commands[command_name]
+
+    def command(self, command_name="default"):
+        return self.command_class(command_name=command_name)()
 
     def reflect(self, command_name="default"):
         return ReflectCommand(self.captain(command_name))

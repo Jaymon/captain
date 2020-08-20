@@ -197,12 +197,10 @@ class ArgumentParser(argparse.ArgumentParser):
             # if dest isn't passed in you get "argument None is required" on
             # error in py2.7
             subparsers = parser.add_subparsers(dest="<SUBCOMMAND>")
-            #subparsers = parser.add_subparsers()
             subparsers.required = False if command_class else True
 
             for subcommand_name, subcommand_class in subcommand_classes.items():
 
-                #rc = ReflectCommand(subcommand_class)
                 rc = subcommand_class.reflect()
                 desc = rc.desc
                 subparser = subparsers.add_parser(
@@ -217,6 +215,12 @@ class ArgumentParser(argparse.ArgumentParser):
 
                 for pa in rc.parseargs():
                     subparser.add_argument(*pa[0], **pa[1])
+
+                # add aliases
+                # you can pass this as aliases=subcommand_class.aliases to
+                # .add_parser() in py3+ but not in py2
+                for a in subcommand_class.aliases:
+                    subparsers._name_parser_map[a] = subparser
 
         return parser
 

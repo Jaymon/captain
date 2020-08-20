@@ -26,6 +26,38 @@ class CommandTest(TestCase):
         self.assertTrue("bar" in r)
         self.assertTrue("'4'" in r)
 
+    def test_name(self):
+        s = FileScript([
+            "class Foo(Command):",
+            "    def handle(self, **kwargs): pass",
+        ])
+        c_class = s.command_class("foo")
+        self.assertEqual("foo", c_class.name)
+
+        s = FileScript([
+            "class Foo(Command):",
+            "    name = 'bar'",
+            "    def handle(self, **kwargs): pass",
+        ])
+        c_class = s.command_class("bar")
+        self.assertEqual("bar", c_class.name)
+
+    def test_aliases(self):
+        s = FileScript([
+            "class FooOne(Command):",
+            "    def handle(self, **kwargs): pass",
+        ])
+
+        a = set([
+            "fooone",
+            "Foo_One",
+            "Foo-One",
+            "foo_one",
+            "FooOne"
+        ])
+        c_class = s.command_class("foo-one")
+        self.assertEqual(a, c_class.aliases)
+
 
 class CaptainTest(TestCase):
     def test_version(self):
@@ -100,4 +132,27 @@ class CaptainTest(TestCase):
 
         r = s.run("bar")
         self.assertTrue("stop message" in r)
+
+    def test_handle_dash_subcommand(self):
+        s = FileScript([
+            "class Foo_One(Command):",
+            "    def handle(self, **kwargs):",
+            "        self.output.out('foo_one')",
+            "",
+            "class FooTwo(Command):",
+            "    def handle(self, **kwargs):",
+            "        self.output.out('foo_two')",
+        ])
+
+        #r = s.run("")
+        #r = s.run("--help")
+
+        r = s.run("foo-one")
+        self.assertTrue("foo_one" in r)
+
+        r = s.run("foo_one")
+        self.assertTrue("foo_one" in r)
+
+        r = s.run("foo_two")
+        self.assertTrue("foo_two" in r)
 

@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
 import sys
+import re
 
 from .compat import *
 from . import exception
 from .parse import ArgumentParser, QuietAction
 from .decorators import classproperty
 from . import decorators
-from .reflection import ReflectCommand
+from .reflection import ReflectCommand, Name
 from .io import Output, Input
 from . import logging
 
@@ -69,12 +70,7 @@ class Captain(object):
         parsed, args, kwargs = parser.parse_handle_args(argv)
         c = parsed._command_instance
         c.parsed = parsed
-        try:
-            ret_code = c.handle(*args, **kwargs)
-
-        except Exception as e:
-            ret_code = c.handle_error(e)
-
+        ret_code = c.run(*args, **kwargs)
         return ret_code
 
     def handle(self):
@@ -94,18 +90,15 @@ class CommandFinder(type):
     see what Command classes are defined while the script is running, it allows us
     to get around all the strange reflection and code parsing stuff we did in the
     previous captain versions, it gets invoked when a new Command class is getting
-    defined and it records those in our Captain singleton
+    defined and it saves those in our Captain singleton
 
     https://stackoverflow.com/a/18126678/5006
     """
     def __init__(cls, name, bases, properties):
         if not cls.__module__.startswith(__name__):
             # filter all *Command classes, this allows sensible inheritance
-            # any found *Command subclass that has a name that doesn't end with
-            # Command and doesn't start with underscore is a valid command
-            class_name = cls.__name__
-            if not class_name.endswith("Command") and not class_name.startswith("_"):
-                cls.interface.commands[class_name.lower()] = cls
+            if cls.is_external():
+                cls.interface.commands[cls.name] = cls
 
         return super(CommandFinder, cls).__init__(name, bases, properties)
 
@@ -138,6 +131,26 @@ class Command(BaseCommand):
     args = decorators.args
 
     @classproperty
+    def name(cls):
+        """This is the name that will be used to invoke the SUBCOMMAND, it can be
+        overridden in child classes but has no effect if the child class is named
+        Default"""
+        n = Name(cls.__name__)
+        return n.dash().lower()
+
+    @classproperty
+    def aliases(cls):
+        """If you want your SUBCOMMAND to have aliases (ie, foo-bar and foo_bar will
+        both trigger the subcommand) then you can return the aliases, this can be
+        set in a child class or set aliases = [] to completely remove any aliases
+        in a subclass"""
+        aliases = set()
+        for name in [cls.__name__, cls.name]:
+            aliases.update(Name(name).all())
+        aliases.discard(cls.name)
+        return aliases
+
+    @classproperty
     def interface(cls):
         """Return our Captain singleton"""
         return cls.interface_class.get_instance()
@@ -150,9 +163,32 @@ class Command(BaseCommand):
     def reflect(cls):
         return ReflectCommand(cls)
 
+    @classmethod
+    def is_external(cls):
+        """Return true if this is a valid user facing command class
+
+        any found *Command subclass that has a name that doesn't end with
+        Command and doesn't start with underscore is a valid command
+
+        :returns: bool, True if valid, False if not user facing
+        """
+        class_name = cls.__name__
+        return not class_name.endswith("Command") and not class_name.startswith("_")
+
     def __init__(self):
         self.input = self.input_class()
         self.output = self.output_class()
+
+    def run(self, *args, **kwargs):
+        """Wrapper around the internal handle methods so you can easily do something
+        before or after the handle method"""
+        try:
+            ret_code = self.handle(*args, **kwargs)
+
+        except Exception as e:
+            ret_code = self.handle_error(e)
+
+        return ret_code
 
     def handle(self, *args, **kwargs):
         logger.warning(
