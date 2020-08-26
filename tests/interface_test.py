@@ -133,7 +133,7 @@ class CaptainTest(TestCase):
         r = s.run("bar")
         self.assertTrue("stop message" in r)
 
-    def test_handle_dash_subcommand(self):
+    def test_handle_aliases(self):
         s = FileScript([
             "class Foo_One(Command):",
             "    def handle(self, **kwargs):",

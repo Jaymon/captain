@@ -193,11 +193,13 @@ class ArgumentParser(argparse.ArgumentParser):
             for pa in rc.parseargs():
                 parser.add_argument(*pa[0], **pa[1])
 
+        parser.subcommand_aliases = {}
         if subcommand_classes:
             # if dest isn't passed in you get "argument None is required" on
             # error in py2.7
             subparsers = parser.add_subparsers(dest="<SUBCOMMAND>")
             subparsers.required = False if command_class else True
+
 
             for subcommand_name, subcommand_class in subcommand_classes.items():
 
@@ -220,7 +222,8 @@ class ArgumentParser(argparse.ArgumentParser):
                 # you can pass this as aliases=subcommand_class.aliases to
                 # .add_parser() in py3+ but not in py2
                 for a in subcommand_class.aliases:
-                    subparsers._name_parser_map[a] = subparser
+                    parser.subcommand_aliases[a] = subcommand_name
+                    #subparsers._name_parser_map[a] = subparser
 
         return parser
 
@@ -318,6 +321,12 @@ class ArgumentParser(argparse.ArgumentParser):
         ulimately be passed to the handle() method"""
         unknown_args = []
         unknown_kwargs = {}
+
+        # swap out the alias in argv[0] for the actual name of the subcommand,
+        # this allows us to keep our aliases hidden (since there are usually
+        # lots of them) but still support aliasing of the subcommands
+        if argv and argv[0] in self.subcommand_aliases:
+            argv[0] = self.subcommand_aliases[argv[0]]
 
         parsed, parsed_unknown = self.parse_known_args(argv)
 
