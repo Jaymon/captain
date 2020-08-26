@@ -155,10 +155,14 @@ class Output(io.IOBase):
         :returns: yield generator
         """
         for i, v in enumerate(itr, n):
-            self._prefix = format_msg.format(i)
-            yield v
+            with self.prefix(format_msg, i):
+            #self._prefix = format_msg.format(i)
+                yield v
 
     def incr(self, *args, **kwargs):
+        return self.increment(*args, **kwargs)
+
+    def enumerate(self, *args, **kwargs):
         return self.increment(*args, **kwargs)
 
     @contextmanager

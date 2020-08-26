@@ -87,8 +87,10 @@ class OutputTest(TestCase):
         with testdata.capture() as r:
             for x in o.incr(range(5)):
                 o.out(x)
+            o.out("=======")
         self.assertTrue("1. " in r)
         self.assertTrue("5. " in r)
+        self.assertFalse(" =======" in r)
 
     def test_profile(self):
         o = Output()
