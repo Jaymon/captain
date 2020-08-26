@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
+import datetime
 
 from captain.io import Output, Input
+from captain.compat import *
 
 from . import testdata, TestCase, FileScript, ModuleScript
 
@@ -101,6 +103,12 @@ class OutputTest(TestCase):
             with o.profile("foo"):
                 o.out("profile 2")
         self.assertTrue("foo in" in r)
+
+        with testdata.capture() as r:
+            with o.profile(quiet=True) as p:
+                pass
+        p.stop_time += 10
+        self.assertEqual("10.0s", p.elapsed())
 
     def test_no_format(self):
         o = Output()

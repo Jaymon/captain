@@ -201,7 +201,6 @@ class Output(io.IOBase):
         kwargs["progress_class"] = ProgressBar
         return self.progress(length, **kwargs)
 
-    @contextmanager
     def profile(self, format_msg="", *args, **kwargs):
         """context manager to print out how long it ran
 
@@ -209,22 +208,15 @@ class Output(io.IOBase):
             with echo.profile():
                 # do stuff
 
-        :param msg: string, the message you want to display with the elapsed time
+        :param format_msg: string, the message you want to display with the elapsed time
+        :param quiet=: boolean, if False then don't print elapsed time when Profile.stop()
+            is called
         """
-        start = time.time()
-        yield self
-        stop = time.time()
-        elapsed = round(abs(stop - start) * 1000.0, 1)
 
-        if format_msg:
-            format_msg +=  " in {:.1f} ms"
-        else:
-            format_msg =  "{:.1f} ms"
-
-        args = list(args)
-        args.append(elapsed)
-
-        self.out(format_msg, *args, **kwargs)
+        profile_class = kwargs.pop("profile_class", Profile)
+        p = profile_class(output=self, quiet=kwargs.pop("quiet", False))
+        p.start(format_msg, *args, **kwargs)
+        return p
 
     def critical(self, format_msg, *args, **kwargs):
         kwargs.setdefault("logmethod", self.stderr.critical)
@@ -609,6 +601,52 @@ class Output(io.IOBase):
     table_column = table_from_columns
     table_col = table_from_columns
     table_cols = table_from_columns
+
+
+class Profile(object):
+    def __init__(self, output, quiet=False):
+        self.output = output
+        self.quiet = quiet
+        self.start_time = None
+        self.stop_time = None
+
+    def start(self, format_msg="", *args, **kwargs):
+        self.start_time = time.time()
+        self.msg = format_msg.format(*args, **kwargs)
+
+    def stop(self):
+        self.stop_time = time.time()
+
+    def elapsed(self):
+        start = self.start_time if self.start_time else time.time()
+        stop = self.stop_time if self.stop_time else time.time()
+        elapsed = self.get_elapsed(start, stop, 1000.00, 1)
+
+        suffix = "ms"
+        if elapsed > 1000.0:
+            elapsed = round(elapsed / 1000.0, 1)
+            suffix = "s"
+
+        return "{:.1f}{}".format(elapsed, suffix)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        self.stop()
+
+        if not self.quiet:
+            msg = self.msg
+            if msg:
+                msg +=  "{} in {}".format(msg, self.elapsed())
+            else:
+                msg =  self.elapsed()
+
+            self.output.out(msg)
+
+    def get_elapsed(self, start, stop, multiplier, rnd):
+        return round(abs(stop - start) * float(multiplier), rnd)
+
 
 
 class Progress(object):
