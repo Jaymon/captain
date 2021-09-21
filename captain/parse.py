@@ -78,7 +78,7 @@ class QuietAction(argparse.Action):
     def get_value(self, arg_string):
         """Hack only supported by our custom ArgumentParser"""
         if "-q" in self.option_strings:
-            pout.v(arg_string)
+            #pout.v(arg_string)
             arg_string = "-" + arg_string[2:]
 
         if arg_string.startswith("-"):
