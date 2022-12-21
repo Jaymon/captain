@@ -9,6 +9,8 @@ from collections import Counter
 import time
 import io
 
+from datatypes import cball
+
 from .compat import *
 from . import environ
 from . import logging
@@ -19,6 +21,9 @@ class Input(io.IOBase):
     self.input, it allows you to prompt for user input"""
     def __init__(self, stdin=None, **kwargs):
         self.stdin = stdin or input
+
+    def __call__(self, *args, **kwargs):
+        return self.prompt(*args, **kwargs)
 
     def polar(self, question):
         """Ask a yes/no question
@@ -45,7 +50,14 @@ class Input(io.IOBase):
     def yesno(self, question):
         return self.polar(question)
 
-    def prompt(self, question, choices=None, type=lambda v: v.strip().lower()):
+    def iprompt(self, question, choices=None, type=lambda v: v.lower()):
+        """Same as .prompt() but sets the type to case-insensitive by default
+
+        https://github.com/Jaymon/captain/issues/70
+        """
+        return super().prompt(question=question, choices=choices, type=type)
+
+    def prompt(self, question, choices=None, type=None):
         """echo a prompt to the user and wait for an answer
 
         :Example:
@@ -65,7 +77,7 @@ class Input(io.IOBase):
         :returns: string, the answer that was given by the user
         """
         if not type:
-            type = lambda: x
+            type = lambda v: v
 
         if choices:
             if isinstance(choices, Mapping):
@@ -125,6 +137,13 @@ class Output(io.IOBase):
         self._prefix = kwargs.pop("prefix", "")
         self._suffix = kwargs.pop("suffix", "\n")
         self.width = kwargs.pop("width", environ.WIDTH)
+
+    def __call__(self, *args, **kwargs):
+        """Syntactic sugar around .out()
+
+        https://github.com/Jaymon/captain/issues/63
+        """
+        return self.out(*args, **kwargs)
 
     @contextmanager
     def prefix(self, format_msg, *args, **kwargs):
@@ -381,6 +400,32 @@ class Output(io.IOBase):
 
         self.write(s)
 
+    def pluralize(self, count, single, multiple="", format_str="{count} {desc}"):
+        """Use the multiple value if count isn't 1, otherwise use single
+
+        :Example:
+            self.pluralize(1, "message", "messages") # 1 message
+            self.pluralize(10, "message", "messages") # 10 messages
+
+        https://github.com/Jaymon/captain/issues/71
+
+        :param count: int, the count value that decides if single or multiple should
+            be used
+        :param single: str, the value to use if count == 1
+        :param multiple: str, the value to use if count != 1
+        :format_str: str, how to arrange the return value
+        :returns: str, "<COUNT> <SINGLE|MULTIPLE>" by default, use format_str to
+            customize
+        """
+        count = int(count)
+        if count == 1:
+            desc = single
+        else:
+            desc = multiple if multiple else single + "s"
+
+        return format_str.format(count=count, desc=desc)
+    plural = pluralize
+
     def ul(self, *lines):
         """unordered list"""
         self.bullets(*lines, numbers=True)
@@ -453,12 +498,12 @@ class Output(io.IOBase):
             9  0
 
         :param *columns: dict|list of lists| *lists, can either be a list of rows or
-            multiple lists representing each column in the table, or a dict where the
-            keys are the headers and the values are the columns corresponding to that
-            header
+            multiple lists representing each column in the table, or a dict with list
+            values, where the keys are the headers and the values are the columns corresponding to that
+            header. If it is a dict of string values then the keys will be considered the first column
+            and the values will be considered the second column
         :param **kwargs: dict
             prefix -- string -- what you want before each row (eg, a tab)
-            #buf_count -- integer -- how many spaces between longest col value and its neighbor
             headers -- list -- the headers you want, must match column count
             widths -- list -- the widths of each column you want to use, this doesn't have
                 to match column count, so you can do something like [0, 5] to set the
@@ -471,14 +516,14 @@ class Output(io.IOBase):
 
         headers = kwargs.get("headers", [])
         prefix = kwargs.get('prefix', '')
-        #buf_count = kwargs.get('buf_count', 2)
         column_delim = kwargs.get("column_delim", " | ")
         header_delim = kwargs.get("header_delim", "-")
         if len(columns) == 1:
             # input is a list of rows or dict of columns
             if isinstance(columns[0], Mapping):
                 # columns are a dict, so keys will be headers and values will be
-                # the columns
+                # the columns if all the values are lists, otherwise keys will
+                # be column 1, and values will be column 2
                 all_lists = True
                 for v in columns[0].values():
                     if not isinstance(v, list):
@@ -495,6 +540,21 @@ class Output(io.IOBase):
                 # columns are a list of rows
                 columns = list(columns[0])
 
+                # do we have a list of dicts?
+                if cball(lambda x: isinstance(x, Mapping), columns):
+                    ds = {}
+                    for d in columns:
+                        for k, v in d.items():
+                            if k not in ds:
+                                ds[k] = []
+                            if isinstance(v, list):
+                                ds[k].extend(v)
+                            else:
+                                ds[k].append(v)
+
+                    headers = list(ds.keys())
+                    columns = list(zip_longest(*ds.values(), fillvalue=""))
+
         else:
             # input is a bunch of columns
             # without the list the zip iterator gets spent
@@ -507,6 +567,27 @@ class Output(io.IOBase):
         # the table, so len(columns) would give the number of rows and
         # len(columns[0]) would give the number of columns
 
+        def rowstr(row, prefix, row_counts, column_delim, row_alignment=None):
+            row_alignment = row_alignment or []
+            row_format = prefix + column_delim
+            cols = list(map(String, row))
+            for i in range(len(row_counts)):
+                if len(cols) > i:
+                    cols.append("")
+
+                c = cols[i]
+                # build the format string for each row, we use the row_counts found
+                # above to decide how much padding each column should get
+                # https://stackoverflow.com/a/9536084/5006
+                if row_alignment and len(row_alignment) > i and row_alignment[i] == "right":
+                #if not c or re.match(r"^\d+(?:\.\,\d+)?$", c):
+                    # right align digits
+                    row_format += "{:>" + str(row_counts[i]) + "}" + column_delim
+                else:
+                    # left align
+                    row_format += "{:<" + str(row_counts[i]) + "}" + column_delim
+
+            return row_format.strip().format(*map(lambda x: "None" if x is None else String(x), cols))
 
         # we have to go through all the rows and calculate the max width of each
         # column of each row
@@ -521,34 +602,9 @@ class Output(io.IOBase):
                 c = "None" if c is None else String(c)
                 row_counts[i] = max(row_counts[i], len(c), width)
 
-        def rowstr(row, prefix, row_counts, column_delim):
-            row_format = prefix + column_delim
-            cols = list(map(String, row))
-            for i in range(len(row_counts)):
-                if len(cols) > i:
-                    cols.append("")
-
-                c = cols[i]
-                # build the format string for each row, we use the row_counts found
-                # above to decide how much padding each column should get
-                # https://stackoverflow.com/a/9536084/5006
-                if not c or re.match(r"^\d+(?:\.\,\d+)?$", c):
-                    # right align digits
-                    #row_format += "{:>" + str(row_counts[i]) + "}" + (" " * buf_count)
-                    row_format += "{:>" + str(row_counts[i]) + "}" + column_delim
-                    #row_format += "{:>" + str(row_counts[i] + (buf_count if i > 0 else 0)) + "}"
-                    #row_format += "{:>" + str(row_counts[i]) + "}"
-                else:
-                    # left align
-                    #row_format += "{:<" + str(row_counts[i] + buf_count) + "}"
-                    #row_format += "{:<" + str(row_counts[i]) + "}" + (" " * buf_count)
-                    row_format += "{:<" + str(row_counts[i]) + "}" + column_delim
-
-            return row_format.strip().format(*map(lambda x: "None" if x is None else String(x), cols))
-
+        # we pop the headers from the columns because we had to put it into the
+        # columns so we could correctly calculate widths
         if headers:
-            # we pop the headers from the columns because we had to put it into the
-            # columns so we could correctly calculate widths
             ret.append(rowstr(columns.pop(0), prefix, row_counts, column_delim))
 
             # we need to figure out exactly how long the table is
@@ -557,11 +613,23 @@ class Output(io.IOBase):
             delim_count -= (len(column_delim) - len(column_delim.rstrip())) # right side of table
             ret.append(prefix + (header_delim * delim_count))
 
+        # we want to go through all the columns and decide if they are right or
+        # left aligned
+        row_alignment = ["right"] * len(columns)
         for row in columns:
-            ret.append(rowstr(row, prefix, row_counts, column_delim))
+            for i, col_row in enumerate(row):
+                if not col_row or re.match(r"^\d+(?:\.\,\d+)?$", String(col_row)):
+                    # we do nothing because it's already set to right
+                    pass
+
+                else:
+                    # we found a non-digit, so this table should be left aligned
+                    row_alignment[i] = "left"
+
+        for row in columns:
+            ret.append(rowstr(row, prefix, row_counts, column_delim, row_alignment))
 
         self.out("\n".join(ret))
-
 
     def table_from_rows(self, *rows, **kwargs):
         """makes a table from the passed in rows

@@ -85,10 +85,20 @@ class ReflectMethod(object):
         }
 
     def decorator_args(self):
+        """Iterate through all the @arg decorator calls
+
+        :returns: generator, this will yield in the order the @arg were added from
+            top to bottom
+        """
         args = reversed(self.method.__dict__.get('decorator_args', []))
         return args
 
     def inherit_args(self):
+        """Iterate through all the @args decorator calls
+
+        :returns: generator, this will yield in the order the @args were added from
+            top to bottom
+        """
         args = reversed(self.method.__dict__.get('inherit_args', []))
         return args
 
@@ -96,21 +106,37 @@ class ReflectMethod(object):
         self.method = method
 
     def parseargs(self):
+        """Return all the ParseArg instances that should be added to the ArgumentParser
+        instance that will validate all the arguments that want to be passed to
+        this method
+
+        :returns: generator<ParseArg>, all the found arguments for this method
+        """
         sig = self.signature
+        pas = {}
 
         # the values injected via @args decorator
-        command_classes = self.inherit_args()
-        for command_class in command_classes:
-            for pa in command_class.reflect().method().parseargs():
-                pa.merge_signature(sig)
-                yield pa
+        iargs = self.inherit_args()
+        for command_classes, kw in iargs:
+            ignore = set(kw.get("omit", kw.get("remove", kw.get("ignore", []))))
+            for command_class in command_classes:
+                for pa in command_class.reflect().method().parseargs():
+                    # ignore any arguments that are in the ignore set
+                    if not (ignore & pa.names):
+                        pa.merge_signature(sig)
+                        pas[pa.name] = pa
 
         # the values injected via @arg decorator
         dargs = self.decorator_args()
         for a, kw in dargs:
             pa = ParseArg(*a, **kw)
             pa.merge_signature(sig)
-            yield pa
+            if pa.name in pas:
+                pas[pa.name].merge(pa)
+            else:
+                pas[pa.name] = pa
+
+        return pas.values()
 
 
 class ParseArg(tuple):
@@ -133,7 +159,7 @@ class ParseArg(tuple):
         return self[1]
 
     def __new__(cls, *names, **kwargs):
-        instance = super(ParseArg, cls).__new__(cls, [list(names), kwargs])
+        instance = super().__new__(cls, [list(names), kwargs])
         instance.set_names()
         return instance
 
@@ -161,8 +187,23 @@ class ParseArg(tuple):
                 if n in sig["defaults"]:
                     self.set_default(sig["defaults"][n])
 
+    def merge(self, pa):
+        """Merge another ParseArg instance into this one
+
+        :param pa: ParseArg instance, any pa.args that are not in self.args will
+            be added, pa.args does not override self.args, pa.kwargs keys will
+            overwrite self.kwargs keys
+        """
+        sa = set(self.args)
+        for a in pa.args:
+            if a not in sa:
+                self.args.append(a)
+
+        # passed in ParseArg kwargs take precedence
+        self.kwargs.update(pa.kwargs)
+
     def set_names(self):
-        """Finad all the possible names for the flag, this normalizes things so
+        """Find all the possible names for the flag, this normalizes things so
         --foo-bar is the same as --foo_bar"""
         is_named = self.is_named()
         names = set()
@@ -259,48 +300,55 @@ class ParseArg(tuple):
             self[1].update(kwargs)
 
 
-class Name(String):
-    def __new__(cls, name):
-        instance = super(Name, cls).__new__(cls, name)
-        return instance
-
-    def splitcamel(self):
-        # https://stackoverflow.com/a/37697078/5006
-        return re.sub('([A-Z][a-z]+)', r' \1', re.sub('([A-Z]+)', r' \1', self)).split()
-
-    def splitdash(self):
-        return self.split("-")
-
-    def splitunderscore(self):
-        return self.split("_")
-
-    def split(self, *args, **kwargs):
-        if args or kwargs:
-            ret = super(Name, self).split(*args, **kwargs)
-
-        else:
-            ret = self.splitunderscore()
-            if len(ret) == 1:
-                ret = self.splitdash()
-                if len(ret) == 1:
-                    ret = self.splitcamel()
-
-        return ret
-
-    def underscore(self):
-        return "_".join(self.split())
-
-    def dash(self):
-        return "-".join(self.split())
-
-    def all(self):
-        s = set()
-        for n in [self, self.underscore(), self.dash()]:
-            s.add(n)
-            s.add(n.lower())
-        return s
-
-    def __iter__(self):
-        for n in self.all():
-            yield n
-
+# class Name(String):
+#     """Class that makes it easy to handle the different types of names that can
+#     be defined and passed in.
+# 
+#     For example, python convention is snake case (underscores), but you would want
+#     to pass in values on the commandline using dashes, so this class makes it easy
+#     to go from `--foo-bar=1` to `foo_bar=1`
+#     """
+#     def __new__(cls, name):
+#         instance = super(Name, cls).__new__(cls, name)
+#         return instance
+# 
+#     def splitcamel(self):
+#         # https://stackoverflow.com/a/37697078/5006
+#         return re.sub('([A-Z][a-z]+)', r' \1', re.sub('([A-Z]+)', r' \1', self)).split()
+# 
+#     def splitdash(self):
+#         return self.split("-")
+# 
+#     def splitunderscore(self):
+#         return self.split("_")
+# 
+#     def split(self, *args, **kwargs):
+#         if args or kwargs:
+#             ret = super(Name, self).split(*args, **kwargs)
+# 
+#         else:
+#             ret = self.splitunderscore()
+#             if len(ret) == 1:
+#                 ret = self.splitdash()
+#                 if len(ret) == 1:
+#                     ret = self.splitcamel()
+# 
+#         return ret
+# 
+#     def underscore(self):
+#         return "_".join(self.split())
+# 
+#     def dash(self):
+#         return "-".join(self.split())
+# 
+#     def all(self):
+#         s = set()
+#         for n in [self, self.underscore(), self.dash()]:
+#             s.add(n)
+#             s.add(n.lower())
+#         return s
+# 
+#     def __iter__(self):
+#         for n in self.all():
+#             yield n
+# 

@@ -58,6 +58,35 @@ class CommandTest(TestCase):
         c_class = s.command_class("foo-one")
         self.assertEqual(a, c_class.aliases)
 
+    def test_unnamed_arg(self):
+        """https://github.com/Jaymon/captain/issues/64"""
+        s = FileScript([
+            "class Foo(Command):",
+            "    def handle(self, bar):",
+            "        print(f'bar: {bar}')",
+        ])
+
+        with self.assertRaises(RuntimeError):
+            r = s.run("foo")
+
+        s = FileScript([
+            "class Foo(Command):",
+            "    def handle(self, bar):",
+            "        print(f'bar: {bar}')",
+        ])
+
+        r = s.run("foo 'bar value'")
+        self.assertTrue("bar: bar value" in r)
+
+        s = FileScript([
+            "class Foo(Command):",
+            "    def handle(self, bar):",
+            "        print(f'bar: {bar}')",
+        ])
+
+        r = s.run("foo --bar 'bar value'")
+        self.assertTrue("bar: bar value" in r)
+
 
 class CaptainTest(TestCase):
     def test_version(self):

@@ -2,15 +2,18 @@
 from __future__ import unicode_literals, division, print_function, absolute_import
 
 from captain.compat import *
+from captain.logging import QuietFilter
 
 from . import testdata, TestCase, FileScript, ModuleScript
-from .parse import (
-    UnknownParser,
-    EnvironParser,
-)
 
 
 class ArgumentParserTest(TestCase):
+
+    @classmethod
+    def tearDownClass(cls):
+        # after this class is done testing the quiet functionality reset logging
+        QuietFilter.reset()
+
     def test_quiet_parsing(self):
         p = FileScript().parser
 
@@ -134,7 +137,7 @@ class ArgumentParserTest(TestCase):
 
         r = s.run('--help')
         self.assertRegexpMatches(r, r"--quiet\s+override\s+quiet")
-        self.assertRegexpMatches(r, r"-Q\s+_QUIET")
+        self.assertRegexpMatches(r, r"-Q\s+<QUIET")
 
     def test_quiet_logging(self):
         s = FileScript([
@@ -229,7 +232,6 @@ class ArgumentParserTest(TestCase):
         self.assertFalse("info" in r)
         self.assertFalse("out" in r)
 
-
     def test_parse_handle_args(self):
         s = FileScript([
             "class Default(Command):",
@@ -273,7 +275,7 @@ class ArgumentParserTest(TestCase):
         self.assertTrue("foo: 2" in r)
 
         r = s.run("bam --foo 1 --bar 2")
-        self.assertTrue("foo': ['1']" in r)
+        self.assertTrue("foo': '1'" in r)
 
     def test_handle_quiet(self):
         s = FileScript(subcommands=True)
@@ -286,58 +288,4 @@ class ArgumentParserTest(TestCase):
 
         r = s.run("--help foo")
         self.assertTrue("--quiet" in r)
-
-
-class UnknownParserTest(TestCase):
-    def test_extra_args(self):
-        extra_args = [
-            "--foo=1",
-            "--che",
-            '--baz="this=that"',
-            "--bar",
-            "2",
-            "--foo=2",
-            "-z",
-            "3",
-            "4"
-        ]
-
-        d = UnknownParser(extra_args)
-        self.assertEqual(["1", "2"], d["foo"])
-        self.assertEqual(["4"], d["*"])
-        self.assertEqual(["2"], d["bar"])
-        self.assertEqual(["3"], d["z"])
-        self.assertEqual(["this=that"], d["baz"])
-        self.assertEqual([True], d["che"])
-
-    def test_binary(self):
-        extra_args = [
-            b"--foo=1",
-            b"--bar=2"
-        ]
-        d = UnknownParser(extra_args)
-        self.assertEqual(["1"], d["foo"])
-        self.assertEqual(["2"], d["bar"])
-
-
-class EnvironParserTest(TestCase):
-    def test___init__(self):
-        unknown_args = [
-            b'--FOO=1',
-            b'--BAR=2'
-        ]
-
-        e = EnvironParser(unknown_args)
-        self.assertEqual("1", e["FOO"])
-        self.assertEqual("2", e["BAR"])
-
-        unknown_args = [
-            b'--FOO=1',
-            b'--FOO=2',
-            b'--BAR=3'
-        ]
-
-        e = EnvironParser(unknown_args)
-        self.assertEqual(["1", "2"], e["FOO"])
-        self.assertEqual("3", e["BAR"])
 

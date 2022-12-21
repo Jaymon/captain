@@ -3,12 +3,14 @@ from __future__ import unicode_literals, division, print_function, absolute_impo
 import sys
 import re
 
+from datatypes import NamingConvention
+
 from .compat import *
 from . import exception
 from .parse import ArgumentParser, QuietAction
 from .decorators import classproperty
 from . import decorators
-from .reflection import ReflectCommand, Name
+from .reflection import ReflectCommand
 from .io import Output, Input
 from . import logging
 
@@ -65,7 +67,12 @@ class Captain(object):
         self.commands = {}
 
     def run(self, argv):
-        """Actually run captain with the given argv"""
+        """Actually run captain with the given argv
+
+        :param argv: list, sys.argv[1:], basically the passed in arguments without
+            the script name
+        :returns: int, the return code you want the script to exit with
+        """
         parser = self.create_parser()
         parsed, args, kwargs = parser.parse_handle_args(argv)
         c = parsed._command_instance
@@ -74,7 +81,7 @@ class Captain(object):
         return ret_code
 
     def handle(self):
-        """wraps run()"""
+        """wraps run() and passes run() the arguments portion of sys.argv"""
         argv = sys.argv[1:]
         ret_code = self.run(argv)
         sys.exit(ret_code)
@@ -100,23 +107,14 @@ class CommandFinder(type):
             if cls.is_external():
                 cls.interface.commands[cls.name] = cls
 
-        return super(CommandFinder, cls).__init__(name, bases, properties)
-
-
-if is_py3:
-    # python 2 compiler throws an error on metaclass=... syntax
-    exec("class BaseCommand(object, metaclass=CommandFinder): pass")
-
-else:
-    class BaseCommand(object):
-        __metaclass__ = CommandFinder
+        return super().__init__(name, bases, properties)
 
 
 # This is the base class of custom commands, any captain command needs to 
 # extend this class and define handle(), basically, every captain script will
 # go through a child of this class's handle() method, this class can't have a
 # docblock because that screws up reflections docblock finder
-class Command(BaseCommand):
+class Command(object, metaclass=CommandFinder):
     interface_class = Captain
 
     output_class = Output
@@ -135,7 +133,7 @@ class Command(BaseCommand):
         """This is the name that will be used to invoke the SUBCOMMAND, it can be
         overridden in child classes but has no effect if the child class is named
         Default"""
-        n = Name(cls.__name__)
+        n = NamingConvention(cls.__name__)
         return n.dash().lower()
 
     @classproperty
@@ -146,7 +144,7 @@ class Command(BaseCommand):
         in a subclass"""
         aliases = set()
         for name in [cls.__name__, cls.name]:
-            aliases.update(Name(name).all())
+            aliases.update(NamingConvention(name).variations())
         aliases.discard(cls.name)
         return aliases
 
@@ -157,18 +155,26 @@ class Command(BaseCommand):
 
     @classproperty
     def module(cls):
+        """The module the child class is defined in"""
         return sys.modules[cls.__module__]
 
     @classmethod
     def reflect(cls):
+        """The interface does a lot of introspection to figure out how to call
+        the .handle() method, this returns the reflection class of this specific
+        command
+
+        :returns: ReflectCommand
+        """
         return ReflectCommand(cls)
 
     @classmethod
     def is_external(cls):
         """Return true if this is a valid user facing command class
 
-        any found *Command subclass that has a name that doesn't end with
-        Command and doesn't start with underscore is a valid command
+        any found Command subclass that has a name that doesn't end with
+        Command (eg BaseCommand) and doesn't start with an underscore (eg _Foo) 
+        is a valid external command
 
         :returns: bool, True if valid, False if not user facing
         """
@@ -178,6 +184,19 @@ class Command(BaseCommand):
     def __init__(self):
         self.input = self.input_class()
         self.output = self.output_class()
+
+    def __getattr__(self, k):
+        """Makes the .input and .output interfaces a little more fluid, output
+        methods take precedence
+
+        https://github.com/Jaymon/captain/issues/67
+        """
+        cb = getattr(self.output, k, None)
+        if not cb:
+            cb = getattr(self.input, k, None)
+            if not cb:
+                cb = super().__getattr__(k)
+        return cb
 
     def run(self, *args, **kwargs):
         """Wrapper around the internal handle methods so you can easily do something
@@ -202,7 +221,6 @@ class Command(BaseCommand):
     def handle_error(self, e):
         """This is called when an uncaught exception on the Command is raised, it
         can be defined in the child to allow custom handling of uncaught exceptions"""
-        #ret_code = 1
         if isinstance(e, self.Stop):
             ret_code = e.code
             msg = String(e)
@@ -214,7 +232,6 @@ class Command(BaseCommand):
 
         else:
             raise
-            #self.output.exception(e)
 
         return ret_code
 

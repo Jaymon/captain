@@ -6,7 +6,6 @@ from captain.reflection import (
     ReflectCommand,
     ReflectMethod,
     ParseArg,
-    Name,
 )
 from captain import Command
 
@@ -53,15 +52,6 @@ class ReflectCommandTest(TestCase):
 
     def test_desc_module(self):
         s = FileScript([
-            '"""the description on module doc"""',
-            "from captain import Command",
-            "class Default(Command): pass",
-        ], header="")
-
-        cbi = ReflectCommand(s.command())
-        self.assertEqual("the description on module doc", cbi.desc)
-
-        s = FileScript([
             '#!/usr/bin/env python',
             '# -*- coding: utf-8 -*-',
             '# the description on module comment',
@@ -72,6 +62,15 @@ class ReflectCommandTest(TestCase):
 
         cbi = ReflectCommand(s.command())
         self.assertEqual("the description on module comment\nand the second line", cbi.desc)
+
+        s = FileScript([
+            '"""the description on module doc"""',
+            "from captain import Command",
+            "class Default(Command): pass",
+        ], header="")
+
+        cbi = ReflectCommand(s.command())
+        self.assertEqual("the description on module doc", cbi.desc)
 
 
 class ReflectMethodTest(TestCase):
@@ -99,6 +98,64 @@ class ReflectMethodTest(TestCase):
         args = list(cbi.parseargs())
         self.assertEqual("foo", args[0][1]["dest"])
         self.assertEqual("bang_one", args[1][1]["dest"])
+
+    def test_omit(self):
+        """Makes sure you can ignore flags when inheriting
+
+        https://github.com/Jaymon/captain/issues/73
+        """
+        s = FileScript([
+            "class Baz(Command):",
+            "    @arg('--baz-foo', default='1')",
+            "    @arg('--baz-bar', type=int)",
+            "    def handle(self, **kwargs): pass",
+            "",
+            "class Foo(Command):",
+            "    @arg('--foo-foo', default='1')",
+            "    @arg('--foo-bar', type=int)",
+            "    def handle(self, **kwargs): pass",
+            "",
+            "class Che(Command):",
+            "    @arg('--che-foo', default='1')",
+            "    @arg('--che-bar', type=int)",
+            "    def handle(self, **kwargs): pass",
+            "",
+            "class Bam(Command):",
+            "    @args(Che, Foo, omit=['foo-foo', 'che-bar'])",
+            "    @args(Baz, omit=['baz-foo'])",
+            "    def handle(self, **kwargs):",
+            "        print('kwargs: {}'.format(kwargs))",
+        ])
+
+        contains = set(["baz-bar", "foo-bar", "che-foo"])
+        mi = s.reflect_method("Bam")
+
+        pas = list(mi.parseargs())
+        self.assertEqual(len(contains), len(pas))
+        for pa in pas:
+            self.assertTrue(pa.names & contains)
+
+    def test_override(self):
+        """Makes sure you can override flags
+
+        https://github.com/Jaymon/captain/issues/73
+        """
+        s = FileScript([
+            "class Foo(Command):",
+            "    @arg('foo', nargs='*')",
+            "    def handle(self, **kwargs): pass",
+            "",
+            "class Bar(Command):",
+            "    @args(Foo)",
+            "    @arg('foo', nargs='+')",
+            "    def handle(self, **kwargs): pass",
+        ])
+
+        mi = s.reflect_method("Bar")
+
+        pas = list(mi.parseargs())
+        self.assertEqual(1, len(pas))
+        self.assertEqual("+", pas[0].kwargs["nargs"])
 
 
 class ParseArgTest(TestCase):
@@ -144,29 +201,28 @@ class ParseArgTest(TestCase):
         self.assertTrue(args.footype.startswith("HAPPY"))
 
 
-class NameTest(TestCase):
-    def test_name(self):
-
-        s = Name("FooBar")
-        self.assertEqual("Foo_Bar", s.underscore())
-        self.assertEqual("Foo-Bar", s.dash())
-        a = set(["FooBar", "foobar", "Foo_Bar", "foo_bar", "Foo-Bar", "foo-bar"])
-        self.assertEqual(a, s.all())
-
-        s = Name("Foo-Bar")
-        self.assertEqual("Foo_Bar", s.underscore())
-        self.assertEqual("Foo-Bar", s.dash())
-        a = set(["Foo_Bar", "foo_bar", "Foo-Bar", "foo-bar"])
-        self.assertEqual(a, s.all())
-
-        s = Name("Foo_Bar")
-        self.assertEqual("Foo_Bar", s.underscore())
-        self.assertEqual("Foo-Bar", s.dash())
-        a = set(["Foo_Bar", "foo_bar", "Foo-Bar", "foo-bar"])
-        self.assertEqual(a, s.all())
-
-        s = Name("Foo_bar")
-        self.assertEqual("Foo_bar", s.underscore())
-        self.assertEqual("Foo-bar", s.dash())
-        a = set(["Foo_bar", "foo_bar", "Foo-bar", "foo-bar"])
-        self.assertEqual(a, s.all())
+# class NameTest(TestCase):
+#     def test_name(self):
+#         s = Name("FooBar")
+#         self.assertEqual("Foo_Bar", s.underscore())
+#         self.assertEqual("Foo-Bar", s.dash())
+#         a = set(["FooBar", "foobar", "Foo_Bar", "foo_bar", "Foo-Bar", "foo-bar"])
+#         self.assertEqual(a, s.all())
+# 
+#         s = Name("Foo-Bar")
+#         self.assertEqual("Foo_Bar", s.underscore())
+#         self.assertEqual("Foo-Bar", s.dash())
+#         a = set(["Foo_Bar", "foo_bar", "Foo-Bar", "foo-bar"])
+#         self.assertEqual(a, s.all())
+# 
+#         s = Name("Foo_Bar")
+#         self.assertEqual("Foo_Bar", s.underscore())
+#         self.assertEqual("Foo-Bar", s.dash())
+#         a = set(["Foo_Bar", "foo_bar", "Foo-Bar", "foo-bar"])
+#         self.assertEqual(a, s.all())
+# 
+#         s = Name("Foo_bar")
+#         self.assertEqual("Foo_bar", s.underscore())
+#         self.assertEqual("Foo-bar", s.dash())
+#         a = set(["Foo_bar", "foo_bar", "Foo-bar", "foo-bar"])
+#         self.assertEqual(a, s.all())

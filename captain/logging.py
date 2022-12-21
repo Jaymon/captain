@@ -84,6 +84,22 @@ class LevelFilter(object):
 
 class QuietFilter(String):
     """see --quiet flag help for what this does"""
+    @classmethod
+    def reset(cls):
+        """This will go through and remove all the filters that this class added
+        to all the logging handlers
+
+        This is mainly for testing
+        """
+        loggers = dict(Logger.manager.loggerDict)
+        for logger_name, logger in loggers.items():
+            # https://docs.python.org/3/library/logging.html#handler-objects
+            for handler in getattr(logger, "handlers", []):
+                for f in list(handler.filters):
+                    if isinstance(f, LevelFilter):
+                        #print(f"Removing {f} from {logger_name}")
+                        handler.removeFilter(f)
+
     def __new__(cls, levels, **kwargs):
         levels = levels or ""
         loggers = dict(Logger.manager.loggerDict)

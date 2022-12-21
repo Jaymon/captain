@@ -5,6 +5,8 @@ import textwrap
 from collections import defaultdict
 import re
 
+from datatypes import ArgvParser as UnknownParser
+
 from .compat import *
 from . import environ
 from .logging import QuietFilter
@@ -78,7 +80,6 @@ class QuietAction(argparse.Action):
     def get_value(self, arg_string):
         """Hack only supported by our custom ArgumentParser"""
         if "-q" in self.option_strings:
-            pout.v(arg_string)
             arg_string = "-" + arg_string[2:]
 
         if arg_string.startswith("-"):
@@ -94,7 +95,6 @@ class QuietAction(argparse.Action):
         # this will actually configure the logging
         return QuietFilter(arg_string)
         #return arg_string
-
 
     def parse_args(self, parser, arg_strings):
         """This is a hack to allow `--quiet` and `--quiet DI` to work correctly,
@@ -175,6 +175,20 @@ class ArgumentParser(argparse.ArgumentParser):
 
     @classmethod
     def create_instance(cls, command_class, subcommand_classes=None, **kwargs):
+        """Create an instance of the parser
+
+        This is where all the magic happens. This handles the reflection on each
+        of the Commands and configures all the arguments
+
+        :param command_class: Command, the default command class, usually the class
+            with the name Default
+        :param subcommand_classes: dict, the key is the subcommand name and the value
+            is the Command instance that corresponds to that key
+        :param **kwargs: these kwargs will be passed through to create_common_parser
+            - default_desc: str, the default help description, will be inferred
+              from the command_class docblock if not passed in
+        :returns: ArgumentParser
+        """
         subcommand_classes = subcommand_classes or {}
 
         common_parser = cls.create_common_instance(**kwargs)
@@ -188,10 +202,13 @@ class ArgumentParser(argparse.ArgumentParser):
 
         if command_class:
             parser.add_handler(command_class)
-            rc = command_class.reflect()
 
-            for pa in rc.parseargs():
-                parser.add_argument(*pa[0], **pa[1])
+#             rc = command_class.reflect()
+# 
+#             count = 0
+#             for count, pa in enumerate(rc.parseargs(), 1):
+#                 parser.add_argument(*pa[0], **pa[1])
+#             parser.set_defaults(_arg_count=count)
 
         parser.subcommand_aliases = {}
         if subcommand_classes:
@@ -199,7 +216,6 @@ class ArgumentParser(argparse.ArgumentParser):
             # error in py2.7
             subparsers = parser.add_subparsers(dest="<SUBCOMMAND>")
             subparsers.required = False if command_class else True
-
 
             for subcommand_name, subcommand_class in subcommand_classes.items():
 
@@ -215,8 +231,10 @@ class ArgumentParser(argparse.ArgumentParser):
                 #subparser.set_defaults(callback=subcommand_class().handle)
                 subparser.add_handler(subcommand_class)
 
-                for pa in rc.parseargs():
-                    subparser.add_argument(*pa[0], **pa[1])
+#                 count = 0
+#                 for count, pa in enumerate(rc.parseargs(), 1):
+#                     subparser.add_argument(*pa[0], **pa[1])
+#                 subparser.set_defaults(_arg_count=count)
 
                 # add aliases
                 # you can pass this as aliases=subcommand_class.aliases to
@@ -229,6 +247,28 @@ class ArgumentParser(argparse.ArgumentParser):
 
     @classmethod
     def create_common_instance(cls, **kwargs):
+        """Creates the common Parser that all other parsers will use as a base
+
+        This is useful to make sure there are certain flags that can be passed
+        both before and after the subcommand. By default, if you had something like
+        --version, you could do:
+
+            $ script.py --version
+
+        But not:
+
+            $ script.py SUBCOMMAND --version
+
+        This fixes that problem by creating this common instance and using it as
+        a base, the subcommand will inherit the common flags/arguments also, so
+        the flags will work the same way on the left or right side of the SUBCOMMAND
+
+        :param **kwargs:
+            - version: str, the version of the script
+            - quiet: bool, default is True, pass in False if you don't want the 
+              default quiet functionality to be active
+        :returns: ArgumentParser
+        """
         parser = cls(add_help=False)
 
         # !!! you can't have a normal group and mutually exclusive group
@@ -291,7 +331,10 @@ class ArgumentParser(argparse.ArgumentParser):
         return arg_strings
 
     def _parse_known_args(self, arg_strings, namespace):
-        """This and _read_args_from_files() are the two places the arg_strings get
+        """Overridden to add call to _parse_action_args which allows customized
+        actions and makes QuietAction work
+
+        This and _read_args_from_files() are the two places the arg_strings get
         set, I tried everything to override parser functionality but there just isn't
         any other hook, these are the methods I looked at overriding and none of them
         provided an override opportunity to get me what I needed:
@@ -312,13 +355,24 @@ class ArgumentParser(argparse.ArgumentParser):
         return args, unknown_args
 
     def _read_args_from_files(self, arg_strings):
+        """Overridden to add call to _parse_action_args which allows customized
+        actions and makes QuietAction work"""
         arg_strings = super(ArgumentParser, self)._read_args_from_files(arg_strings)
         arg_strings = self._parse_action_args(arg_strings)
         return arg_strings
 
     def parse_handle_args(self, argv):
         """This is our hook to parse all the arguments and get the values that will
-        ulimately be passed to the handle() method"""
+        ulimately be passed to the handle() method
+
+        By the time this method is called, all the argument classes have been setup,
+        all the defined arguments are actually configured in .create_instance
+
+        :param argv: list, a list of arguments to parse (see sys.argv for the format)
+        :returns: tuple, (argparse parsed arguments instance, list of args to pass
+            to the handle method as *args, dict of kwargs to pass to the handle
+            method as **kwargs)
+        """
         unknown_args = []
         unknown_kwargs = {}
 
@@ -333,26 +387,31 @@ class ArgumentParser(argparse.ArgumentParser):
         if parsed_unknown:
             unknown_kwargs = UnknownParser(parsed_unknown)
             unknown_args = unknown_kwargs.pop("*", [])
+            unknown_kwargs = unknown_kwargs.unwrap()
 
-            if unknown_args and not parsed._has_handle_args:
-                # we parse again with the more restrictive parser to raise the error
-                self.parse_args(argv)
+            if parsed._arg_count > 0:
 
-            if unknown_kwargs and not parsed._has_handle_kwargs:
-                # we parse again with the more restrictive parser to raise the error
-                self.parse_args(argv)
+                if unknown_args and not parsed._has_handle_args:
+                    # we parse again with the more restrictive parser to raise the error
+                    self.parse_args(argv)
+
+                if unknown_kwargs and not parsed._has_handle_kwargs:
+                    # we parse again with the more restrictive parser to raise the error
+                    self.parse_args(argv)
 
         args = []
-        tentative_kwargs = dict(vars(parsed)) # convert Namespace instance to dict
+        tentative_kwargs = dict(unknown_kwargs)
+        tentative_kwargs.update(dict(vars(parsed))) # convert Namespace instance to dict
 
         # because of how args works, we need to make sure the kwargs are put in correct
         # order to be passed to the function, otherwise our real *args won't make it
         # to the *args variable
         for name in parsed._handle_signature["names"]:
-            args.append(tentative_kwargs.pop(name))
+            if name in tentative_kwargs:
+                args.append(tentative_kwargs.pop(name))
 
         args.extend(unknown_args)
-        tentative_kwargs.update(unknown_kwargs)
+        #tentative_kwargs.update(unknown_kwargs)
 
         # we want to remove any values from the built-in group since we don't
         # want to pass those to the handle method, any value that begins with an 
@@ -368,105 +427,33 @@ class ArgumentParser(argparse.ArgumentParser):
         return parsed, args, kwargs
 
     def add_handler(self, command_class):
+        """Every Command subclass will be added through this method, look at
+        .create_instance to see where this is called
+
+        :param command_class: Command, this is the Command subclass that is going
+            to be added to this parser
+        """
         rc = command_class.reflect()
         sig = rc.method().signature
         c = command_class()
+
+        _arg_count = 0
+        for _arg_count, pa in enumerate(rc.parseargs(), 1):
+            self.add_argument(*pa[0], **pa[1])
+        #subparser.set_defaults(_arg_count=count)
+
         self.set_defaults(
             _command_instance=c,
             _has_handle_args=True if sig["*_name"] else False,
             _has_handle_kwargs=True if sig["**_name"] else False,
             _handle_signature=sig,
+            _arg_count=_arg_count,
         )
 
-    def error(self, message):
-        # compensate for https://bugs.python.org/issue9253#msg186387 in python2
-        if is_py2 and message == "too few arguments":
-            return
-
-        super(ArgumentParser, self).error(message)
-
-
-class UnknownParser(dict):
-    """handle parsing any extra args that are passed from ArgParser.parse_known_args """
-    def __init__(self, args):
-        """
-        :param args: list, the list of extra args returned from parse_known_args
-        :returns: dict, key is the arg name (* for non positional args) and value is
-            a list of found arguments (so --foo 1 --foo 2 is supported). The value is
-            always a list
-        """
-        d = defaultdict(list)
-        i = 0
-        length = len(args)
-        while i < length:
-            if args[i].startswith("-"):
-                s = args[i].lstrip("-")
-                bits = s.split("=", 1)
-                if len(bits) > 1:
-                    key = bits[0]
-                    val = bits[1].strip("\"'")
-                    d[key].append(val)
-
-                else:
-                    if i + 1 < length:
-                        if args[i + 1].startswith("-"):
-                            d[s].append(True)
-
-                        else:
-                            d[s].append(args[i + 1])
-                            i += 1
-
-            else:
-                d["*"].append(args[i])
-
-            i += 1
-
-        super(UnknownParser, self).__init__(d)
-
-    def unwrap(self, ignore_keys=None):
-        """remove list wrapper of any value that has a count of 1
-
-        by default, this returns lists for everything because it has no idea what
-        might have multiple values so it treats everything as if it has multiple values
-        so it can support things like `--foo=1 --foo=2` but that might not be wanted,
-        so this method will return a dict with any value that has a length of one it
-        will remove the list, so `[1]` becomes `1`
-
-        UnknownParse always has array values, let's normalize that so values
-        with only one item contain just that item instead of a list of length 1
-
-        :param ignore_keys: list, keys you don't want to strip of the list even if
-            it only has one element
-        :returns: dict, a dictionary with values unrwapped
-        """
-        ignore_keys = set(ignore_keys or [])
-        ignore_keys.add("*")
-
-        d = {}
-        for k in (k for k in d if (len(d[k]) == 1) and k not in ignore_keys):
-            d[k] = d[k][0]
-        return d
-
-
-class EnvironParser(UnknownParser):
-    def __init__(self, args):
-        super(EnvironParser, self).__init__(args)
-        for k in list(self.keys()):
-            if not re.match(r"^[A-Z0-9_-]+$", k):
-                del self[k]
-
-
-class Extra(object):
-    def __init__(self, args):
-        self.environ = {} # Environ()
-        self.options = {}
-
-        d = UnknownParser(args)
-        for k, v in d.items():
-            # is this en environment variable?
-            if re.match(r"^[A-Z0-9_-]+$", k):
-                self.environ[k] = v[0] if len(v) == 1 else v
-
-            else:
-                self.options[k] = v[0] if len(v) == 1 else v
+#     def error(self, message):
+#         # compensate for https://bugs.python.org/issue9253#msg186387 in python2
+#         if is_py2 and message == "too few arguments":
+#             return
+# 
+#         super(ArgumentParser, self).error(message)
 

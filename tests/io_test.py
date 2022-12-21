@@ -238,6 +238,21 @@ class OutputTest(TestCase):
 
         self.assertNotEqual(r1, r2)
 
+    def test_table_list_of_dicts(self):
+        """https://github.com/Jaymon/captain/issues/65"""
+        ds = [
+            {
+                "foo": 1,
+                "bar": "one",
+            },
+            {
+                "foo": 2,
+                "bar": "two",
+            },
+        ]
+
+        Output().table(ds)
+
     def test_table_rows(self):
         o = Output()
         it = [
@@ -322,5 +337,15 @@ class OutputTest(TestCase):
             for x in range(count):
                 pbar.update(x)
 
+    def test_pluralize(self):
+        """https://github.com/Jaymon/captain/issues/71"""
+        o = Output()
+        self.assertEqual("1 message", o.pluralize(1, "message"))
+        self.assertEqual("10 messages", o.pluralize(10, "message"))
+        self.assertEqual("messages:10", o.pluralize(10, "message", format_str="{desc}:{count}"))
+        self.assertEqual("10 bar", o.pluralize(10, "foo", "bar"))
 
+    def test___call__(self):
+        o = Output()
+        o("this is just a test {}", "foo")
 
