@@ -200,29 +200,3 @@ class ParseArgTest(TestCase):
         args = parser.parse_args(["--footype", "/foo/bar/che"])
         self.assertTrue(args.footype.startswith("HAPPY"))
 
-
-# class NameTest(TestCase):
-#     def test_name(self):
-#         s = Name("FooBar")
-#         self.assertEqual("Foo_Bar", s.underscore())
-#         self.assertEqual("Foo-Bar", s.dash())
-#         a = set(["FooBar", "foobar", "Foo_Bar", "foo_bar", "Foo-Bar", "foo-bar"])
-#         self.assertEqual(a, s.all())
-# 
-#         s = Name("Foo-Bar")
-#         self.assertEqual("Foo_Bar", s.underscore())
-#         self.assertEqual("Foo-Bar", s.dash())
-#         a = set(["Foo_Bar", "foo_bar", "Foo-Bar", "foo-bar"])
-#         self.assertEqual(a, s.all())
-# 
-#         s = Name("Foo_Bar")
-#         self.assertEqual("Foo_Bar", s.underscore())
-#         self.assertEqual("Foo-Bar", s.dash())
-#         a = set(["Foo_Bar", "foo_bar", "Foo-Bar", "foo-bar"])
-#         self.assertEqual(a, s.all())
-# 
-#         s = Name("Foo_bar")
-#         self.assertEqual("Foo_bar", s.underscore())
-#         self.assertEqual("Foo-bar", s.dash())
-#         a = set(["Foo_bar", "foo_bar", "Foo-bar", "foo-bar"])
-#         self.assertEqual(a, s.all())

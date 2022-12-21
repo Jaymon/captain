@@ -203,13 +203,6 @@ class ArgumentParser(argparse.ArgumentParser):
         if command_class:
             parser.add_handler(command_class)
 
-#             rc = command_class.reflect()
-# 
-#             count = 0
-#             for count, pa in enumerate(rc.parseargs(), 1):
-#                 parser.add_argument(*pa[0], **pa[1])
-#             parser.set_defaults(_arg_count=count)
-
         parser.subcommand_aliases = {}
         if subcommand_classes:
             # if dest isn't passed in you get "argument None is required" on
@@ -230,11 +223,6 @@ class ArgumentParser(argparse.ArgumentParser):
                 )
                 #subparser.set_defaults(callback=subcommand_class().handle)
                 subparser.add_handler(subcommand_class)
-
-#                 count = 0
-#                 for count, pa in enumerate(rc.parseargs(), 1):
-#                     subparser.add_argument(*pa[0], **pa[1])
-#                 subparser.set_defaults(_arg_count=count)
 
                 # add aliases
                 # you can pass this as aliases=subcommand_class.aliases to
@@ -449,11 +437,4 @@ class ArgumentParser(argparse.ArgumentParser):
             _handle_signature=sig,
             _arg_count=_arg_count,
         )
-
-#     def error(self, message):
-#         # compensate for https://bugs.python.org/issue9253#msg186387 in python2
-#         if is_py2 and message == "too few arguments":
-#             return
-# 
-#         super(ArgumentParser, self).error(message)
 

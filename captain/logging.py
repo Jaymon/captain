@@ -53,7 +53,6 @@ stderr = getLogger('stderr.{}'.format(modname))
 if len(stderr.handlers) == 0:
     stderr.propagate = False
     stderr.setLevel(DEBUG)
-    #errlh = StreamHandler(stream=InlineStream(sys.stderr))
     errlh = StreamHandler(stream=InlineStream("stderr"))
     errlh.setFormatter(log_formatter)
     stderr.addHandler(errlh)
@@ -63,7 +62,6 @@ stdout = getLogger('stdout.{}'.format(modname))
 if len(stdout.handlers) == 0:
     stdout.propagate = False
     stdout.setLevel(DEBUG)
-    #outlh = StreamHandler(stream=InlineStream(sys.stdout))
     outlh = StreamHandler(stream=InlineStream("stdout"))
     outlh.setFormatter(log_formatter)
     stdout.addHandler(outlh)
@@ -75,11 +73,7 @@ class LevelFilter(object):
         self.__level = NOTSET
 
     def filter(self, logRecord):
-        #pout.v(logRecord.levelname[0], self.levels)
         return logRecord.levelname[0].upper() not in self.levels
-        #print(logRecord.levelname[0].upper())
-        #print(self.levels)
-        #return logRecord.levelname[0].upper() in self.levels
 
 
 class QuietFilter(String):

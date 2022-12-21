@@ -4,7 +4,6 @@ from __future__ import unicode_literals, division, print_function, absolute_impo
 from . import testdata, TestCase, FileScript, ModuleScript
 
 
-
 class CommandTest(TestCase):
     def test_arguments(self):
         c = FileScript([
