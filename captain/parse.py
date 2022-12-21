@@ -5,7 +5,11 @@ import textwrap
 from collections import defaultdict
 import re
 
-from datatypes import ArgvParser as UnknownParser
+from datatypes import (
+    ArgvParser as UnknownParser,
+    NamingConvention,
+    Namespace,
+)
 
 from .compat import *
 from . import environ
@@ -220,6 +224,7 @@ class ArgumentParser(argparse.ArgumentParser):
                     help=desc,
                     description=desc,
                     conflict_handler="resolve",
+                    aliases=subcommand_class.aliases,
                 )
                 #subparser.set_defaults(callback=subcommand_class().handle)
                 subparser.add_handler(subcommand_class)
@@ -227,8 +232,8 @@ class ArgumentParser(argparse.ArgumentParser):
                 # add aliases
                 # you can pass this as aliases=subcommand_class.aliases to
                 # .add_parser() in py3+ but not in py2
-                for a in subcommand_class.aliases:
-                    parser.subcommand_aliases[a] = subcommand_name
+#                 for a in subcommand_class.aliases:
+#                     parser.subcommand_aliases[a] = subcommand_name
                     #subparsers._name_parser_map[a] = subparser
 
         return parser
@@ -391,6 +396,15 @@ class ArgumentParser(argparse.ArgumentParser):
         tentative_kwargs = dict(unknown_kwargs)
         tentative_kwargs.update(dict(vars(parsed))) # convert Namespace instance to dict
 
+        # re-organize to be in defined groups. If you set a group then you have
+        # to use the group in the signature because this makes sure the
+        # arguments are grouped into their defined groups
+        for groupname, names in parsed._groups.items():
+            for name in names:
+                if name in tentative_kwargs:
+                    tentative_kwargs.setdefault(groupname, Namespace())
+                    tentative_kwargs[groupname][name] = tentative_kwargs.pop(name)
+
         # because of how args works, we need to make sure the kwargs are put in correct
         # order to be passed to the function, otherwise our real *args won't make it
         # to the *args variable
@@ -416,7 +430,9 @@ class ArgumentParser(argparse.ArgumentParser):
 
     def add_handler(self, command_class):
         """Every Command subclass will be added through this method, look at
-        .create_instance to see where this is called
+        .create_instance to see where this is called and parse_handle_args to see
+        how the arguments added in this method are parsed and prepared to be sent
+        to the handle method
 
         :param command_class: Command, this is the Command subclass that is going
             to be added to this parser
@@ -425,10 +441,23 @@ class ArgumentParser(argparse.ArgumentParser):
         sig = rc.method().signature
         c = command_class()
 
+        groups = {} # holds the group parser instance
+        _groups = {} # holds the arguments that belong to each group
+
         _arg_count = 0
         for _arg_count, pa in enumerate(rc.parseargs(), 1):
-            self.add_argument(*pa[0], **pa[1])
-        #subparser.set_defaults(_arg_count=count)
+            if pa.group:
+                group = NamingConvention(pa.group)
+                groupname = group.varname()
+                if groupname not in groups:
+                    groups[groupname] = self.add_argument_group(group)
+                    _groups[groupname] = []
+
+                groups[groupname].add_argument(*pa[0], **pa[1])
+                _groups[groupname].append(pa.name)
+
+            else:
+                self.add_argument(*pa[0], **pa[1])
 
         self.set_defaults(
             _command_instance=c,
@@ -436,5 +465,6 @@ class ArgumentParser(argparse.ArgumentParser):
             _has_handle_kwargs=True if sig["**_name"] else False,
             _handle_signature=sig,
             _arg_count=_arg_count,
+            _groups=_groups,
         )
 

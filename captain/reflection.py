@@ -159,8 +159,10 @@ class ParseArg(tuple):
         return self[1]
 
     def __new__(cls, *names, **kwargs):
+        group = kwargs.pop("group", None)
         instance = super().__new__(cls, [list(names), kwargs])
         instance.set_names()
+        instance.group = group
         return instance
 
     def is_positional(self):

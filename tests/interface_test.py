@@ -86,6 +86,23 @@ class CommandTest(TestCase):
         r = s.run("foo --bar 'bar value'")
         self.assertTrue("bar: bar value" in r)
 
+    def test_io_fluid_interface(self):
+        s = FileScript([
+            "class Default(Command):",
+            "    def handle(self, bar):",
+            "        self.out(f'bar: {bar}')",
+        ])
+        r = s.run("--bar 1")
+        self.assertTrue("bar: 1" in r)
+
+        s = FileScript([
+            "class Default(Command):",
+            "    def handle(self, bar):",
+            "        self.foobar(f'bar: {bar}')",
+        ])
+        with self.assertRaises(RuntimeError):
+            r = s.run("--bar 1")
+
 
 class CaptainTest(TestCase):
     def test_version(self):

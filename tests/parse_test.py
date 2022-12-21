@@ -289,3 +289,37 @@ class ArgumentParserTest(TestCase):
         r = s.run("--help foo")
         self.assertTrue("--quiet" in r)
 
+    def test_group_simple(self):
+        s = FileScript([
+            "class Default(Command):",
+            "    @arg('--foo', type=int, group='bar')",
+            "    @arg('--che', action='store_true', group='bar')",
+            "    @arg('--baz', type=int)",
+            "    def handle(self, bar, baz):",
+            "        print('bar group: {}, baz: {}'.format(bar, baz))",
+        ])
+
+        r = s.run("--foo=1 --che --baz=3")
+        self.assertTrue("bar group: {'foo': 1, 'che': True}, baz: 3" in r)
+
+        r = s.run("--help")
+        self.assertTrue("bar:" in r)
+
+    def test_group_multiword(self):
+        s = FileScript([
+            "class Default(Command):",
+            "    @arg('--foo', type=int, group='Bar Bam')",
+            "    @arg('--che', action='store_true', group='Bar Bam')",
+            "    def handle(self, bar_bam):",
+            "        print('bar_bam group: {}'.format(bar_bam))",
+            "        print('bar_bam foo: {}'.format(bar_bam.foo))",
+            "        print('bar_bam che: {}'.format(bar_bam.che))",
+        ])
+
+        r = s.run("--foo=1 --che")
+        self.assertTrue("bar_bam group: {'foo': 1, 'che': True}" in r)
+        self.assertTrue("bar_bam foo: 1" in r)
+        self.assertTrue("bar_bam che: True" in r)
+
+        r = s.run("--help")
+        self.assertTrue("Bar Bam:" in r)
