@@ -26,7 +26,6 @@ class Captain(object):
     captain/__init__.py you will see it basically assigns handle to an instance of
     this class
     """
-
     instance = None
     """the singleton instance created/returned with get_instance()"""
 
@@ -53,6 +52,11 @@ class Captain(object):
         return cls.instance
 
     def create_parser(self):
+        """Create our custom parser that will merge the Command.handle method signature
+        and the argument decorator configuration
+
+        :returns: parse.ArgumentParser instance, or whatever class is in self.parser_class
+        """
         subcommand_classes = dict(self.commands)
         command_class = subcommand_classes.pop("default", subcommand_classes.pop("main", None))
         return self.parser_class.create_instance(
@@ -75,9 +79,7 @@ class Captain(object):
         """
         parser = self.create_parser()
         parsed, args, kwargs = parser.parse_handle_args(argv)
-        c = parsed._command_instance
-        c.parsed = parsed
-        ret_code = c.run(*args, **kwargs)
+        ret_code = parsed._command_instance.run(*args, **kwargs)
         return ret_code
 
     def handle(self):
@@ -199,8 +201,21 @@ class Command(object, metaclass=CommandFinder):
         return cb
 
     def run(self, *args, **kwargs):
-        """Wrapper around the internal handle methods so you can easily do something
-        before or after the handle method"""
+        """Wrapper around the internal handle methods, this should be considered the
+        correct external method to call
+
+        this could be easily overridden so you can easily do something before or after
+        the handle calls
+
+        The handle methods should be considered "internal" to the Captain class
+        that are interacted with through this method
+
+        :param *args: all positional values passed in through the command line passed through
+            any configured parsers
+        :param **kwargs: all the flag values passed in through the command line passed through
+            any configured parsers
+        :returns: int, the return code
+        """
         try:
             ret_code = self.handle(*args, **kwargs)
 

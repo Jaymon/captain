@@ -226,15 +226,7 @@ class ArgumentParser(argparse.ArgumentParser):
                     conflict_handler="resolve",
                     aliases=subcommand_class.aliases,
                 )
-                #subparser.set_defaults(callback=subcommand_class().handle)
                 subparser.add_handler(subcommand_class)
-
-                # add aliases
-                # you can pass this as aliases=subcommand_class.aliases to
-                # .add_parser() in py3+ but not in py2
-#                 for a in subcommand_class.aliases:
-#                     parser.subcommand_aliases[a] = subcommand_name
-                    #subparsers._name_parser_map[a] = subparser
 
         return parser
 
@@ -394,7 +386,7 @@ class ArgumentParser(argparse.ArgumentParser):
 
         args = []
         tentative_kwargs = dict(unknown_kwargs)
-        tentative_kwargs.update(dict(vars(parsed))) # convert Namespace instance to dict
+        tentative_kwargs.update(dict(vars(parsed))) # merge Namespace into our dict
 
         # re-organize to be in defined groups. If you set a group then you have
         # to use the group in the signature because this makes sure the
@@ -425,6 +417,9 @@ class ArgumentParser(argparse.ArgumentParser):
             # we filter out private (start with _) and placeholder (surrounded by <>) keys
             if not k.startswith("_") and not k.startswith("<"):
                 kwargs[k] = v
+
+        # set any instance variables the command instance should have
+        parsed._command_instance.parsed = parsed
 
         return parsed, args, kwargs
 
