@@ -10,7 +10,7 @@ from . import exception
 from .exception import Stop, Error
 
 
-__version__ = "4.3.0"
+__version__ = "4.4.0"
 
 
 # get rid of "No handler found" warnings (cribbed from requests)

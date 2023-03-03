@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
 
-from decorators import classproperty
+from datatypes import classproperty
 
 from .compat import *
 

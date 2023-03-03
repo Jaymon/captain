@@ -32,7 +32,7 @@ kwargs = dict(
 )
 
 kwargs["tests_require"] = []
-kwargs["install_requires"] = ["datatypes", "decorators"]
+kwargs["install_requires"] = ["datatypes"]
 #kwargs["extras_require"] = {"extra_name": []}
 
 
