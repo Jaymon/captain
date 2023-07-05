@@ -323,3 +323,15 @@ class ArgumentParserTest(TestCase):
 
         r = s.run("--help")
         self.assertTrue("Bar Bam:" in r)
+
+    def test_parse_undefined_normalization(self):
+        s = FileScript([
+            "class Default(Command):",
+            "    def handle(self, **kwargs):",
+            "        print('kwargs: {}'.format(kwargs))"
+        ])
+
+        r = s.run("--foo-bar 1")
+        self.assertTrue("'foo_bar':" in r)
+        self.assertFalse("'foo-bar':" in r)
+

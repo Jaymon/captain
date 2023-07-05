@@ -370,7 +370,10 @@ class ArgumentParser(argparse.ArgumentParser):
         parsed, parsed_unknown = self.parse_known_args(argv)
 
         if parsed_unknown:
-            unknown_kwargs = UnknownParser(parsed_unknown)
+            unknown_kwargs = UnknownParser(
+                parsed_unknown,
+                hyphen_to_underscore=True,
+            )
             unknown_args = unknown_kwargs.pop("*", [])
             unknown_kwargs = unknown_kwargs.unwrap()
 
