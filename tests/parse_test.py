@@ -1,10 +1,83 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
 
 from captain.compat import *
 from captain.logging import QuietFilter
+from captain.parse import Router
+from captain.call import Command
 
 from . import testdata, TestCase, FileScript, ModuleScript
+
+
+
+
+class RouterTest(TestCase):
+
+    def test_default_only(self):
+        p = self.create_module([
+            "from captain import Command",
+            "",
+            "class Default(Command):",
+            "    def handle(self):",
+            "        self.output.out('default')",
+        ])
+
+        r = Router(command_prefixes=[p])
+
+        pout.v(r.parser)
+
+
+    def test_prefixes(self):
+        p = self.create_modules({
+            "far.commands": {
+                "foo": [
+                    "from captain import Command",
+                    "",
+                    "class Default(Command):",
+                    "    def handle(self):",
+                    "        self.output.out('foo')",
+                    "",
+                    "class Bar(Command):",
+                    "    def handle(self):",
+                    "        self.output.out('foo bar')",
+                ],
+                "__init__": [
+                    "from captain import Command",
+                    "",
+                    "class Default(Command):",
+                    "    def handle(self):",
+                    "        self.output.out('foo')",
+                ],
+                "che": {
+                    "__init__": [
+                        "from captain import Command",
+                        "",
+                        "class Default(Command):",
+                        "    def handle(self):",
+                        "        self.output.out('che')",
+                    ],
+                    "boo": [
+                        "from captain import Command",
+                        "",
+                        "class Default(Command):",
+                        "    def handle(self):",
+                        "        self.output.out('che boo')",
+                    ],
+                },
+            },
+#             "cli": [
+#                 "from captain import Application",
+#                 "application = Application()",
+#                 "application()",
+#             ],
+        })
+
+        pout.v(p)
+
+        r = Router(Command, [], paths=[p])
+
+
+
+
 
 
 class ArgumentParserTest(TestCase):

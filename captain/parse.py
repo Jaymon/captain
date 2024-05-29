@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
 import argparse
 import textwrap
 from collections import defaultdict
@@ -12,7 +11,7 @@ from datatypes import (
 )
 
 from .compat import *
-from . import environ
+from .config import environ
 from .logging import QuietFilter
 
 
@@ -30,16 +29,20 @@ class QuietAction(argparse.Action):
 
     DEST = "<QUIET_INJECT>"
 
-    HELP_QUIET = ''.join([
-        'Selectively turn off [D]ebug, [I]nfo, [W]arning, [E]rror, or [C]ritical, ',
-        '(--quiet=DI means suppress Debug and Info), ',
-        'use - to invert (--quiet=-EW means suppress everything but Error and warning), ',
-        'use + to change default (--quiet=+D means remove D from default value)',
+    HELP_QUIET = "".join([
+        "Selectively turn off ",
+        "[D]ebug, [I]nfo, [W]arning, [E]rror, or [C]ritical, ",
+        "(--quiet=DI means suppress Debug and Info), ",
+        "use - to invert ",
+        "(--quiet=-EW means suppress everything but Error and warning), ",
+        "use + to change default ",
+        "(--quiet=+D means remove D from default value)",
     ])
 
-    HELP_Q_LOWER = ''.join([
-        'Turn off [D]ebug (-q), [I]nfo (-qq), [W]arning (-qqq), [E]rror (-qqqq), ',
-        'and [C]ritical (-qqqqq)',
+    HELP_Q_LOWER = "".join([
+        "Turn off ",
+        "[D]ebug (-q), [I]nfo (-qq), [W]arning (-qqq), [E]rror (-qqqq), ",
+        "and [C]ritical (-qqqqq)",
     ])
 
     def __init__(self, option_strings, dest, nargs=None, **kwargs):
@@ -55,7 +58,7 @@ class QuietAction(argparse.Action):
             kwargs.setdefault("default", environ.QUIET_DEFAULT)
             kwargs.setdefault("help", self.HELP_QUIET)
 
-        super(QuietAction, self).__init__(option_strings, self.DEST, **kwargs)
+        super().__init__(option_strings, self.DEST, **kwargs)
 
     def order(self, options):
         o = []
@@ -89,16 +92,19 @@ class QuietAction(argparse.Action):
         if arg_string.startswith("-"):
             # if we have a subtract then just remove those from being suppressed
             # so -E would only show errors
-            arg_string = self.order(set(self.OPTIONS) - set(arg_string[1:].upper()))
+            arg_string = self.order(
+                set(self.OPTIONS) - set(arg_string[1:].upper())
+            )
 
         elif arg_string.startswith("+"):
             # if we have an addition then just remove those from default
             # so if default="D" then +D would leave default=""
-            arg_string = self.order(set(self.default) - set(arg_string[1:].upper()))
+            arg_string = self.order(
+                set(self.default) - set(arg_string[1:].upper())
+            )
 
         # this will actually configure the logging
         return QuietFilter(arg_string)
-        #return arg_string
 
     def parse_args(self, parser, arg_strings):
         """This is a hack to allow `--quiet` and `--quiet DI` to work correctly,
@@ -173,6 +179,355 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
 
         text = "\n".join(lines)
         return text
+
+
+
+
+
+from .call import Command
+from datatypes import (
+    Dirpath,
+    ReflectModule,
+    ReflectPath,
+    ReflectName,
+    DictTree,
+)
+
+
+class Router(object):
+    def __init__(self, command_prefixes=None, paths=None, **kwargs):
+        #self.command_class = command_class
+        self.command_prefixes = command_prefixes or []
+        self.paths = paths or [Dirpath.cwd()]
+
+        self.parser_class = kwargs.get("parser_class", ArgumentParser)
+        self.command_class = kwargs.get("command_class", Command)
+
+        self.parser = self.create_parser(**kwargs)
+
+    def get_tree_parser(self, subcommand, tree, common_parser):
+        created = False
+        if "" not in tree:
+            created = True
+            tree[""] = {
+                "parser": self.parser_class(
+                    parents=[common_parser],
+                    conflict_handler="resolve",
+                ),
+            }
+
+        if not tree[""]["parser"]:
+            created = True
+            tree[""]["parser"] = self.create_command_parser(
+                tree[""]["command_class"],
+                common_parser,
+            )
+
+        if created:
+            if subcommand and parent_parser:
+                subparsers = parent_parser.add_subparsers()
+
+                desc = kwargs.get("default_desc", command_class.reflect().desc)
+                parser = self.parser_class(
+                    description=desc,
+                    parents=[common_parser],
+                    conflict_handler="resolve",
+                )
+
+                parser.set_defaults(command_class=command_class)
+
+
+                subparser = subparsers.add_parser(
+                    subcommand_name,
+                    parents=[common_parser],
+                    help=desc,
+                    description=desc,
+                    conflict_handler="resolve",
+                    aliases=subcommand_class.aliases,
+                )
+                parser.set_defaults(command_class=command_class)
+
+
+
+
+        return tree[""]["parser"]
+
+
+    def create_parsers(self, subcommands, common_parser):
+        parsers = []
+        tree = self.pathfinder
+
+        for subcommand in subcommands:
+            if subcommand:
+                tree = tree[subcommand]
+
+            subcommand_info = tree[""]
+            parser = subcommand_info["parser"]
+            if not parser:
+                desc = ""
+                command_class = subcommand_info["command_class"]
+                if command_class:
+                    desc = command_class.reflect().desc
+
+                if tp := tree.tree_parent:
+                    subparsers = tp[""]["parser"].add_subparsers()
+                    parser = subparsers.add_parser(
+                        subcommand,
+                        parents=[common_parser],
+                        help=desc,
+                        description=desc,
+                        conflict_handler="resolve",
+                        #aliases=command_class.aliases,
+                    )
+
+                else:
+                    parser = self.parser_class(
+                        description=desc,
+                        parents=[common_parser],
+                        conflict_handler="resolve",
+                    )
+
+                parser.set_defaults(command_class=command_class)
+                subcommand_info["parser"] = parser
+
+            parsers.append(parser)
+
+        return parsers
+
+    def create_parser(self, **kwargs):
+        self.load_commands(**kwargs)
+        self.pathfinder = self.create_pathfinder(**kwargs)
+
+        #pout.v(self.pathfinder)
+
+        common_parser = self.create_common_parser(**kwargs)
+        for subcommands, subcommand_info in self.pathfinder.leaves():
+            # tree leaves should always end with "" with the "" key containing
+            # the subcommand information
+#             if subcommands[-1] == "":
+#                 subcommands = subcommands[:-1]
+# 
+#             else:
+#                 raise ValueError(
+#                     "pathfinder leaf path did not end with empty string"
+#                 )
+
+            self.create_parsers(subcommands, common_parser)
+
+        return self.pathfinder[""]["parser"]
+
+            #pout.v(subcommands, d)
+
+
+#             tree = self.pathfinder
+#             tree_subcommand = ""
+#             parent_parser = None
+# 
+#             for subcommand in subcommands:
+#                 parent_parser = self.get_tree_parser(
+#                     tree_subcommand,
+#                     tree,
+#                     common_parser,
+#                     parent_parser
+#                 )
+#                 tree = tree[subcommand]
+#                 tree_subcommand = subcommand
+# 
+# 
+# 
+# 
+#             pout.v(subcommands, d)
+
+
+#         for k, v in self.pathfinder.items():
+#             if k == "":
+#                 # this is a root parser
+# 
+#             else:
+
+    def create_parent_parser(self, common_parser, **kwargs):
+        parser = self.parser_class(
+            parents=[common_parser],
+            conflict_handler="resolve",
+        )
+        #subparsers.required = False if command_class else True
+        return parser
+
+    def create_command_parser(self, command_class, common_parser, **kwargs):
+        """Create an instance of the parser
+
+        This is where all the magic happens. This handles the reflection on
+        each of the Commands and configures all the arguments
+
+        :param command_class: Command, the default command class, usually the
+            class with the name Default
+        :param subcommand_classes: dict, the key is the subcommand name and the
+            value is the Command instance that corresponds to that key
+        :param **kwargs: these kwargs will be passed through to
+        create_common_parser
+            - default_desc: str, the default help description, will be inferred
+              from the command_class docblock if not passed in
+        :returns: ArgumentParser
+        """
+        desc = kwargs.get("default_desc", command_class.reflect().desc)
+        parser = self.parser_class(
+            description=desc,
+            parents=[common_parser],
+            conflict_handler="resolve",
+        )
+
+        parser.set_defaults(command_class=command_class)
+        return parser
+
+#         if command_class:
+#             parser.add_handler(command_class)
+# 
+#         parser.subcommand_aliases = {}
+#         if subcommand_classes:
+#             # if dest isn't passed in you get "argument None is required" on
+#             # error in py2.7
+#             subparsers = parser.add_subparsers(dest="<SUBCOMMAND>")
+#             subparsers.required = False if command_class else True
+# 
+#             for subcommand_name, subcommand_class in subcommand_classes.items():
+# 
+#                 rc = subcommand_class.reflect()
+#                 desc = rc.desc
+#                 subparser = subparsers.add_parser(
+#                     subcommand_name,
+#                     parents=[common_parser],
+#                     help=desc,
+#                     description=desc,
+#                     conflict_handler="resolve",
+#                     aliases=subcommand_class.aliases,
+#                 )
+#                 subparser.add_handler(subcommand_class)
+# 
+#         return parser
+
+
+    def create_common_parser(self, **kwargs):
+        """Creates the common Parser that all other parsers will use as a base
+
+        This is useful to make sure there are certain flags that can be passed
+        both before and after the subcommand. By default, if you had something
+        like
+        --version, you could do:
+
+            $ script.py --version
+
+        But not:
+
+            $ script.py SUBCOMMAND --version
+
+        This fixes that problem by creating this common instance and using it
+        as a base, the subcommand will inherit the common flags/arguments also,
+        so the flags will work the same way on the left or right side of the
+        SUBCOMMAND
+
+        :param **kwargs:
+            - version: str, the version of the script
+            - quiet: bool, default is True, pass in False if you don't want the 
+              default quiet functionality to be active
+        :returns: ArgumentParser
+        """
+        parser = self.parser_class(add_help=False)
+        # !!! you can't have a normal group and mutually exclusive group
+
+        version = kwargs.get("version", "<TODO>")
+        if version:
+            parser.add_argument(
+                "--version", "-V",
+                action='version',
+                version="%(prog)s {}".format(version)
+            )
+
+        quiet = kwargs.get("quiet", True)
+        if quiet:
+            # https://docs.python.org/3/library/argparse.html#mutual-exclusion
+            me_group = parser.add_mutually_exclusive_group()
+
+            me_group.add_argument(
+                "--quiet", "-Q",
+                action=QuietAction,
+            )
+
+            me_group.add_argument(
+                "-q",
+                action=QuietAction,
+            )
+
+        return parser
+
+
+    def _create_parser(self):
+        pass
+
+
+    def load_commands(self, **kwargs):
+        self.command_modules = {}
+        seen = set(self.command_modules)
+
+        if self.command_prefixes:
+            for command_prefix in self.command_prefixes:
+                rm = ReflectModule(command_prefix)
+                for m in rm.get_modules():
+                    if m.__name__ not in seen:
+                        self.command_modules[m.__name__] = m
+                        seen.add(m.__name__)
+
+        else:
+            if environ.AUTODISCOVER:
+                for path in self.paths:
+                    rp = ReflectPath(path)
+                    for m in rp.find_modules(environ.AUTODISCOVER_NAME):
+                        if m.__name__ not in seen:
+                            rn = ReflectName(m.__name__)
+                            command_prefix = rn.absolute_module_name(
+                                environ.AUTODISCOVER_NAME
+                            )
+
+                            if command_prefix not in seen:
+                                self.command_prefixes.append(command_prefix)
+                                seen.add(command_prefix)
+
+                            self.command_modules[m.__name__] = m
+                            seen.add(m.__name__)
+
+    def create_pathfinder(self, **kwargs):
+        """
+        The pathfinder is a DictTree that will always have a "" key to
+        represent the command class for that particular tree
+        """
+        pathfinder = DictTree()
+        command_classes = self.command_class.command_classes
+
+        for classpath, command_class in command_classes.items():
+            rn = ReflectName(classpath)
+            subcommands = []
+
+            for command_prefix in self.command_prefixes:
+                if classpath.startswith(command_prefix):
+                    subcommands = rn.relative_module_parts(command_prefix)
+                    break
+
+            if rn.class_name == "Default":
+                subcommands.append("")
+
+            else:
+                subcommands.extend(rn.class_names)
+                subcommands.append("")
+
+            subcommands = [sc.lower() for sc in subcommands]
+            pathfinder.set(
+                subcommands,
+                {
+                    "command_class": command_class,
+                    "parser": None,
+                },
+            )
+
+            return pathfinder
 
 
 class ArgumentParser(argparse.ArgumentParser):

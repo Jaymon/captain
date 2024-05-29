@@ -6,7 +6,7 @@ import testdata
 from testdata.test import TestCase
 
 from captain.compat import *
-from captain import Captain, Command
+from captain import Application as Captain, Command
 from captain.reflection import ReflectMethod, ReflectCommand
 
 
