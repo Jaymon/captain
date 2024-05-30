@@ -12,18 +12,41 @@ from . import testdata, TestCase, FileScript, ModuleScript
 
 class RouterTest(TestCase):
 
-    def test_default_only(self):
+    def test_only_default(self):
         p = self.create_module([
             "from captain import Command",
             "",
             "class Default(Command):",
-            "    def handle(self):",
+            "    def handle(self, *args):",
             "        self.output.out('default')",
         ])
 
         r = Router(command_prefixes=[p])
 
-        pout.v(r.parser)
+
+        #pout.v(r.parser)
+        pout.b(5)
+        r.parser.parse_args([])
+
+
+    def test_only_subcommands(self):
+        p = self.create_module([
+            "from captain import Command",
+            "",
+            "class Foo(Command):",
+            "    def handle(self, *args, **kwargs):",
+            "        self.output.out('foo')",
+            "",
+            "class Bar(Command):",
+            "    def handle(self, *args, **kwargs):",
+            "        self.output.out('bar')",
+        ])
+
+        r = Router(command_prefixes=[p])
+
+        parsed = r.parser.parse_args(["foo", "--one=1", "--two=2"])
+        #pout.v(parsed._command_args, parsed._command_kwargs)
+        pout.v(parsed)
 
 
     def test_prefixes(self):
