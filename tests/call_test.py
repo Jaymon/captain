@@ -50,7 +50,9 @@ class CommandTest(TestCase):
         a = set([
             "fooone",
             "Foo_One",
+            "foo_one",
             "Foo-One",
+            "foo-one",
             "foo_one",
             "FooOne"
         ])

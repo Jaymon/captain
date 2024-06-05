@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
+import subprocess
 
-from . import testdata, TestCase, FileScript, ModuleScript
+from . import TestCase, FileScript
 
 
 class ApplicationTest(TestCase):
     def test_version(self):
-        c = FileScript().captain
+        c = FileScript()
+        self.assertTrue("0.0.1" in c.run("--version"))
 
-        self.assertEqual("0.0.1", c.version)
-
-    def test_handle(self):
+    def test_handle_1(self):
         s = FileScript(subcommands=True)
         s.run("--bar=1 --che=2")
 
@@ -41,10 +41,10 @@ class ApplicationTest(TestCase):
         self.assertTrue("success foo" in r)
 
         # test error
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(subprocess.CalledProcessError):
             r = s.run("1")
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(subprocess.CalledProcessError):
             r = s.run("1 --bar=1")
 
     def test_handle_sub_no_default(self):
@@ -57,7 +57,7 @@ class ApplicationTest(TestCase):
         r = s.run("foo --bar=1")
         self.assertTrue("success foo" in r)
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(subprocess.CalledProcessError):
             s.run()
 
     def test_handle_error(self):
@@ -68,10 +68,10 @@ class ApplicationTest(TestCase):
             "",
             "class Bar(Command):",
             "    def handle(self, **kwargs):",
-            "        raise self.Stop(0, 'stop message')"
+            "        raise exception.Stop(0, 'stop message')"
         ])
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(subprocess.CalledProcessError):
             r = s.run("foo")
 
         r = s.run("bar")
@@ -87,9 +87,6 @@ class ApplicationTest(TestCase):
             "    def handle(self, **kwargs):",
             "        self.output.out('foo_two')",
         ])
-
-        #r = s.run("")
-        #r = s.run("--help")
 
         r = s.run("foo-one")
         self.assertTrue("foo_one" in r)

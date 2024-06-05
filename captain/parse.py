@@ -3,6 +3,7 @@ import argparse
 import textwrap
 from collections import defaultdict
 import re
+import sys
 
 from datatypes import (
     ArgvParser as UnknownParser,
@@ -239,12 +240,14 @@ class Router(object):
             subcommand_info = tree[""]
             parser = subcommand_info["parser"]
             if not parser:
+                version = ""
                 desc = ""
                 aliases = []
                 command_class = subcommand_info["command_class"]
                 if command_class:
                     desc = command_class.reflect().desc
                     aliases = command_class.aliases
+                    version = command_class.version
 
                 if tp := tree.tree_parent:
                     subparsers = tp[""]["subparsers"]
@@ -266,6 +269,13 @@ class Router(object):
                         description=desc,
                         parents=[common_parser],
                         conflict_handler="resolve",
+                    )
+
+                if version:
+                    parser.add_argument(
+                        "--version", "-V",
+                        action='version',
+                        version="%(prog)s {}".format(version)
                     )
 
                 parser.set_defaults(_command_class=command_class)
@@ -314,7 +324,11 @@ class Router(object):
         parser = self.parser_class(add_help=False)
         # !!! you can't have a normal group and mutually exclusive group
 
-        version = kwargs.get("version", "<TODO>")
+        version = kwargs.get("version", "")
+        if not version:
+            if m := sys.modules.get("__main__"):
+                version = getattr(m, "__version__", "")
+
         if version:
             parser.add_argument(
                 "--version", "-V",

@@ -61,10 +61,10 @@ class FileScript(object):
             header = kwargs["header"]
             if not isinstance(header, basestring):
                 header = "\n".join(header)
+
         else:
             header = ""
             if "# -*-" not in body:
-            #if "__future__" not in body and "# -*-" not in body:
                 header += "\n".join([
                     "# -*- coding: utf-8 -*-",
                     "",
@@ -75,7 +75,7 @@ class FileScript(object):
                     #"#!/usr/bin/env python",
                     #"import sys",
                     #"sys.path.insert(0, '{}')".format(self.cwd),
-                    "from captain import Command, arg, args",
+                    "from captain import Command, arg, args, exception",
                     "",
                 ])
 

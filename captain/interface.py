@@ -17,19 +17,19 @@ class Application(object):
 
     router_class = Router
 
-    @property
-    def version(self):
-        """Check all the modules of all the commands, first __version__ found
-        wins"""
-        v = ""
-        for command_class in self.commands.values():
-            m = command_class.module
-            if m:
-                v = getattr(m, "__version__", "")
-                if v:
-                    v = String(v)
-                    break
-        return v
+#     @property
+#     def version(self):
+#         """Check all the modules of all the commands, first __version__ found
+#         wins"""
+#         v = ""
+#         for command_class in self.commands.values():
+#             m = command_class.module
+#             if m:
+#                 v = getattr(m, "__version__", "")
+#                 if v:
+#                     v = String(v)
+#                     break
+#         return v
 
     def create_router(self):
         return self.router_class(
