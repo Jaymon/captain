@@ -198,7 +198,7 @@ class Router(object):
     """
     def __init__(self, command_prefixes=None, paths=None, **kwargs):
         self.command_prefixes = command_prefixes or []
-        self.paths = paths or [Dirpath.cwd()]
+        self.paths = paths or []
 
         self.parser_class = kwargs.get("parser_class", ArgumentParser)
         self.command_class = kwargs.get("command_class", Command)
@@ -353,22 +353,25 @@ class Router(object):
                         seen.add(m.__name__)
 
         else:
-            if environ.AUTODISCOVER:
-                for path in self.paths:
-                    rp = ReflectPath(path)
-                    for m in rp.find_modules(environ.AUTODISCOVER_NAME):
-                        if m.__name__ not in seen:
-                            rn = ReflectName(m.__name__)
-                            command_prefix = rn.absolute_module_name(
-                                environ.AUTODISCOVER_NAME
-                            )
+            if not self.paths:
+                if not self.command_class.command_classes:
+                    self.paths = [Dirpath.cwd()]
 
-                            if command_prefix not in seen:
-                                self.command_prefixes.append(command_prefix)
-                                seen.add(command_prefix)
+            for path in self.paths:
+                rp = ReflectPath(path)
+                for m in rp.find_modules(environ.AUTODISCOVER_NAME):
+                    if m.__name__ not in seen:
+                        rn = ReflectName(m.__name__)
+                        command_prefix = rn.absolute_module_name(
+                            environ.AUTODISCOVER_NAME
+                        )
 
-                            self.command_modules[m.__name__] = m
-                            seen.add(m.__name__)
+                        if command_prefix not in seen:
+                            self.command_prefixes.append(command_prefix)
+                            seen.add(command_prefix)
+
+                        self.command_modules[m.__name__] = m
+                        seen.add(m.__name__)
 
     def create_pathfinder(self, **kwargs):
         """The pathfinder is a DictTree that will always have a "" key to
@@ -509,7 +512,30 @@ class ArgumentParser(argparse.ArgumentParser):
             unknown_kwargs = unknown_kwargs.unwrap()
             parsed_unknown = []
 
+            if unknown_kwargs:
+                if parsed._has_handle_kwargs:
+                    for k, v in unknown_kwargs.items():
+                        setattr(parsed, k, v)
+
+                else:
+                    for k in parsed._handle_signature["names"]:
+                        if k in unknown_kwargs:
+                            setattr(parsed, k, unknown_kwargs.pop(k))
+
+                    for k, v in unknown_kwargs.items():
+                        parsed_unknown.extend([k, v])
+
             if unknown_args:
+                # we try and line our unknown args with names in the handle
+                # signature
+                for name in parsed._handle_signature["names"]:
+                    if unknown_args:
+                        if name not in parsed:
+                            setattr(parsed, name, unknown_args.pop(0))
+
+                    else:
+                        break
+
                 if parsed._has_handle_args:
                     setattr(
                         parsed,
@@ -519,15 +545,6 @@ class ArgumentParser(argparse.ArgumentParser):
 
                 else:
                     parsed_unknown.extend(unknown_args)
-
-            if unknown_kwargs:
-                if parsed._has_handle_kwargs:
-                    for k, v in unknown_kwargs.items():
-                        setattr(parsed, k, v)
-
-                else:
-                    for k, v in unknown_kwargs.items():
-                        parsed_unknown.extend([k, v])
 
         # re-organize to be in defined groups. If you set a group then you
         # have to use the group in the signature because this makes sure the

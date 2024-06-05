@@ -32,6 +32,9 @@ class Command(object):
     private = False
     """set this to True if the Command is not designed to be called"""
 
+    version = ""
+    """Set this as the version for this command"""
+
     @classproperty
     def name(cls):
         """This is the name that will be used to invoke the SUBCOMMAND, it can
@@ -48,8 +51,11 @@ class Command(object):
         any aliases in a subclass"""
         aliases = set()
         for name in [cls.__name__, cls.name]:
-            aliases.update(NamingConvention(name).variations())
-        aliases.discard(cls.name)
+            for n in NamingConvention(name).variations():
+                aliases.add(n)
+                aliases.add(n.lower())
+
+        #aliases.discard(cls.name)
         return aliases
 
     @classproperty
@@ -137,9 +143,9 @@ class Command(object):
             # because of how args works, we need to make sure the kwargs are
             # put in correct order to be passed to the function, otherwise our
             # real *args won't make it to the *args variable
-            for name in parsed._handle_signature["names"]:
-                if name in ckwargs:
-                    cargs.append(ckwargs.pop(name))
+#             for name in parsed._handle_signature["names"]:
+#                 if name in ckwargs:
+#                     cargs.append(ckwargs.pop(name))
 
             if args_name := parsed._handle_signature["*_name"]:
                 cargs.extend(ckwargs.pop(args_name, []))

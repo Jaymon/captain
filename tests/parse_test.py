@@ -430,3 +430,23 @@ class ArgumentParserTest(TestCase):
         self.assertTrue("'foo_bar':" in r)
         self.assertFalse("'foo-bar':" in r)
 
+    def test_parse_unnamed(self):
+        parser = FileScript([
+            "class Default(Command):",
+            "    def handle(self, foo, bar):",
+            "        print('foo: {}'.format(foo))",
+            "        print('bar: {}'.format(bar))",
+        ]).parser
+
+        parsed = parser.parse_args(["--bar", "1", "--foo=2"])
+        self.assertEqual("2", parsed.foo)
+        self.assertEqual("1", parsed.bar)
+
+        parsed = parser.parse_args(["1", "--foo=2"])
+        self.assertEqual("2", parsed.foo)
+        self.assertEqual("1", parsed.bar)
+
+        parsed = parser.parse_args(["1", "2"])
+        self.assertEqual("1", parsed.foo)
+        self.assertEqual("2", parsed.bar)
+

@@ -129,17 +129,31 @@ class FileScript(object):
         return body
 
     def command_class(self, command_name="default"):
-        cap = self.captain
-        return cap.commands[command_name.lower()]
+        command_class = None
 
-    def command(self, command_name="default"):
-        return self.command_class(command_name=command_name)()
+        self.path.get_module()
 
-    def reflect(self, command_name="default"):
-        return ReflectCommand(self.command_class(command_name))
+        for command_class in Command.command_classes.values():
+            if command_name.lower() == command_class.__name__.lower():
+                break
 
-    def reflect_method(self, command_name="default"):
-        return self.reflect(command_name).method()
+            elif command_name.lower() == command_class.name:
+                break
+
+            else:
+                if command_name in command_class.aliases:
+                    break
+
+        return command_class
+
+#     def command(self, command_name="default"):
+#         return self.command_class(command_name=command_name)()
+
+#     def reflect(self, command_name="default"):
+#         return ReflectCommand(self.command_class(command_name))
+# 
+#     def reflect_method(self, command_name="default"):
+#         return self.reflect(command_name).method()
 
     def create_script(self, body, **kwargs):
         return testdata.create_module(
