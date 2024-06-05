@@ -2,8 +2,6 @@
 
 Easy python cli scripts for people that just want get things done.
 
-__Important__ - If you have older scripts you might need the [captain~=3.0.0 branch](https://github.com/Jaymon/captain/tree/3.0.0). The mainline branch has an entirely different interface.
-
 
 ## Usage
 
@@ -19,17 +17,17 @@ A valid `captain` cli script needs just two things:
             return 0
     ```
 
-2. Calling `captain.handle()` at the end of your script:
+2. Calling `captain.application()` at the end of your script:
 
     ```python
-    from captain import Command, handle
+    from captain import Command, application
     
     class Default(Command):
         def handle(self, foo, bar):
             return 0
 
     if __name__ == "__main__":
-        handle()
+        application()
     ```
 
 That's it! Whatever arguments you define in your class's `Default.handle()` method will be options on the command line. A captain script is called just like any other python command line script, so to run the above example you could do:
@@ -42,7 +40,7 @@ That's it! Whatever arguments you define in your class's `Default.handle()` meth
 The `captain.arg()` decorator provides a nice passthrough api to the full [argparse.ArgumentParser.add_argument() method](https://docs.python.org/3/library/argparse.html#the-add-argument-method) if you want to fine tune how arguments are passed into your script:
 
 ```python
-from captain import Command, handle, arg
+from captain import Command, application, arg
 
 class Default(Command):
     @arg('--foo', '-f', action="store_true")
@@ -53,7 +51,7 @@ class Default(Command):
         self.output.out(kwargs)
 
 if __name__ == "__main__":
-    handle()
+    application()
 ```
 
 Would print a help string like this:
@@ -98,7 +96,7 @@ The `captain.io.Output` class has a lot of nice little helper methods but Captai
 
 ## Examples
 
-A typical standard python cli script
+A typical python cli script
 
 ```python
 import argparse
@@ -123,7 +121,7 @@ class Default(captain.Command):
         return 0
 
 if __name__ == '__main__':
-    captain.handle()
+    captain.application()
 ```
 
 
@@ -145,7 +143,7 @@ class Bar(captain.Command):
         pass
 
 if __name__ == '__main__':
-    captain.handle()
+    captain.application()
 ```
 
 So `foo` could be called using:
@@ -165,14 +163,14 @@ If you want a script from you package to be usable using both `python -m example
 ```python
 # example/__main__.py
 
-from captain import Command, handle
+from captain import Command, application
 
 class Default(captain.Command):
     def handle(self):
         pass
         
 if __name__ == "__main__":
-    handle()
+    application()
 ```
 
 And then in your `setup.py` script you can add:
@@ -181,7 +179,7 @@ And then in your `setup.py` script you can add:
 ```python
 entry_points = {
     'console_scripts': [
-        'example = example.__main__:handle'
+        'example = example.__main__:application'
     ],
 }
 ```

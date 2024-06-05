@@ -1,15 +1,13 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
 import argparse
 
 from captain.reflection import (
     ReflectCommand,
-    ReflectMethod,
     ParseArg,
 )
 from captain import Command
 
-from . import testdata, TestCase, FileScript, ModuleScript
+from . import TestCase, FileScript
 
 
 class ReflectCommandTest(TestCase):
@@ -29,7 +27,10 @@ class ReflectCommandTest(TestCase):
                 pass
 
         cbi = ReflectCommand(Default)
-        self.assertEqual("the description on method comment\nand the second line", cbi.desc)
+        self.assertEqual(
+            "the description on method comment\nand the second line",
+            cbi.desc
+        )
 
     def test_desc_class(self):
         class Default(Command):
@@ -40,45 +41,46 @@ class ReflectCommandTest(TestCase):
         cbi = ReflectCommand(Default)
         self.assertEqual("the description on class doc", cbi.desc)
 
-        c = FileScript([
+        cbi = ReflectCommand(FileScript([
             "# the description on class comment",
             "# and the second line",
             "class Default(Command):",
             "    def handle(self): pass",
-        ]).command()
+        ]).command_class())
 
-        cbi = ReflectCommand(c)
-        self.assertEqual("the description on class comment\nand the second line", cbi.desc)
+        self.assertEqual(
+            "the description on class comment\nand the second line",
+            cbi.desc
+        )
 
     def test_desc_module(self):
-        s = FileScript([
+        cbi = ReflectCommand(FileScript([
             '#!/usr/bin/env python',
             '# -*- coding: utf-8 -*-',
             '# the description on module comment',
             "# and the second line",
             "from captain import Command",
             "class Default(Command): pass",
-        ], header="")
+        ], header="").command_class())
+        self.assertEqual(
+            "the description on module comment\nand the second line",
+            cbi.desc
+        )
 
-        cbi = ReflectCommand(s.command())
-        self.assertEqual("the description on module comment\nand the second line", cbi.desc)
-
-        s = FileScript([
+        cbi = ReflectCommand(FileScript([
             '"""the description on module doc"""',
             "from captain import Command",
             "class Default(Command): pass",
-        ], header="")
-
-        cbi = ReflectCommand(s.command())
+        ], header="").command_class())
         self.assertEqual("the description on module doc", cbi.desc)
 
 
 class ReflectMethodTest(TestCase):
-    def test_signature(self):
-        cbi = FileScript([
+    def test_signature_info(self):
+        cbi = ReflectCommand(FileScript([
             "class Default(Command):",
             "    def handle(self, foo, bar=1, che=3, **kwargs): pass",
-        ]).reflect_method()
+        ]).command_class()).method()
 
         sig = cbi.signature
         self.assertEqual(set(["foo"]), sig["required"])
@@ -87,13 +89,27 @@ class ReflectMethodTest(TestCase):
         self.assertEqual("kwargs", sig["**_name"])
         self.assertIsNone(sig["*_name"])
 
+#     def test_signature_args(self):
+#         mi = ReflectCommand(FileScript([
+#             "class Default(Command):",
+#             "    def handle(self, foo, bar=1, che=3): pass",
+#         ]).command_class()).method()
+# 
+#         dests = set(["foo", "bar", "che"])
+# 
+#         count = 0
+#         for pa, pkw in mi.parseargs():
+#             count += 1
+#             self.assertTrue(pkw["dest"] in dests)
+#         self.assertEqual(3, count)
+
     def test_parseargs(self):
-        cbi = FileScript([
+        cbi = ReflectCommand(FileScript([
             "class Default(Command):",
             "    @arg('--foo', '-f', default=2, help='foo value')",
             "    @arg('--bang-one', '-b', default=4, help='bang value')",
             "    def handle(self, foo, bar=1, che=3, **kwargs): pass",
-        ]).reflect_method()
+        ]).command_class()).method()
 
         args = list(cbi.parseargs())
         self.assertEqual("foo", args[0][1]["dest"])
@@ -104,7 +120,7 @@ class ReflectMethodTest(TestCase):
 
         https://github.com/Jaymon/captain/issues/73
         """
-        s = FileScript([
+        mi = ReflectCommand(FileScript([
             "class Baz(Command):",
             "    @arg('--baz-foo', default='1')",
             "    @arg('--baz-bar', type=int)",
@@ -125,10 +141,9 @@ class ReflectMethodTest(TestCase):
             "    @args(Baz, omit=['baz-foo'])",
             "    def handle(self, **kwargs):",
             "        print('kwargs: {}'.format(kwargs))",
-        ])
+        ]).command_class()).method("Bam")
 
         contains = set(["baz-bar", "foo-bar", "che-foo"])
-        mi = s.reflect_method("Bam")
 
         pas = list(mi.parseargs())
         self.assertEqual(len(contains), len(pas))
@@ -140,7 +155,7 @@ class ReflectMethodTest(TestCase):
 
         https://github.com/Jaymon/captain/issues/73
         """
-        s = FileScript([
+        mi = ReflectCommand(FileScript([
             "class Foo(Command):",
             "    @arg('foo', nargs='*')",
             "    def handle(self, **kwargs): pass",
@@ -149,9 +164,7 @@ class ReflectMethodTest(TestCase):
             "    @args(Foo)",
             "    @arg('foo', nargs='+')",
             "    def handle(self, **kwargs): pass",
-        ])
-
-        mi = s.reflect_method("Bar")
+        ]).command_class()).method("Bar")
 
         pas = list(mi.parseargs())
         self.assertEqual(1, len(pas))
@@ -164,7 +177,12 @@ class ParseArgTest(TestCase):
         self.assertTrue("--foo_bar" in pa[0])
         self.assertEqual("foo-bar", pa.name)
 
-        pa = ParseArg("--foo-bar", "--foo", "-f", dest="foo", default=2, help="foo value")
+        pa = ParseArg(
+            "--foo-bar", "--foo", "-f",
+            dest="foo",
+            default=2,
+            help="foo value"
+        )
         self.assertTrue("--foo_bar" in pa[0])
         self.assertEqual("foo", pa.name)
 

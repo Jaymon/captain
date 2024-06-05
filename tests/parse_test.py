@@ -1,23 +1,118 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
+import subprocess
 
 from captain.compat import *
 from captain.logging import QuietFilter
+from captain.parse import Router
+from captain.call import Command
 
 from . import testdata, TestCase, FileScript, ModuleScript
 
 
-class ArgumentParserTest(TestCase):
+class RouterTest(TestCase):
+    def test_only_default(self):
+        p = self.create_module([
+            "from captain import Command",
+            "",
+            "class Default(Command):",
+            "    def handle(self, *args, **kwargs):",
+            "        self.output.out('default')",
+        ])
 
+        r = Router(command_prefixes=[p])
+
+        parsed = r.parser.parse_args(["foo", "--one=1", "--two=2"])
+        self.assertEqual(["foo"], parsed.args)
+        self.assertEqual("1", parsed.one)
+        self.assertEqual("2", parsed.two)
+
+    def test_only_subcommands(self):
+        p = self.create_module([
+            "from captain import Command",
+            "",
+            "class Foo(Command):",
+            "    def handle(self, *args, **kwargs):",
+            "        self.output.out('foo')",
+            "",
+            "class Bar(Command):",
+            "    def handle(self, *args, **kwargs):",
+            "        self.output.out('bar')",
+        ])
+
+        r = Router(command_prefixes=[p])
+
+        parsed = r.parser.parse_args(["foo", "--one=1", "--two=2"])
+        self.assertEqual("1", parsed.one)
+        self.assertEqual("2", parsed.two)
+
+    def test_prefixes(self):
+        p = self.create_modules({
+            "far.commands": {
+                "foo": [
+                    "from captain import Command",
+                    "",
+                    "class Default(Command):",
+                    "    def handle(self):",
+                    "        self.output.out('foo')",
+                    "",
+                    "class Bar(Command):",
+                    "    def handle(self):",
+                    "        self.output.out('foo bar')",
+                ],
+                "__init__": [
+                    "from captain import Command",
+                    "",
+                    "class Default(Command):",
+                    "    def handle(self):",
+                    "        self.output.out('foo')",
+                ],
+                "che": {
+                    "__init__": [
+                        "from captain import Command",
+                        "",
+                        "class Default(Command):",
+                        "    def handle(self):",
+                        "        self.output.out('che')",
+                    ],
+                    "boo": [
+                        "from captain import Command",
+                        "",
+                        "class Default(Command):",
+                        "    def handle(self):",
+                        "        self.output.out('che boo')",
+                    ],
+                },
+            },
+#             "cli": [
+#                 "from captain import Application",
+#                 "application = Application()",
+#                 "application()",
+#             ],
+        })
+
+        r = Router(paths=[p])
+
+        tree = r.pathfinder.get(["che", "boo"])
+        self.assertIsNotNone(tree[""]["parser"])
+
+        tree = r.pathfinder.get(["foo", "bar"])
+        self.assertIsNotNone(tree[""]["parser"])
+
+        tree = r.pathfinder.get(["foo"])
+        self.assertIsNotNone(tree[""]["parser"])
+
+
+class ArgumentParserTest(TestCase):
     @classmethod
     def tearDownClass(cls):
-        # after this class is done testing the quiet functionality reset logging
+        # after this class is done testing the quiet functionality reset
+        # logging
         QuietFilter.reset()
 
     def test_quiet_parsing(self):
         p = FileScript().parser
 
-        p.add_argument('args', nargs="*")
+        #p.add_argument('args', nargs="*")
         #rquiet = p._option_string_actions["--quiet"].OPTIONS
         rargs = ["arg1", "arg2"]
 
@@ -72,9 +167,6 @@ class ArgumentParserTest(TestCase):
         args = p.parse_args(['--quiet', 'DWI'])
         self.assertEqual("DWI", getattr(args, "<QUIET_INJECT>"))
 
-        with self.assertRaises(SystemExit):
-            args = p.parse_args(['--quiet', 'DWA'])
-
         p = FileScript().parser
         p.add_argument('-D', action="store_true")
 
@@ -91,18 +183,15 @@ class ArgumentParserTest(TestCase):
             "        self.output.err('err')",
         ])
 
-#         r = s.run('--help')
-#         return
+        r = s.run('')
+        self.assertTrue("err" in r)
+        self.assertTrue("verbose" in r)
+        self.assertTrue("out" in r)
 
         r = s.run('--quiet=-WE')
         self.assertTrue("err" in r)
         self.assertFalse("verbose" in r)
         self.assertFalse("out" in r)
-
-        r = s.run('')
-        self.assertTrue("err" in r)
-        self.assertTrue("verbose" in r)
-        self.assertTrue("out" in r)
 
         r = s.run('--quiet=D')
         self.assertTrue("err" in r)
@@ -117,13 +206,17 @@ class ArgumentParserTest(TestCase):
     def test_quiet_override(self):
         s = FileScript([
             "class Default(Command):",
-            "    @arg('--quiet', '-Q', '-q', action='store_true', help='override quiet')",
+            "    @arg(",
+            "        '--quiet', '-Q', '-q',",
+            "        action='store_true',",
+            "        help='override quiet'"
+            "    )",
             "    def handle(self, quiet):",
             "        self.output.out(quiet)",
         ])
         r = s.run('--help')
         self.assertTrue("override quiet" in r)
-        self.assertNotRegexpMatches(r, r"-Q\s+QUIET")
+        self.assertNotRegex(r, r"-Q\s+QUIET")
 
         r = s.run('--quiet')
         self.assertEqual("True", r)
@@ -136,8 +229,8 @@ class ArgumentParserTest(TestCase):
         ])
 
         r = s.run('--help')
-        self.assertRegexpMatches(r, r"--quiet\s+override\s+quiet")
-        self.assertRegexpMatches(r, r"-Q\s+<QUIET")
+        self.assertRegex(r, r"--quiet\s+override\s+quiet")
+        self.assertRegex(r, r"-Q\s+<QUIET")
 
     def test_quiet_logging(self):
         s = FileScript([
@@ -145,8 +238,10 @@ class ArgumentParserTest(TestCase):
             "import logging",
             "logging.basicConfig(",
             "  format='[%(levelname)s] %(message)s',",
-            "  level=logging.DEBUG, stream=sys.stdout",
+            "  level=logging.DEBUG,",
+            "  stream=sys.stdout,",
             ")",
+            "logging.getLogger('asyncio').setLevel(logging.ERROR)",
             "logger = logging.getLogger(__name__)",
             "",
             "class Default(Command):",
@@ -162,7 +257,7 @@ class ArgumentParserTest(TestCase):
         ])
 
         r = s.run('--quiet=-C')
-        self.assertRegexpMatches(r, r"^\[CRITICAL]\s+critical\s*$")
+        self.assertRegex(r, r"^\[CRITICAL]\s+critical\s*$")
 
         r = s.run('--quiet=-I')
         self.assertEqual("[INFO] info\nout", r)
@@ -241,7 +336,7 @@ class ArgumentParserTest(TestCase):
             "        print('foo: {}, bar: {}'.format(foo, bar))"
         ])
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(subprocess.CalledProcessError):
             r = s.run("--foo 1 --bar 2 --che 3")
 
         r = s.run("--foo 1 --bar 2")
@@ -300,7 +395,7 @@ class ArgumentParserTest(TestCase):
         ])
 
         r = s.run("--foo=1 --che --baz=3")
-        self.assertTrue("bar group: {'foo': 1, 'che': True}, baz: 3" in r)
+        self.assertTrue("bar group: Namespace(foo=1, che=True), baz: 3" in r)
 
         r = s.run("--help")
         self.assertTrue("bar:" in r)
@@ -317,7 +412,7 @@ class ArgumentParserTest(TestCase):
         ])
 
         r = s.run("--foo=1 --che")
-        self.assertTrue("bar_bam group: {'foo': 1, 'che': True}" in r)
+        self.assertTrue("bar_bam group: Namespace(foo=1, che=True)" in r)
         self.assertTrue("bar_bam foo: 1" in r)
         self.assertTrue("bar_bam che: True" in r)
 
@@ -334,4 +429,24 @@ class ArgumentParserTest(TestCase):
         r = s.run("--foo-bar 1")
         self.assertTrue("'foo_bar':" in r)
         self.assertFalse("'foo-bar':" in r)
+
+    def test_parse_unnamed(self):
+        parser = FileScript([
+            "class Default(Command):",
+            "    def handle(self, foo, bar):",
+            "        print('foo: {}'.format(foo))",
+            "        print('bar: {}'.format(bar))",
+        ]).parser
+
+        parsed = parser.parse_args(["--bar", "1", "--foo=2"])
+        self.assertEqual("2", parsed.foo)
+        self.assertEqual("1", parsed.bar)
+
+        parsed = parser.parse_args(["1", "--foo=2"])
+        self.assertEqual("2", parsed.foo)
+        self.assertEqual("1", parsed.bar)
+
+        parsed = parser.parse_args(["1", "2"])
+        self.assertEqual("1", parsed.foo)
+        self.assertEqual("2", parsed.bar)
 

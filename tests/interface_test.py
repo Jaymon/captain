@@ -1,116 +1,15 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
+import subprocess
 
-from . import testdata, TestCase, FileScript, ModuleScript
-
-
-class CommandTest(TestCase):
-    def test_arguments(self):
-        c = FileScript([
-            "class Default(Command):",
-            "    def handle(self, *args, **kwargs):",
-            "        print('args: ', args)",
-            "        print('kwargs: ', kwargs)",
-        ])
-
-        r = c.run("0 1 2 3")
-        self.assertTrue("('0', '1', '2', '3')" in r)
-        self.assertTrue("{}" in r)
+from . import TestCase, FileScript
 
 
-        r = c.run("0 1 2 --foo=3 --bar=4")
-        self.assertTrue("('0', '1', '2')" in r)
-        self.assertTrue("foo" in r)
-        self.assertTrue("'3'" in r)
-        self.assertTrue("bar" in r)
-        self.assertTrue("'4'" in r)
-
-    def test_name(self):
-        s = FileScript([
-            "class Foo(Command):",
-            "    def handle(self, **kwargs): pass",
-        ])
-        c_class = s.command_class("foo")
-        self.assertEqual("foo", c_class.name)
-
-        s = FileScript([
-            "class Foo(Command):",
-            "    name = 'bar'",
-            "    def handle(self, **kwargs): pass",
-        ])
-        c_class = s.command_class("bar")
-        self.assertEqual("bar", c_class.name)
-
-    def test_aliases(self):
-        s = FileScript([
-            "class FooOne(Command):",
-            "    def handle(self, **kwargs): pass",
-        ])
-
-        a = set([
-            "fooone",
-            "Foo_One",
-            "Foo-One",
-            "foo_one",
-            "FooOne"
-        ])
-        c_class = s.command_class("foo-one")
-        self.assertEqual(a, c_class.aliases)
-
-    def test_unnamed_arg(self):
-        """https://github.com/Jaymon/captain/issues/64"""
-        s = FileScript([
-            "class Foo(Command):",
-            "    def handle(self, bar):",
-            "        print(f'bar: {bar}')",
-        ])
-
-        with self.assertRaises(RuntimeError):
-            r = s.run("foo")
-
-        s = FileScript([
-            "class Foo(Command):",
-            "    def handle(self, bar):",
-            "        print(f'bar: {bar}')",
-        ])
-
-        r = s.run("foo 'bar value'")
-        self.assertTrue("bar: bar value" in r)
-
-        s = FileScript([
-            "class Foo(Command):",
-            "    def handle(self, bar):",
-            "        print(f'bar: {bar}')",
-        ])
-
-        r = s.run("foo --bar 'bar value'")
-        self.assertTrue("bar: bar value" in r)
-
-    def test_io_fluid_interface(self):
-        s = FileScript([
-            "class Default(Command):",
-            "    def handle(self, bar):",
-            "        self.out(f'bar: {bar}')",
-        ])
-        r = s.run("--bar 1")
-        self.assertTrue("bar: 1" in r)
-
-        s = FileScript([
-            "class Default(Command):",
-            "    def handle(self, bar):",
-            "        self.foobar(f'bar: {bar}')",
-        ])
-        with self.assertRaises(RuntimeError):
-            r = s.run("--bar 1")
-
-
-class CaptainTest(TestCase):
+class ApplicationTest(TestCase):
     def test_version(self):
-        c = FileScript().captain
+        c = FileScript()
+        self.assertTrue("0.0.1" in c.run("--version"))
 
-        self.assertEqual("0.0.1", c.version)
-
-    def test_handle(self):
+    def test_handle_1(self):
         s = FileScript(subcommands=True)
         s.run("--bar=1 --che=2")
 
@@ -142,10 +41,10 @@ class CaptainTest(TestCase):
         self.assertTrue("success foo" in r)
 
         # test error
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(subprocess.CalledProcessError):
             r = s.run("1")
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(subprocess.CalledProcessError):
             r = s.run("1 --bar=1")
 
     def test_handle_sub_no_default(self):
@@ -158,7 +57,7 @@ class CaptainTest(TestCase):
         r = s.run("foo --bar=1")
         self.assertTrue("success foo" in r)
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(subprocess.CalledProcessError):
             s.run()
 
     def test_handle_error(self):
@@ -169,10 +68,10 @@ class CaptainTest(TestCase):
             "",
             "class Bar(Command):",
             "    def handle(self, **kwargs):",
-            "        raise self.Stop(0, 'stop message')"
+            "        raise exception.Stop(0, 'stop message')"
         ])
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(subprocess.CalledProcessError):
             r = s.run("foo")
 
         r = s.run("bar")
@@ -188,9 +87,6 @@ class CaptainTest(TestCase):
             "    def handle(self, **kwargs):",
             "        self.output.out('foo_two')",
         ])
-
-        #r = s.run("")
-        #r = s.run("--help")
 
         r = s.run("foo-one")
         self.assertTrue("foo_one" in r)

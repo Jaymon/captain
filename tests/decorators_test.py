@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
+import subprocess
 
-from . import testdata, TestCase, FileScript, ModuleScript
+from . import TestCase, FileScript
 
 
 class ArgsTest(TestCase):
@@ -45,19 +45,19 @@ class ArgsTest(TestCase):
             "        self.output.out(foo)",
         ])
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(subprocess.CalledProcessError):
             r = s.run("two --foo=4")
 
         r = s.run("two --foo=2")
         self.assertEqual("2", r)
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(subprocess.CalledProcessError):
             r = s.run("three --foo=2")
 
         r = s.run("three --foo=4")
         self.assertEqual("4", r)
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(subprocess.CalledProcessError):
             r = s.run("four --foo=2")
 
         r = s.run("four --foo=6")

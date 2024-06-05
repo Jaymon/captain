@@ -1,48 +1,49 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
 import inspect
 
 import testdata
 from testdata.test import TestCase
 
 from captain.compat import *
-from captain import Captain, Command
+from captain import Application, Command
 from captain.reflection import ReflectMethod, ReflectCommand
 
 
 class FileScript(object):
-    @property
-    def captain(self):
-        ret = None
-        m = self.module()
-        for name, o in inspect.getmembers(m, lambda o: inspect.isclass(o) or inspect.ismodule(o)):
-            if isinstance(o, Captain):
-                ret = o.get_instance()
-                break
-
-            elif issubclass(o, Command):
-                ret = o.interface
-                break
-
-            elif inspect.ismodule(o):
-                cap = getattr(o, "Captain", None)
-                if cap:
-                    ret = cap.get_instance()
-                    break
-
-        if not ret:
-            raise AttributeError("captain")
-
-        return ret
+#     @property
+#     def captain(self):
+#         ret = None
+#         m = self.module()
+#         members = inspect.getmembers(
+#             m,
+#             lambda o: inspect.isclass(o) or inspect.ismodule(o)
+#         )
+#         for name, o in members:
+#             if isinstance(o, Application):
+#                 ret = Application()
+#                 break
+# 
+#             elif issubclass(o, Command):
+#                 ret = o.interface
+#                 break
+# 
+#             elif inspect.ismodule(o):
+#                 if ret := getattr(o, "application", None):
+#                     break
+# 
+#         if not ret:
+#             raise AttributeError("captain")
+# 
+#         return ret
 
     @property
     def parser(self):
-        return self.captain.create_parser()
+        return Application(command_prefixes=[self.path]).router.parser
 
     def __init__(self, body="", **kwargs):
-        # we want to reset the global captain instance each time this class is
-        # instantiated
-        Captain.instance = None
+
+        # we reset the command classes everytime we create a new script
+        Command.command_classes = {}
 
         self.body = self.get_body(body, **kwargs)
         self.path = self.create_script(self.body, **kwargs)
@@ -60,10 +61,10 @@ class FileScript(object):
             header = kwargs["header"]
             if not isinstance(header, basestring):
                 header = "\n".join(header)
+
         else:
             header = ""
             if "# -*-" not in body:
-            #if "__future__" not in body and "# -*-" not in body:
                 header += "\n".join([
                     "# -*- coding: utf-8 -*-",
                     "",
@@ -74,7 +75,7 @@ class FileScript(object):
                     #"#!/usr/bin/env python",
                     #"import sys",
                     #"sys.path.insert(0, '{}')".format(self.cwd),
-                    "from captain import Command, handle, arg, args",
+                    "from captain import Command, arg, args, exception",
                     "",
                 ])
 
@@ -122,48 +123,57 @@ class FileScript(object):
                 "",
                 "",
                 "if __name__ == '__main__':",
-                "    handle()",
+                "    captain.Application()()",
             ])
 
         return body
 
-    def module(self):
-        return self.path.module()
-
     def command_class(self, command_name="default"):
-        cap = self.captain
-        return cap.commands[command_name.lower()]
+        command_class = None
 
-    def command(self, command_name="default"):
-        return self.command_class(command_name=command_name)()
+        self.path.get_module()
 
-    def reflect(self, command_name="default"):
-        return ReflectCommand(self.command_class(command_name))
+        for command_class in Command.command_classes.values():
+            if command_name.lower() == command_class.__name__.lower():
+                break
 
-    def reflect_method(self, command_name="default"):
-        return self.reflect(command_name).method()
+            elif command_name.lower() == command_class.name:
+                break
+
+            else:
+                if command_name in command_class.aliases:
+                    break
+
+        return command_class
+
+#     def command(self, command_name="default"):
+#         return self.command_class(command_name=command_name)()
+
+#     def reflect(self, command_name="default"):
+#         return ReflectCommand(self.command_class(command_name))
+# 
+#     def reflect_method(self, command_name="default"):
+#         return self.reflect(command_name).method()
 
     def create_script(self, body, **kwargs):
         return testdata.create_module(
-            contents=body,
-            foo=1,
-            #tmpdir=cwd,
+            body,
         )
 
     def run(self, arg_str="", **kwargs):
-        s = testdata.Command(
+        return testdata.run_command(
             "{} {}".format(testdata.get_interpreter(), self.path.path),
+            arg_str,
             cwd=self.cwd,
             **kwargs
-        )
-        return s.run(arg_str, **kwargs)
+        ).strip()
 
 
 class ModuleScript(FileScript):
     def create_script(self, body):
         m = testdata.create_module(
+            body,
             module_name="{}.__main__".format(testdata.get_module_name()),
-            contents=body,
             #tmpdir=cwd,
         )
         return m
