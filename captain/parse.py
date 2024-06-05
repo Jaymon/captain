@@ -68,7 +68,6 @@ class QuietAction(argparse.Action):
         return "".join(o)
 
     def __call__(self, parser, namespace, values, option_string=""):
-
         if option_string.startswith("-q"):
             v = getattr(namespace, self.dest, "")
             if v == "":
@@ -107,16 +106,18 @@ class QuietAction(argparse.Action):
         return QuietFilter(arg_string)
 
     def parse_args(self, parser, arg_strings):
-        """This is a hack to allow `--quiet` and `--quiet DI` to work correctly,
-        basically it goes through all arg_strings and if it finds --quiet it checks
-        the next argument to see if it is some combination of DIWEC, if it is then
-        it combines it to `--quiet=ARG` and returns the modified arg_strings list
+        """This is a hack to allow `--quiet` and `--quiet DI` to work
+        correctly, basically it goes through all arg_strings and if it finds
+        --quiet it checks the next argument to see if it is some combination
+        of DIWEC, if it is then it combines it to `--quiet=ARG` and returns
+        the modified arg_strings list
 
         :param parser: argparse.ArgumentParser instance
         :param arg_strings: list, the raw arguments
         :returns: list, the arg_strings changed if needed
         """
-        if "-q" in self.option_strings: return arg_strings
+        if "-q" in self.option_strings:
+            return arg_strings
 
         count = len(arg_strings)
         new_args = []
@@ -129,17 +130,19 @@ class QuietAction(argparse.Action):
                     if narg_string in parser._option_string_actions:
                         # make sure a flag like -D isn't mistaken for a
                         # --quiet value
-                        new_args.append("{}={}".format(arg_string, self.const))
+                        new_args.append(f"{arg_string}={self.const}")
 
-                    elif re.match(r"^\-?[{}]+$".format(self.const), narg_string):
-                        new_args.append("{}={}".format(arg_string, narg_string))
+                    elif re.match(rf"^\-?[{self.const}]+$", narg_string):
+                        new_args.append(
+                            f"{arg_string}={narg_string}"
+                        )
                         i += 1
 
                     else:
-                        new_args.append("{}={}".format(arg_string, self.const))
+                        new_args.append(f"{arg_string}={self.const}")
 
                 else:
-                    new_args.append("{}={}".format(arg_string, self.const))
+                    new_args.append(f"{arg_string}={self.const}")
 
             else:
                 new_args.append(arg_string)
@@ -204,6 +207,10 @@ class Router(object):
         self.command_class = kwargs.get("command_class", Command)
 
         self.parser = self.create_parser(**kwargs)
+
+    def create_command(self, argv=None):
+        parsed = self.parser.parse_args(argv)
+        return parsed._command_class(parsed)
 
     def create_parsers(self, subcommands, common_parser):
         parsers = []
@@ -440,108 +447,108 @@ class ArgumentParser(argparse.ArgumentParser):
 #         else:
 #             return super().add_subparsers(**kwargs)
 
-    @classmethod
-    def create_instance(cls, command_class, subcommand_classes=None, **kwargs):
-        """Create an instance of the parser
-
-        This is where all the magic happens. This handles the reflection on each
-        of the Commands and configures all the arguments
-
-        :param command_class: Command, the default command class, usually the class
-            with the name Default
-        :param subcommand_classes: dict, the key is the subcommand name and the value
-            is the Command instance that corresponds to that key
-        :param **kwargs: these kwargs will be passed through to create_common_parser
-            - default_desc: str, the default help description, will be inferred
-              from the command_class docblock if not passed in
-        :returns: ArgumentParser
-        """
-        subcommand_classes = subcommand_classes or {}
-
-        common_parser = cls.create_common_instance(**kwargs)
-
-        desc = command_class.reflect().desc if command_class else kwargs.get("default_desc", "")
-        parser = cls(
-            description=desc,
-            parents=[common_parser],
-            conflict_handler="resolve",
-        )
-
-        if command_class:
-            parser.add_handler(command_class)
-
-        parser.subcommand_aliases = {}
-        if subcommand_classes:
-            # if dest isn't passed in you get "argument None is required" on
-            # error in py2.7
-            subparsers = parser.add_subparsers(dest="<SUBCOMMAND>")
-            subparsers.required = False if command_class else True
-
-            for subcommand_name, subcommand_class in subcommand_classes.items():
-
-                rc = subcommand_class.reflect()
-                desc = rc.desc
-                subparser = subparsers.add_parser(
-                    subcommand_name,
-                    parents=[common_parser],
-                    help=desc,
-                    description=desc,
-                    conflict_handler="resolve",
-                    aliases=subcommand_class.aliases,
-                )
-                subparser.add_handler(subcommand_class)
-
-        return parser
-
-    @classmethod
-    def create_common_instance(cls, **kwargs):
-        """Creates the common Parser that all other parsers will use as a base
-
-        This is useful to make sure there are certain flags that can be passed
-        both before and after the subcommand. By default, if you had something like
-        --version, you could do:
-
-            $ script.py --version
-
-        But not:
-
-            $ script.py SUBCOMMAND --version
-
-        This fixes that problem by creating this common instance and using it as
-        a base, the subcommand will inherit the common flags/arguments also, so
-        the flags will work the same way on the left or right side of the SUBCOMMAND
-
-        :param **kwargs:
-            - version: str, the version of the script
-            - quiet: bool, default is True, pass in False if you don't want the 
-              default quiet functionality to be active
-        :returns: ArgumentParser
-        """
-        parser = cls(add_help=False)
-
-        # !!! you can't have a normal group and mutually exclusive group
-        #group = parser.add_argument_group('Built-in', 'Captain built-in options')
-
-        version = kwargs.get("version", "")
-        if version:
-            parser.add_argument("--version", "-V", action='version', version="%(prog)s {}".format(version))
-
-        quiet = kwargs.get("quiet", True)
-        if quiet:
-            # https://docs.python.org/3/library/argparse.html#mutual-exclusion
-            me_group = parser.add_mutually_exclusive_group()
-
-            me_group.add_argument(
-                '--quiet', '-Q',
-                action=QuietAction,
-            )
-
-            me_group.add_argument(
-                "-q",
-                action=QuietAction,
-            )
-
-        return parser
+#     @classmethod
+#     def create_instance(cls, command_class, subcommand_classes=None, **kwargs):
+#         """Create an instance of the parser
+# 
+#         This is where all the magic happens. This handles the reflection on each
+#         of the Commands and configures all the arguments
+# 
+#         :param command_class: Command, the default command class, usually the class
+#             with the name Default
+#         :param subcommand_classes: dict, the key is the subcommand name and the value
+#             is the Command instance that corresponds to that key
+#         :param **kwargs: these kwargs will be passed through to create_common_parser
+#             - default_desc: str, the default help description, will be inferred
+#               from the command_class docblock if not passed in
+#         :returns: ArgumentParser
+#         """
+#         subcommand_classes = subcommand_classes or {}
+# 
+#         common_parser = cls.create_common_instance(**kwargs)
+# 
+#         desc = command_class.reflect().desc if command_class else kwargs.get("default_desc", "")
+#         parser = cls(
+#             description=desc,
+#             parents=[common_parser],
+#             conflict_handler="resolve",
+#         )
+# 
+#         if command_class:
+#             parser.add_handler(command_class)
+# 
+#         parser.subcommand_aliases = {}
+#         if subcommand_classes:
+#             # if dest isn't passed in you get "argument None is required" on
+#             # error in py2.7
+#             subparsers = parser.add_subparsers(dest="<SUBCOMMAND>")
+#             subparsers.required = False if command_class else True
+# 
+#             for subcommand_name, subcommand_class in subcommand_classes.items():
+# 
+#                 rc = subcommand_class.reflect()
+#                 desc = rc.desc
+#                 subparser = subparsers.add_parser(
+#                     subcommand_name,
+#                     parents=[common_parser],
+#                     help=desc,
+#                     description=desc,
+#                     conflict_handler="resolve",
+#                     aliases=subcommand_class.aliases,
+#                 )
+#                 subparser.add_handler(subcommand_class)
+# 
+#         return parser
+# 
+#     @classmethod
+#     def create_common_instance(cls, **kwargs):
+#         """Creates the common Parser that all other parsers will use as a base
+# 
+#         This is useful to make sure there are certain flags that can be passed
+#         both before and after the subcommand. By default, if you had something like
+#         --version, you could do:
+# 
+#             $ script.py --version
+# 
+#         But not:
+# 
+#             $ script.py SUBCOMMAND --version
+# 
+#         This fixes that problem by creating this common instance and using it as
+#         a base, the subcommand will inherit the common flags/arguments also, so
+#         the flags will work the same way on the left or right side of the SUBCOMMAND
+# 
+#         :param **kwargs:
+#             - version: str, the version of the script
+#             - quiet: bool, default is True, pass in False if you don't want the 
+#               default quiet functionality to be active
+#         :returns: ArgumentParser
+#         """
+#         parser = cls(add_help=False)
+# 
+#         # !!! you can't have a normal group and mutually exclusive group
+#         #group = parser.add_argument_group('Built-in', 'Captain built-in options')
+# 
+#         version = kwargs.get("version", "")
+#         if version:
+#             parser.add_argument("--version", "-V", action='version', version="%(prog)s {}".format(version))
+# 
+#         quiet = kwargs.get("quiet", True)
+#         if quiet:
+#             # https://docs.python.org/3/library/argparse.html#mutual-exclusion
+#             me_group = parser.add_mutually_exclusive_group()
+# 
+#             me_group.add_argument(
+#                 '--quiet', '-Q',
+#                 action=QuietAction,
+#             )
+# 
+#             me_group.add_argument(
+#                 "-q",
+#                 action=QuietAction,
+#             )
+# 
+#         return parser
 
     def __init__(self, **kwargs):
         # https://docs.python.org/2/library/argparse.html#conflict-handler
@@ -574,10 +581,13 @@ class ArgumentParser(argparse.ArgumentParser):
         for the handle method is parse_args(parser, arg_strings) return
         arg_string. This gives actions the ability to customize functionality
         and keeps that customization contained to within the action class."""
+        seen_flags = set()
         for flag, action in self._option_string_actions.items():
-            cb = getattr(action, "parse_args", None)
-            if cb:
-                arg_strings = cb(self, arg_strings)
+            if flag not in seen_flags:
+                if cb := getattr(action, "parse_args", None):
+                    arg_strings = cb(self, arg_strings)
+
+                seen_flags.update(action.option_strings)
 
         return arg_strings
 
@@ -603,8 +613,7 @@ class ArgumentParser(argparse.ArgumentParser):
         possible to manipulate the arg_strings
         """
         arg_strings = self._parse_action_args(arg_strings)
-        args, unknown_args = super()._parse_known_args(arg_strings, namespace)
-        return args, unknown_args
+        return super()._parse_known_args(arg_strings, namespace)
 
     def _read_args_from_files(self, arg_strings):
         """Overridden to add call to _parse_action_args which allows customized
@@ -717,60 +726,59 @@ class ArgumentParser(argparse.ArgumentParser):
             unknown_kwargs = unknown_kwargs.unwrap()
             parsed_unknown = []
 
-            if unknown_args and not parsed._has_handle_args:
-                parsed_unknown.extend(unknown_args)
+            if unknown_args:
+                if parsed._has_handle_args:
+                    setattr(
+                        parsed,
+                        parsed._handle_signature["*_name"],
+                        unknown_args
+                    )
 
-            if unknown_kwargs and not parsed._has_handle_kwargs:
-                for k, v in unknown_kwargs.items():
-                    parsed_unknown.extend([k, v])
+                else:
+                    parsed_unknown.extend(unknown_args)
 
-            if parsed_unknown:
-                return parsed, parsed_unknown
+            if unknown_kwargs:
+                if parsed._has_handle_kwargs:
+                    for k, v in unknown_kwargs.items():
+                        setattr(parsed, k, v)
 
-        args = []
-        tentative_kwargs = dict(unknown_kwargs)
-        # merge Namespace into our dict
-        tentative_kwargs.update(dict(vars(parsed)))
+                else:
+                    for k, v in unknown_kwargs.items():
+                        parsed_unknown.extend([k, v])
+
+#             if unknown_args and not parsed._has_handle_args:
+#                 parsed_unknown.extend(unknown_args)
+
+#             if unknown_kwargs and not parsed._has_handle_kwargs:
+#                 for k, v in unknown_kwargs.items():
+#                     parsed_unknown.extend([k, v])
 
         # re-organize to be in defined groups. If you set a group then you have
         # to use the group in the signature because this makes sure the
         # arguments are grouped into their defined groups
         for groupname, names in parsed._groups.items():
             for name in names:
-                if name in tentative_kwargs:
-                    tentative_kwargs.setdefault(groupname, Namespace())
-                    tentative_kwargs[groupname][name] = tentative_kwargs.pop(
-                        name
+                if name in parsed:
+                    if groupname not in parsed:
+                        setattr(parsed, groupname, type(parsed)())
+
+                    setattr(
+                        getattr(parsed, groupname),
+                        name,
+                        getattr(parsed, name)
                     )
 
-        # because of how args works, we need to make sure the kwargs are put in
-        # correct order to be passed to the function, otherwise our real *args
-        # won't make it to the *args variable
-        for name in parsed._handle_signature["names"]:
-            if name in tentative_kwargs:
-                args.append(tentative_kwargs.pop(name))
+                    delattr(parsed, name)
 
-        args.extend(unknown_args)
-        #tentative_kwargs.update(unknown_kwargs)
+#         if args_name := parsed._handle_signature["*_name"]:
+#             setattr(parsed, args_name, unknown_args)
 
-        # we want to remove any values from the built-in group since we don't
-        # want to pass those to the handle method, any value that begins with
-        # an underscore or is wrapped with <> are stripped from the final args
-        # passed to the handle() method, they will still be available in
-        # self.parsed though
-        kwargs = {}
-        for k, v in tentative_kwargs.items():
-            # we filter out private (start with _) and placeholder (surrounded
-            # by <>) keys
-            if not k.startswith("_") and not k.startswith("<"):
-                kwargs[k] = v
+#         for k, v in unknown_kwargs.items():
+#             setattr(parsed, k, v)
 
         # set any instance variables the command instance should have
-        parsed._command_instance.parsed = parsed
-        parsed.command_args = args
-        parsed.command_kwargs = kwargs
+        #parsed._command_instance.parsed = parsed
 
-        pout.v(parsed.command_kwargs)
         return parsed, parsed_unknown
 
     def add_handler(self, command_class):
@@ -789,7 +797,6 @@ class ArgumentParser(argparse.ArgumentParser):
 
         rc = command_class.reflect()
         sig = rc.method().signature
-        c = command_class()
 
         groups = {} # holds the group parser instance
         _groups = {} # holds the arguments that belong to each group
@@ -810,7 +817,7 @@ class ArgumentParser(argparse.ArgumentParser):
                 self.add_argument(*pa[0], **pa[1])
 
         self.set_defaults(
-            _command_instance=c,
+            _command_class=command_class,
             _has_handle_args=True if sig["*_name"] else False,
             _has_handle_kwargs=True if sig["**_name"] else False,
             _handle_signature=sig,

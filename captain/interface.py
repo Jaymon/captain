@@ -76,13 +76,9 @@ class Application(object):
             script name, if not passed in then sys.argv[1:] will be used
         :returns: int, the return code you want the script to exit with
         """
-        if argv is None:
-            argv = sys.argv[1:]
-
-        parser = self.create_parser()
-        parsed, args, kwargs = parser.parse_handle_args(argv)
-        ret_code = parsed._command_instance.run(*args, **kwargs)
-        return ret_code
+        router = self.create_router()
+        command = router.create_command(argv)
+        return await command.run()
 
     def __call__(self):
         ret_code = asyncio.run(self.run())
