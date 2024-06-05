@@ -7,8 +7,18 @@ from . import exception
 from .exception import Stop, Error
 
 
-__version__ = "4.5.0"
+__version__ = "5.0.0"
 
 
-#handle = Captain().handle # invoke this at the end of your script
+def application(*args, **kwargs):
+    """Factory method to create the Application in order to answer requests
+
+    :Example:
+        from captain import application
+        if __name__ == "__main__":
+            application()
+
+    :returns: Application
+    """
+    return Application(*args, **kwargs)
 

@@ -90,7 +90,6 @@ class QuietFilter(String):
             for handler in getattr(logger, "handlers", []):
                 for f in list(handler.filters):
                     if isinstance(f, LevelFilter):
-                        #print(f"Removing {f} from {logger_name}")
                         handler.removeFilter(f)
 
     def __new__(cls, levels, **kwargs):

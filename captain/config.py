@@ -37,8 +37,8 @@ class Environ(Environ):
             export CAPTAIN_PREFIX_1=foo.commands
             export CAPTAIN_PREFIX_2=bar.che
             $ python
-            >>> from captain import environ
-            >>> environ.get_controller_prefixes()
+            >>> from captain.config import environ
+            >>> environ.get_command_prefixes()
             ['foo.commands', 'bar.che']
 
         :param env_name: string, the name of the environment variables
@@ -48,5 +48,4 @@ class Environ(Environ):
 
 
 environ = Environ()
-
 

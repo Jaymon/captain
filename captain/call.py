@@ -15,26 +15,6 @@ from . import logging
 logger = logging.getLogger(__name__)
 
 
-# class CommandFinder(type):
-#     """The Command metaclass
-# 
-#     This is tough to explain, basically this allows our Captain singleton to
-#     see what Command classes are defined while the script is running, it allows us
-#     to get around all the strange reflection and code parsing stuff we did in the
-#     previous captain versions, it gets invoked when a new Command class is getting
-#     defined and it saves those in our Captain singleton
-# 
-#     https://stackoverflow.com/a/18126678/5006
-#     """
-#     def __init__(cls, name, bases, properties):
-#         if not cls.__module__.startswith(__name__):
-#             # filter all *Command classes, this allows sensible inheritance
-#             if cls.is_external():
-#                 cls.interface.commands[cls.name] = cls
-# 
-#         return super().__init__(name, bases, properties)
-
-
 # This is the base class of custom commands, any captain command needs to 
 # extend this class and define handle(), basically, every captain script will
 # go through a child of this class's handle() method, this class can't have a
@@ -54,18 +34,18 @@ class Command(object):
 
     @classproperty
     def name(cls):
-        """This is the name that will be used to invoke the SUBCOMMAND, it can be
-        overridden in child classes but has no effect if the child class is named
-        Default"""
+        """This is the name that will be used to invoke the SUBCOMMAND, it can
+        be overridden in child classes but has no effect if the child class is
+        named Default"""
         n = NamingConvention(cls.__name__)
         return n.dash().lower()
 
     @classproperty
     def aliases(cls):
-        """If you want your SUBCOMMAND to have aliases (ie, foo-bar and foo_bar will
-        both trigger the subcommand) then you can return the aliases, this can be
-        set in a child class or set aliases = [] to completely remove any aliases
-        in a subclass"""
+        """If you want your SUBCOMMAND to have aliases (ie, foo-bar and foo_bar
+        will both trigger the subcommand) then you can return the aliases, this
+        can be set in a child class or set aliases = [] to completely remove
+        any aliases in a subclass"""
         aliases = set()
         for name in [cls.__name__, cls.name]:
             aliases.update(NamingConvention(name).variations())
@@ -80,8 +60,8 @@ class Command(object):
     @classmethod
     def reflect(cls):
         """The interface does a lot of introspection to figure out how to call
-        the .handle() method, this returns the reflection class of this specific
-        command
+        the .handle() method, this returns the reflection class of this
+        specific command
 
         :returns: ReflectCommand
         """
@@ -172,19 +152,21 @@ class Command(object):
         return args, kwargs
 
     async def run(self, *args, **kwargs):
-        """Wrapper around the internal handle methods, this should be considered the
-        correct external method to call
+        """Wrapper around the internal handle methods, this should be
+        considered the correct external method to call
 
-        this could be easily overridden so you can easily do something before or after
-        the handle calls
+        this could be easily overridden so you can easily do something before
+        or after the handle calls
 
         The handle methods should be considered "internal" to the Captain class
         that are interacted with through this method
 
-        :param *args: all positional values passed in through the command line passed through
-            any configured parsers
-        :param **kwargs: all the flag values passed in through the command line passed through
-            any configured parsers
+        passed in args and kwargs will be merged with .parsed
+
+        :param *args: all positional values passed in through the command line
+            passed through any configured parsers, merged with .parsed
+        :param **kwargs: all the flag values passed in through the command line
+            passed through any configured parsers, merged with .parsed
         :returns: int, the return code
         """
         try:
@@ -202,22 +184,29 @@ class Command(object):
 
     async def handle(self, *args, **kwargs):
         logger.warning(
-            "Command.handle() received {} args and {} kwargs".format(
+            "{}.handle() received {} args and {} kwargs".format(
+                self.__class__.__name__,
                 len(args),
                 len(kwargs),
             )
         )
-        raise NotImplementedError("Override handle() in your child class")
+        raise NotImplementedError(
+            "Implemented {}.handle() in your class".format(
+                self.__class__.__name__
+            )
+        )
 
     async def handle_error(self, e):
-        """This is called when an uncaught exception on the Command is raised, it
-        can be defined in the child to allow custom handling of uncaught exceptions"""
+        """This is called when an uncaught exception on the Command is raised,
+        it can be defined in the child to allow custom handling of uncaught
+        exceptions"""
         if isinstance(e, exception.Stop):
             ret_code = e.code
             msg = String(e)
             if msg:
                 if ret_code != 0:
                     self.output.err(msg)
+
                 else:
                     self.output.out(msg)
 

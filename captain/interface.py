@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 class Application(object):
     command_class = Command
 
-    #parser_class = Parser
     router_class = Router
 
     @property
@@ -36,27 +35,6 @@ class Application(object):
         return self.router_class(
             command_class=self.command_class,
             command_prefixes=self.command_prefixes,
-        )
-
-
-    def xcreate_parser(self):
-        """Create our custom parser that will merge the Command.handle method
-        signature and the argument decorator configuration
-
-        :returns: parse.ArgumentParser instance, or whatever class is in
-            self.parser_class
-        """
-        subcommand_classes = dict(Command.command_classes)
-        command_class = subcommand_classes.pop(
-            "default",
-            subcommand_classes.pop("main", None)
-        )
-        return self.parser_class.create_instance(
-            command_class,
-            subcommand_classes,
-            version=self.version,
-            quiet=True,
-            default_desc="Captain CLI",
         )
 
     def __init__(self, command_prefixes=None):
