@@ -450,3 +450,19 @@ class ArgumentParserTest(TestCase):
         self.assertEqual("1", parsed.foo)
         self.assertEqual("2", parsed.bar)
 
+    def test_help_aliases(self):
+        s = FileScript([
+            "class FooBar(Command):",
+            "    def handle(self): pass",
+            "",
+            "class BarChe(Command):",
+            "    def handle(self): pass",
+            "",
+            "class CheBoo(Command):",
+            "    def handle(self): pass",
+        ])
+
+        r = s.run("--help")
+        self.assertTrue("foobar" in r)
+        self.assertTrue("foo-bar" not in r)
+

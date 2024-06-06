@@ -8,7 +8,6 @@ import sys
 from datatypes import (
     ArgvParser as UnknownParser,
     NamingConvention,
-    Namespace,
     Dirpath,
     ReflectModule,
     ReflectPath,
@@ -191,6 +190,38 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         text = "\n".join(lines)
         return text
 
+    def _metavar_formatter(self, action, default_metavar):
+        """Overrides the default formatter in order hide the aliases
+
+        https://github.com/python/cpython/blob/3.11/Lib/argparse.py#L1189
+
+        NOTE -- this relies on knowing how the parent's version of this
+        method works and duck types the action to get the wanted output
+        """
+        if isinstance(action, argparse._SubParsersAction._ChoicesPseudoAction):
+            fake_action = argparse.Namespace(
+                metavar=None,
+                choices=None,
+            )
+
+        elif isinstance(action, argparse._SubParsersAction):
+            choices = set()
+            for parser in action.choices.values():
+                choices.add(parser._defaults["_parser_name"])
+
+            choices = list(choices)
+            choices.sort()
+
+            fake_action = argparse.Namespace(
+                metavar=None,
+                choices=choices,
+            )
+
+        else:
+            fake_action = action
+
+        return super()._metavar_formatter(fake_action, default_metavar)
+
 
 class Router(object):
     """The glue that connects the Application and the passed in arguments
@@ -278,7 +309,10 @@ class Router(object):
                         version="%(prog)s {}".format(version)
                     )
 
-                parser.set_defaults(_command_class=command_class)
+                parser.set_defaults(
+                    _command_class=command_class,
+                    _parser_name=subcommand,
+                )
                 subcommand_info["parser"] = parser
 
             parsers.append(parser)

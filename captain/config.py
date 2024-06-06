@@ -18,10 +18,6 @@ class Environ(Environ):
         # AUTODISCOVER is True
         self.setdefault("AUTODISCOVER_NAME", "commands")
 
-        # If set to True (default) then captain will attempt to autodiscover
-        # commands using AUTODISCOVER_NAME
-        self.setdefault("AUTODISCOVER", True, type=bool)
-
     def get_command_prefixes(self, env_name='PREFIX'):
         """this will look for CAPTAIN_PREFIX, and CAPTAIN_PREFIX_N (where
         N is 1 to infinity) in the environment, if it finds them, it will

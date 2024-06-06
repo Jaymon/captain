@@ -151,19 +151,6 @@ class ReflectMethod(object):
             else:
                 pas[pa.name] = pa
 
-        # the signature values that weren't accounted for above
-#         for name in sig["names"]:
-#             if name not in pas:
-#                 kw = {}
-#                 if name in sig["required"]:
-#                     kw["required"] = True
-# 
-#                 if name in sig["defaults"]:
-#                     kw["default"] = sig["defaults"][name]
-# 
-#                 pa = ParseArg(f"--{name}", **kw)
-#                 pas[pa.name] = pa
-
         return pas.values()
 
 
