@@ -552,12 +552,13 @@ class ArgumentParser(argparse.ArgumentParser):
         unknown_kwargs = {}
 
         if parsed_unknown:
-            unknown_kwargs = UnknownParser(
+            unknown = UnknownParser(
                 parsed_unknown,
                 hyphen_to_underscore=True,
+                infer_type=True,
             )
-            unknown_args = unknown_kwargs.pop("*", [])
-            unknown_kwargs = unknown_kwargs.unwrap()
+            unknown_args = unknown.positionals()
+            unknown_kwargs = unknown.unwrap_optionals()
             parsed_unknown = []
 
             if unknown_kwargs:
@@ -571,7 +572,7 @@ class ArgumentParser(argparse.ArgumentParser):
                             setattr(parsed, k, unknown_kwargs.pop(k))
 
                     for k, v in unknown_kwargs.items():
-                        parsed_unknown.extend([k, v])
+                        parsed_unknown.extend(unknown.info[k]["arg_strings"])
 
             if unknown_args:
                 # we try and line our unknown args with names in the handle
