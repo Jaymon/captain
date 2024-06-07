@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import argparse
 import textwrap
-from collections import defaultdict
 import re
 import sys
 

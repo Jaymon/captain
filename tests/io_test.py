@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
-import datetime
 
 from captain.io import Output, Input
 from captain.compat import *
 
-from . import testdata, TestCase, FileScript, ModuleScript
+from . import testdata, TestCase
 
 
 class InputTest(TestCase):
@@ -33,7 +31,10 @@ class InputTest(TestCase):
         i.prompt("Is this ok?", choices={"y": ["yes", "y"], "n": ["no", "n"]})
         self.assertEqual("Is this ok? (y|n) ", i.stdin.question)
 
-        i.prompt("Is this ok?\n", choices={"y": ["yes", "y"], "n": ["no", "n"]})
+        i.prompt(
+            "Is this ok?\n",
+            choices={"y": ["yes", "y"], "n": ["no", "n"]}
+        )
         self.assertEqual("Is this ok? (y|n)\n", i.stdin.question)
 
         i.prompt("Is this ok")
@@ -44,11 +45,17 @@ class InputTest(TestCase):
 
     def test_prompt_answer(self):
         i = self.create_input(answer="yes")
-        answer = i.prompt("Is this ok?", choices={"y": ["yes", "y"], "n": ["no", "n"]})
+        answer = i.prompt(
+            "Is this ok?",
+            choices={"y": ["yes", "y"], "n": ["no", "n"]}
+        )
         self.assertEqual("y", answer)
 
         i = self.create_input(answer="no")
-        answer = i.prompt("Is this ok?", choices={"y": ["yes", "y"], "n": ["no", "n"]})
+        answer = i.prompt(
+            "Is this ok?",
+            choices={"y": ["yes", "y"], "n": ["no", "n"]}
+        )
         self.assertEqual("n", answer)
 
         i = self.create_input(answer="n")
@@ -300,15 +307,21 @@ class OutputTest(TestCase):
 
     def test_table_unicode(self):
         o = Output()
-        l = [(1, testdata.get_unicode_words()), (2, testdata.get_unicode_words())]
+        l = [
+            (1, testdata.get_unicode_words()),
+            (2, testdata.get_unicode_words())
+        ]
         o.table(l)
 
-        l = [(1, [testdata.get_unicode_words()]), (2, [testdata.get_unicode_words()])]
+        l = [
+            (1, [testdata.get_unicode_words()]),
+            (2, [testdata.get_unicode_words()])
+        ]
         o.table(l)
 
     def test_table_none_value(self):
-        """We were getting an error in a script when passing d.items() to the table
-        method with a None value"""
+        """We were getting an error in a script when passing d.items() to the
+        table method with a None value"""
         o = Output()
         d = {
             "foo": None,
@@ -342,7 +355,10 @@ class OutputTest(TestCase):
         o = Output()
         self.assertEqual("1 message", o.pluralize(1, "message"))
         self.assertEqual("10 messages", o.pluralize(10, "message"))
-        self.assertEqual("messages:10", o.pluralize(10, "message", format_str="{desc}:{count}"))
+        self.assertEqual(
+            "messages:10",
+            o.pluralize(10, "message", format_str="{desc}:{count}")
+        )
         self.assertEqual("10 bar", o.pluralize(10, "foo", "bar"))
 
     def test___call__(self):

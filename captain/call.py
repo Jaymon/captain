@@ -55,7 +55,6 @@ class Command(object):
                 aliases.add(n)
                 aliases.add(n.lower())
 
-        #aliases.discard(cls.name)
         return aliases
 
     @classproperty
@@ -139,13 +138,6 @@ class Command(object):
                     ckwargs[k] = v
 
             ckwargs.update(kwargs)
-
-            # because of how args works, we need to make sure the kwargs are
-            # put in correct order to be passed to the function, otherwise our
-            # real *args won't make it to the *args variable
-#             for name in parsed._handle_signature["names"]:
-#                 if name in ckwargs:
-#                     cargs.append(ckwargs.pop(name))
 
             if args_name := parsed._handle_signature["*_name"]:
                 cargs.extend(ckwargs.pop(args_name, []))

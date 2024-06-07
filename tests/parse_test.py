@@ -4,9 +4,8 @@ import subprocess
 from captain.compat import *
 from captain.logging import QuietFilter
 from captain.parse import Router
-from captain.call import Command
 
-from . import testdata, TestCase, FileScript, ModuleScript
+from . import TestCase, FileScript
 
 
 class RouterTest(TestCase):
