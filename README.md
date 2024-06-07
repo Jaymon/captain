@@ -7,13 +7,13 @@ Easy python cli scripts for people that just want get things done.
 
 A valid `captain` cli script needs just two things:
 
-1. A `Default` class that extends `captain.Command` and has a `handle()` method:
+1. A `Default` class that extends `captain.Command` and has a `handle()` method (can be async):
 
     ```python
     from captain import Command
     
     class Default(Command):
-        def handle(self, foo, bar):
+        async def handle(self, foo, bar):
             return 0
     ```
 
@@ -23,7 +23,7 @@ A valid `captain` cli script needs just two things:
     from captain import Command, application
     
     class Default(Command):
-        def handle(self, foo, bar):
+        async def handle(self, foo, bar):
             return 0
 
     if __name__ == "__main__":
@@ -45,7 +45,7 @@ from captain import Command, application, arg
 class Default(Command):
     @arg('--foo', '-f', action="store_true")
     @arg('arg', metavar='ARG')
-    def handle(self, *args, **kwargs):
+    async def handle(self, *args, **kwargs):
         '''this is the help description'''
         self.output.out(args)
         self.output.out(kwargs)
@@ -78,7 +78,7 @@ It's available in the `handle()` method by using `self.output`:
 from captain import Command
 
 class Default(Command):
-    def handle(self, *args, **kwargs):
+    async def handle(self, *args, **kwargs):
         var1 = "print"
 
         var2 = "stdout"
@@ -116,7 +116,7 @@ would become:
 import captain
 
 class Default(captain.Command):
-    def handle(foo=False, bar=0, *args):
+    async def handle(foo=False, bar=0, *args):
         '''fancy script description'''
         return 0
 
@@ -135,11 +135,11 @@ Captain supports multiple subcommands defined in the script by naming your `capt
 import captain
 
 class Foo(captain.Command):
-    def handle(self):
+    async def handle(self):
         pass
 
 class Bar(captain.Command):
-    def handle(self):
+    async def handle(self):
         pass
 
 if __name__ == '__main__':
@@ -166,7 +166,7 @@ If you want a script from you package to be usable using both `python -m example
 from captain import Command, application
 
 class Default(captain.Command):
-    def handle(self):
+    async def handle(self):
         pass
         
 if __name__ == "__main__":
