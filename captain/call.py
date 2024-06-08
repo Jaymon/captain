@@ -213,3 +213,9 @@ class Command(object):
 
         return ret_code
 
+
+class PrintHelpCommand(Command):
+    """This is a simple Command child that just prints the help"""
+    def handle(self, *args, **kwargs):
+        self.parsed._parser.print_help()
+

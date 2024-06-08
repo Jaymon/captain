@@ -15,7 +15,7 @@ from datatypes import (
 )
 
 from .compat import *
-from .call import Command
+from .call import Command, PrintHelpCommand
 from .config import environ
 from .logging import QuietFilter
 
@@ -233,6 +233,10 @@ class Router(object):
 
         self.parser_class = kwargs.get("parser_class", ArgumentParser)
         self.command_class = kwargs.get("command_class", Command)
+        self.command_default_class = kwargs.get(
+            "command_default_class",
+            PrintHelpCommand
+        )
 
         self.parser = self.create_parser(**kwargs)
 
@@ -311,6 +315,7 @@ class Router(object):
                 parser.set_defaults(
                     _command_class=command_class,
                     _parser_name=subcommand,
+                    _parser=parser,
                 )
                 subcommand_info["parser"] = parser
 
@@ -454,6 +459,7 @@ class Router(object):
                 subcommands.append("")
 
             subcommands = [sc.lower() for sc in subcommands]
+
             pathfinder.set(
                 subcommands,
                 {
@@ -462,6 +468,23 @@ class Router(object):
                     "subparsers": None,
                 },
             )
+
+            # we want to make sure our datastructure is valid all the way down
+            # the chain
+            index = -2
+            while scs := subcommands[:index]:
+                if "" not in pathfinder.get(scs):
+                    scs.append("")
+                    pathfinder.set(
+                        scs,
+                        {
+                            "command_class": self.command_default_class,
+                            "parser": None,
+                            "subparsers": None,
+                        },
+                    )
+
+                index -= 1
 
         return pathfinder
 
@@ -620,38 +643,42 @@ class ArgumentParser(argparse.ArgumentParser):
         :param command_class: Command, this is the Command subclass that is
             going to be added to this parser
         """
-        if self.handler_added or not command_class:
+        if self.handler_added:
+        #if self.handler_added or not command_class:
             return
 
         self.handler_added = True
-
-        rc = command_class.reflect()
-        sig = rc.method().signature
-
-        groups = {} # holds the group parser instance
         _groups = {} # holds the arguments that belong to each group
-
+        sig = {}
         _arg_count = 0
-        for _arg_count, pa in enumerate(rc.parseargs(), 1):
-            if pa.group:
-                group = NamingConvention(pa.group)
-                groupname = group.varname()
-                if groupname not in groups:
-                    groups[groupname] = self.add_argument_group(group)
-                    _groups[groupname] = []
 
-                groups[groupname].add_argument(*pa[0], **pa[1])
-                _groups[groupname].append(pa.name)
+        if command_class:
+            rc = command_class.reflect()
+            sig = rc.method().signature
 
-            else:
-                self.add_argument(*pa[0], **pa[1])
+            groups = {} # holds the group parser instance
+
+            for _arg_count, pa in enumerate(rc.parseargs(), 1):
+                if pa.group:
+                    group = NamingConvention(pa.group)
+                    groupname = group.varname()
+                    if groupname not in groups:
+                        groups[groupname] = self.add_argument_group(group)
+                        _groups[groupname] = []
+
+                    groups[groupname].add_argument(*pa[0], **pa[1])
+                    _groups[groupname].append(pa.name)
+
+                else:
+                    self.add_argument(*pa[0], **pa[1])
 
         self.set_defaults(
             _command_class=command_class,
-            _has_handle_args=True if sig["*_name"] else False,
-            _has_handle_kwargs=True if sig["**_name"] else False,
+            _has_handle_args=True if sig.get("*_name") else False,
+            _has_handle_kwargs=True if sig.get("**_name") else False,
             _handle_signature=sig,
             _arg_count=_arg_count,
             _groups=_groups,
+            #_parser=self,
         )
 

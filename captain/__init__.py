@@ -7,18 +7,18 @@ from . import exception
 from .exception import Stop, Error
 
 
-__version__ = "5.0.0"
+__version__ = "5.0.1"
 
 
 def application(*args, **kwargs):
-    """Factory method to create the Application in order to answer requests
+    """Factory method to create and call the Application in order to answer
+    CLI requests
 
     :Example:
         from captain import application
+
         if __name__ == "__main__":
             application()
-
-    :returns: Application
     """
-    return Application(*args, **kwargs)
+    Application(*args, **kwargs)()
 
