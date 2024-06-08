@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from .interface import Application
-from .interface import Command # extend this to create commands/subcommands in your scripts
+from .interface import Command
 from .decorators import arg, args
 from . import exception
 from .exception import Stop, Error

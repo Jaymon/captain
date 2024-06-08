@@ -181,18 +181,7 @@ class Command(object):
         return ret_code
 
     async def handle(self, *args, **kwargs):
-        logger.warning(
-            "{}.handle() received {} args and {} kwargs".format(
-                self.__class__.__name__,
-                len(args),
-                len(kwargs),
-            )
-        )
-        raise NotImplementedError(
-            "Implemented {}.handle() in your class".format(
-                self.__class__.__name__
-            )
-        )
+        self.parsed._parser.print_help()
 
     async def handle_error(self, e):
         """This is called when an uncaught exception on the Command is raised,
@@ -212,10 +201,4 @@ class Command(object):
             raise e
 
         return ret_code
-
-
-class PrintHelpCommand(Command):
-    """This is a simple Command child that just prints the help"""
-    def handle(self, *args, **kwargs):
-        self.parsed._parser.print_help()
 

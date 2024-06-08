@@ -15,7 +15,7 @@ from datatypes import (
 )
 
 from .compat import *
-from .call import Command, PrintHelpCommand
+from .call import Command
 from .config import environ
 from .logging import QuietFilter
 
@@ -233,10 +233,6 @@ class Router(object):
 
         self.parser_class = kwargs.get("parser_class", ArgumentParser)
         self.command_class = kwargs.get("command_class", Command)
-        self.command_default_class = kwargs.get(
-            "command_default_class",
-            PrintHelpCommand
-        )
 
         self.parser = self.create_parser(**kwargs)
 
@@ -469,8 +465,8 @@ class Router(object):
                 },
             )
 
-            # we want to make sure our datastructure is valid all the way down
-            # the chain
+            # we want to make sure our datastructure looks the same all the
+            # way down the chain
             index = -2
             while scs := subcommands[:index]:
                 if "" not in pathfinder.get(scs):
@@ -478,7 +474,7 @@ class Router(object):
                     pathfinder.set(
                         scs,
                         {
-                            "command_class": self.command_default_class,
+                            "command_class": self.command_class,
                             "parser": None,
                             "subparsers": None,
                         },
@@ -644,7 +640,6 @@ class ArgumentParser(argparse.ArgumentParser):
             going to be added to this parser
         """
         if self.handler_added:
-        #if self.handler_added or not command_class:
             return
 
         self.handler_added = True
@@ -679,6 +674,5 @@ class ArgumentParser(argparse.ArgumentParser):
             _handle_signature=sig,
             _arg_count=_arg_count,
             _groups=_groups,
-            #_parser=self,
         )
 

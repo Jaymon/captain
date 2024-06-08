@@ -4,7 +4,7 @@ import asyncio
 
 from .compat import *
 from .parse import Router
-from .call import Command, PrintHelpCommand
+from .call import Command
 from .config import environ
 
 
@@ -25,10 +25,6 @@ class Application(object):
     """The base Comamnd class that will be used to retrieve the
     .command_classes class variable"""
 
-    command_default_class = PrintHelpCommand
-    """The default command class that will be used for undefined subcommands
-    """
-
     router_class = Router
     """The router class that converts the passed in arg strings into a
     callable command class"""
@@ -36,7 +32,6 @@ class Application(object):
     def create_router(self):
         return self.router_class(
             command_class=self.command_class,
-            command_default_class=self.command_default_class,
             command_prefixes=self.command_prefixes,
         )
 
