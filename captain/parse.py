@@ -653,7 +653,7 @@ class ArgumentParser(argparse.ArgumentParser):
 
             groups = {} # holds the group parser instance
 
-            for _arg_count, pa in enumerate(rc.parseargs(), 1):
+            for _arg_count, pa in enumerate(rc.arguments(), 1):
                 if pa.group:
                     group = NamingConvention(pa.group)
                     groupname = group.varname()

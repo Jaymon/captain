@@ -89,21 +89,7 @@ class ReflectMethodTest(TestCase):
         self.assertEqual("kwargs", sig["**_name"])
         self.assertIsNone(sig["*_name"])
 
-#     def test_signature_args(self):
-#         mi = ReflectCommand(FileScript([
-#             "class Default(Command):",
-#             "    def handle(self, foo, bar=1, che=3): pass",
-#         ]).command_class()).method()
-# 
-#         dests = set(["foo", "bar", "che"])
-# 
-#         count = 0
-#         for pa, pkw in mi.parseargs():
-#             count += 1
-#             self.assertTrue(pkw["dest"] in dests)
-#         self.assertEqual(3, count)
-
-    def test_parseargs(self):
+    def test_arguments(self):
         cbi = ReflectCommand(FileScript([
             "class Default(Command):",
             "    @arg('--foo', '-f', default=2, help='foo value')",
@@ -111,7 +97,7 @@ class ReflectMethodTest(TestCase):
             "    def handle(self, foo, bar=1, che=3, **kwargs): pass",
         ]).command_class()).method()
 
-        args = list(cbi.parseargs())
+        args = list(cbi.arguments())
         self.assertEqual("foo", args[0][1]["dest"])
         self.assertEqual("bang_one", args[1][1]["dest"])
 
@@ -145,7 +131,7 @@ class ReflectMethodTest(TestCase):
 
         contains = set(["baz-bar", "foo-bar", "che-foo"])
 
-        pas = list(mi.parseargs())
+        pas = list(mi.arguments())
         self.assertEqual(len(contains), len(pas))
         for pa in pas:
             self.assertTrue(pa.names & contains)
@@ -166,7 +152,7 @@ class ReflectMethodTest(TestCase):
             "    def handle(self, **kwargs): pass",
         ]).command_class()).method("Bar")
 
-        pas = list(mi.parseargs())
+        pas = list(mi.arguments())
         self.assertEqual(1, len(pas))
         self.assertEqual("+", pas[0].kwargs["nargs"])
 

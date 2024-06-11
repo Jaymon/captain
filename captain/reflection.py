@@ -57,10 +57,10 @@ class ReflectCommand(object):
     def method(self, method_name="handle"):
         return ReflectMethod(self.command_class.handle)
 
-    def parseargs(self):
-        """yield all the ParseArg instances of the arguments defined for this
+    def arguments(self):
+        """yield all the Argument instances of the arguments defined for this
         command"""
-        for pa in self.method().parseargs():
+        for pa in self.method().arguments():
             yield pa
 
 
@@ -117,12 +117,12 @@ class ReflectMethod(object):
     def __init__(self, method):
         self.method = method
 
-    def parseargs(self):
-        """Return all the ParseArg instances that should be added to the
+    def arguments(self):
+        """Return all the Argument instances that should be added to the
         ArgumentParser instance that will validate all the arguments that want
         to be passed to this method
 
-        :returns: list[ParseArg], all the found arguments for this method
+        :returns: list[Argument], all the found arguments for this method
         """
         pas = {}
         sig = self.signature
@@ -134,7 +134,7 @@ class ReflectMethod(object):
                 kw.get("omit", kw.get("remove", kw.get("ignore", [])))
             )
             for command_class in command_classes:
-                for pa in command_class.reflect().method().parseargs():
+                for pa in command_class.reflect().method().arguments():
                     # ignore any arguments that are in the ignore set
                     if not (ignore & pa.names):
                         pa.merge_signature(sig)
@@ -143,7 +143,7 @@ class ReflectMethod(object):
         # the values injected via @arg decorator
         dargs = self.decorator_args()
         for a, kw in dargs:
-            pa = ParseArg(*a, **kw)
+            pa = Argument(*a, **kw)
             pa.merge_signature(sig)
             if pa.name in pas:
                 pas[pa.name].merge(pa)
@@ -154,7 +154,7 @@ class ReflectMethod(object):
         return pas.values()
 
 
-class ParseArg(tuple):
+class Argument(tuple):
     """This class gets all the *args and **kwargs together to be passed to an
     argparse.ArgumentParser.add_argument() call, this combines the signature
     values with the @arg() arguments to get a comprehensive set of values that
@@ -206,9 +206,9 @@ class ParseArg(tuple):
                     self.set_default(sig["defaults"][n])
 
     def merge(self, pa):
-        """Merge another ParseArg instance into this one
+        """Merge another Argument instance into this one
 
-        :param pa: ParseArg instance, any pa.args that are not in self.args
+        :param pa: Argument instance, any pa.args that are not in self.args
             will be added, pa.args does not override self.args, pa.kwargs keys
             will overwrite self.kwargs keys
         """
@@ -217,7 +217,7 @@ class ParseArg(tuple):
             if a not in sa:
                 self.args.append(a)
 
-        # passed in ParseArg kwargs take precedence
+        # passed in Argument kwargs take precedence
         self.kwargs.update(pa.kwargs)
 
     def set_names(self):
