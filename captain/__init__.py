@@ -3,6 +3,7 @@
 from .interface import Application
 from .interface import Command
 from .decorators import arg, args
+from .reflection import Argument
 from . import exception
 from .exception import Stop, Error
 

@@ -3,7 +3,7 @@ import argparse
 
 from captain.reflection import (
     ReflectCommand,
-    ParseArg,
+    Argument,
 )
 from captain import Command
 
@@ -157,13 +157,13 @@ class ReflectMethodTest(TestCase):
         self.assertEqual("+", pas[0].kwargs["nargs"])
 
 
-class ParseArgTest(TestCase):
+class ArgumentTest(TestCase):
     def test___new__(self):
-        pa = ParseArg("--foo-bar", "--foo", "-f", default=2, help="foo value")
+        pa = Argument("--foo-bar", "--foo", "-f", default=2, help="foo value")
         self.assertTrue("--foo_bar" in pa[0])
         self.assertEqual("foo-bar", pa.name)
 
-        pa = ParseArg(
+        pa = Argument(
             "--foo-bar", "--foo", "-f",
             dest="foo",
             default=2,
@@ -173,21 +173,21 @@ class ParseArgTest(TestCase):
         self.assertEqual("foo", pa.name)
 
     def test_merge_signature_1(self):
-        pa = ParseArg("--foo", "-f", help="foo value")
+        pa = Argument("--foo", "-f", help="foo value")
         pa.merge_signature({"names": ["foo"], "defaults": {"foo": 1}})
         self.assertFalse(pa[1]["required"])
         self.assertEqual("foo", pa[1]["dest"])
         self.assertEqual(int, pa[1]["type"])
 
     def test_merge_signature_2(self):
-        pa = ParseArg("-f", dest="foo", help="foo value")
+        pa = Argument("-f", dest="foo", help="foo value")
         pa.merge_signature({"names": ["foo"], "defaults": {"foo": 1}})
         self.assertFalse(pa[1]["required"])
         self.assertEqual("foo", pa[1]["dest"])
         self.assertEqual(1, pa[1]["default"])
 
     def test_default(self):
-        pa = ParseArg('foo')
+        pa = Argument('foo')
         pa.set_default(True)
         self.assertEqual("store_false", pa[1]["action"])
 
@@ -197,7 +197,7 @@ class ParseArgTest(TestCase):
                 d = "HAPPY" + d
                 return super(FooType, cls).__new__(cls, d)
 
-        s = ParseArg("--footype", type=FooType)
+        s = Argument("--footype", type=FooType)
 
         parser = argparse.ArgumentParser()
         parser.add_argument(*s[0], **s[1])
