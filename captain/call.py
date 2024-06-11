@@ -6,7 +6,7 @@ from datatypes import NamingConvention
 
 from .compat import *
 from .decorators import classproperty
-from .reflection import ReflectCommand
+from .reflection import ReflectCommand, Argument
 from .io import Output, Input
 from . import exception
 from . import logging
@@ -88,10 +88,24 @@ class Command(object):
             or cls.__name__.endswith("Command")
         )
 
+    @classmethod
+    def arguments(cls):
+        arguments = {}
+        for k, v in inspect.getmembers(cls, lambda v: isinstance(v, Argument)):
+            arguments[k] = v
+
+        return arguments
+
     def __init__(self, parsed=None):
         self.parsed = parsed
         self.input = self.input_class()
         self.output = self.output_class()
+
+        # any class properties should be set to None on this instance since
+        # they don't exist and we don't want any instance methods messing with
+        # the actual Argument instance
+        for k in self.arguments().keys():
+            setattr(self, k, None)
 
     def __init_subclass__(cls):
         """When a child class is loaded into memory it will be saved into
@@ -129,13 +143,23 @@ class Command(object):
         """
         cargs = []
         ckwargs = {}
+        c_argnames = set(self.arguments().keys())
 
         if parsed := self.parsed:
+            m_argnames = set(parsed._handle_signature["names"])
+
             for k, v in vars(parsed).items():
                 # we filter out private (starts with _) and placeholder
                 # (surrounded by <>) keys
                 if not k.startswith("_") and not k.startswith("<"):
-                    ckwargs[k] = v
+                    if k in c_argnames:
+                        setattr(self, k, v)
+
+                        if k in m_argnames:
+                            ckwargs[k] = v
+
+                    else:
+                        ckwargs[k] = v
 
             ckwargs.update(kwargs)
 

@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import subprocess
 
+from captain.call import Command
+from captain.reflection import Argument
+
 from . import TestCase, FileScript
 
 
@@ -104,4 +107,26 @@ class CommandTest(TestCase):
         ])
         with self.assertRaises(subprocess.CalledProcessError):
             r = s.run("--bar 1")
+
+    def test_arguments(self):
+        class ParentCommand(Command):
+            foo = Argument(
+                "--foo", "-f",
+                type=int,
+                help="parent foo"
+            )
+            bar = Argument(
+                "--bar", "-b",
+                action="store_true",
+                help="parent bar"
+            )
+
+        class ChildCommand(ParentCommand):
+            foo = Argument("--foo", "-f", help="child foo")
+            che = Argument("--che", "-c", required=True, help="child che")
+
+
+        args = ChildCommand.arguments()
+        self.assertTrue("child foo" in args["foo"][1]["help"])
+        self.assertTrue("parent bar" in args["bar"][1]["help"])
 

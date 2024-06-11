@@ -10,32 +10,6 @@ from captain.reflection import ReflectMethod, ReflectCommand
 
 
 class FileScript(object):
-#     @property
-#     def captain(self):
-#         ret = None
-#         m = self.module()
-#         members = inspect.getmembers(
-#             m,
-#             lambda o: inspect.isclass(o) or inspect.ismodule(o)
-#         )
-#         for name, o in members:
-#             if isinstance(o, Application):
-#                 ret = Application()
-#                 break
-# 
-#             elif issubclass(o, Command):
-#                 ret = o.interface
-#                 break
-# 
-#             elif inspect.ismodule(o):
-#                 if ret := getattr(o, "application", None):
-#                     break
-# 
-#         if not ret:
-#             raise AttributeError("captain")
-# 
-#         return ret
-
     @property
     def parser(self):
         return Application(command_prefixes=[self.path]).router.parser
@@ -75,7 +49,13 @@ class FileScript(object):
                     #"#!/usr/bin/env python",
                     #"import sys",
                     #"sys.path.insert(0, '{}')".format(self.cwd),
-                    "from captain import Command, arg, args, exception",
+                    "from captain import (",
+                    "    Command,",
+                    "    Argument,",
+                    "    arg,",
+                    "    args,",
+                    "    exception,",
+                    ")",
                     "",
                 ])
 
@@ -146,19 +126,19 @@ class FileScript(object):
 
         return command_class
 
-#     def command(self, command_name="default"):
-#         return self.command_class(command_name=command_name)()
-
-#     def reflect(self, command_name="default"):
-#         return ReflectCommand(self.command_class(command_name))
-# 
-#     def reflect_method(self, command_name="default"):
-#         return self.reflect(command_name).method()
-
     def create_script(self, body, **kwargs):
-        return testdata.create_module(
-            body,
-        )
+        if kwargs.get("module", False):
+            m = testdata.create_module(
+                body,
+                module_name="{}.__main__".format(testdata.get_module_name()),
+            )
+
+        else:
+            m = testdata.create_module(
+                body,
+            )
+
+        return m
 
     def run(self, arg_str="", **kwargs):
         return testdata.run_command(
@@ -167,14 +147,4 @@ class FileScript(object):
             cwd=self.cwd,
             **kwargs
         ).strip()
-
-
-class ModuleScript(FileScript):
-    def create_script(self, body):
-        m = testdata.create_module(
-            body,
-            module_name="{}.__main__".format(testdata.get_module_name()),
-            #tmpdir=cwd,
-        )
-        return m
 

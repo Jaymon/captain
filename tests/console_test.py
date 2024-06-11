@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from . import testdata, TestCase, FileScript, ModuleScript
+from . import testdata, TestCase, FileScript
 
 
 class EntryPointsTest(TestCase):
@@ -9,10 +9,10 @@ class EntryPointsTest(TestCase):
     changes"""
     def test_python37_console_scripts(self):
         """https://github.com/Jaymon/transcribe/issues/2"""
-        m = ModuleScript([
+        m = FileScript([
             "class Default(Command):",
             "    def handle(self): print('success 3.7+')",
-        ])
+        ], module=True)
 
         path = testdata.create_file(contents=[
             "# -*- coding: utf-8 -*-",
@@ -37,10 +37,10 @@ class EntryPointsTest(TestCase):
 
     def test_python27_console_scripts(self):
 
-        m = ModuleScript([
+        m = FileScript([
             "class Default(Command):",
             "    def handle(self): print('success 2.7')",
-        ])
+        ], module=True)
 
         path = testdata.create_file(contents=[
             "import sys",
@@ -87,10 +87,10 @@ class EntryPointsTest(TestCase):
     def test_script_main(self):
         """A <MODULE_NAME>.__main__.py file"""
 
-        m = ModuleScript([
+        m = FileScript([
             "class Default(Command):",
             "    def handle(self): print('success script __main__')",
-        ])
+        ], module=True)
 
         s = testdata.Command(
             "{} -m {}".format(testdata.get_interpreter(), m.path),

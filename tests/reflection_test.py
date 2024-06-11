@@ -195,7 +195,7 @@ class ArgumentTest(TestCase):
         class FooType(str):
             def __new__(cls, d):
                 d = "HAPPY" + d
-                return super(FooType, cls).__new__(cls, d)
+                return super().__new__(cls, d)
 
         s = Argument("--footype", type=FooType)
 
@@ -203,4 +203,20 @@ class ArgumentTest(TestCase):
         parser.add_argument(*s[0], **s[1])
         args = parser.parse_args(["--footype", "/foo/bar/che"])
         self.assertTrue(args.footype.startswith("HAPPY"))
+
+    def test_class_property(self):
+        s = FileScript([
+            "class Default(Command):",
+            "    foo = Argument('--foo', type=int)",
+            "    bar = Argument('--bar', action='store_true')",
+            "    che = Argument('--che', required=True)",
+            "    def handle(self, che):",
+            "        print(f'foo: {self.foo}, bar: {self.bar}')",
+            "        print(f'{self.che}={che}')",
+        ])
+
+        r = s.run("--foo=1 --bar --che=che")
+        self.assertTrue("foo: 1" in r)
+        self.assertTrue("bar: True" in r)
+        self.assertTrue("che=che" in r)
 
