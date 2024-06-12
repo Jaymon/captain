@@ -169,27 +169,8 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
     https://docs.python.org/2/library/argparse.html#formatter-class
     """
     def _fill_text(self, text, width, indent):
-        """Overridden to not get rid of newlines
-
-        https://github.com/python/cpython/blob/2.7/Lib/argparse.py#L620"""
+        """Overridden to not get rid of newlines"""
         return "\n".join(self._split_lines(text, width, indent))
-
-#         lines = []
-#         for line in text.splitlines(False):
-#             if line:
-#                 # https://docs.python.org/2/library/textwrap.html
-#                 lines.extend(textwrap.wrap(
-#                     line.strip(),
-#                     width,
-#                     initial_indent=indent,
-#                     subsequent_indent=indent
-#                 ))
-# 
-#             else:
-#                 lines.append(line)
-# 
-#         text = "\n".join(lines)
-#         return text
 
     def _metavar_formatter(self, action, default_metavar):
         """Overrides the default formatter in order hide the aliases
@@ -197,7 +178,7 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         https://github.com/python/cpython/blob/3.11/Lib/argparse.py#L1189
 
         NOTE -- this relies on knowing how the parent's version of this
-        method works and duck types the action to get the wanted output
+        method works and duck types the action to get the desired output
         """
         if isinstance(action, argparse._SubParsersAction._ChoicesPseudoAction):
             fake_action = argparse.Namespace(
@@ -223,11 +204,6 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
 
         return super()._metavar_formatter(fake_action, default_metavar)
 
-#     def x_get_help_string(self, action):
-#         pout.v(action.help)
-#         # _expand_help calls this, and this returns what I expected
-#         return super()._get_help_string(action)
-
     def _split_lines(self, text, width, indent=""):
         """Overridden to not get rid of newlines
 
@@ -252,16 +228,6 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
                 lines.append(line)
 
         return lines
-
-#         self._whitespace_matcher = re.compile(r'[ \t\f\v]+')
-# 
-#         #pout.v(text, self._whitespace_matcher)
-#         text = self._whitespace_matcher.sub(' ', text).strip()
-#         pout.v(text)
-#         lines = super()._split_lines(text, width)
-#         pout.v(lines)
-#         return lines
-
 
 
 class Router(object):

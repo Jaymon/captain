@@ -172,10 +172,6 @@ class Argument(tuple):
 
     https://docs.python.org/3/library/argparse.html#the-add-argument-method
     """
-
-    #command_property = False
-    """True if an Argument instance is defined on a command class"""
-
     @property
     def args(self):
         return self[0]
@@ -197,14 +193,11 @@ class Argument(tuple):
         https://docs.python.org/3/howto/descriptor.html#customized-names
 
         This is only called when an instance is created while a class is being
-        parsed/created, so if you just created an instance of Field you would
-        need to call this method manually
+        parsed/created
 
         :param command_class: type, the class this Argument will belong to
         :param name: str, the argument's public name on the class
         """
-        #self.command_property = True
-
         if self.is_named():
             self.name = name
             self[1]["dest"] = name

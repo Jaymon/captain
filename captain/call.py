@@ -90,6 +90,14 @@ class Command(object):
 
     @classmethod
     def arguments(cls):
+        """Returns all the defined class arguments that will become class
+        properties when the command is ran
+
+        :returns: dict[str, Argument], where the key is the name of the 
+            property and the value is the Argument information that can be
+            used when adding the argument to a parser using
+            parser.add_argument
+        """
         arguments = {}
         for k, v in inspect.getmembers(cls, lambda v: isinstance(v, Argument)):
             arguments[k] = v
