@@ -172,22 +172,24 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         """Overridden to not get rid of newlines
 
         https://github.com/python/cpython/blob/2.7/Lib/argparse.py#L620"""
-        lines = []
-        for line in text.splitlines(False):
-            if line:
-                # https://docs.python.org/2/library/textwrap.html
-                lines.extend(textwrap.wrap(
-                    line.strip(),
-                    width,
-                    initial_indent=indent,
-                    subsequent_indent=indent
-                ))
+        return "\n".join(self._split_lines(text, width, indent))
 
-            else:
-                lines.append(line)
-
-        text = "\n".join(lines)
-        return text
+#         lines = []
+#         for line in text.splitlines(False):
+#             if line:
+#                 # https://docs.python.org/2/library/textwrap.html
+#                 lines.extend(textwrap.wrap(
+#                     line.strip(),
+#                     width,
+#                     initial_indent=indent,
+#                     subsequent_indent=indent
+#                 ))
+# 
+#             else:
+#                 lines.append(line)
+# 
+#         text = "\n".join(lines)
+#         return text
 
     def _metavar_formatter(self, action, default_metavar):
         """Overrides the default formatter in order hide the aliases
@@ -220,6 +222,46 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
             fake_action = action
 
         return super()._metavar_formatter(fake_action, default_metavar)
+
+#     def x_get_help_string(self, action):
+#         pout.v(action.help)
+#         # _expand_help calls this, and this returns what I expected
+#         return super()._get_help_string(action)
+
+    def _split_lines(self, text, width, indent=""):
+        """Overridden to not get rid of newlines
+
+        :param text: str, the text
+        :param width: int, how long each line can be
+        :param indent: str, not in parent so has to have a default value
+        :returns: list[str], the lines no more than width long
+        """
+        lines = []
+        text = textwrap.dedent(text)
+        for line in text.splitlines(False):
+            if line:
+                # https://docs.python.org/2/library/textwrap.html
+                lines.extend(textwrap.wrap(
+                    line,
+                    width,
+                    initial_indent=indent,
+                    subsequent_indent=indent
+                ))
+
+            else:
+                lines.append(line)
+
+        return lines
+
+#         self._whitespace_matcher = re.compile(r'[ \t\f\v]+')
+# 
+#         #pout.v(text, self._whitespace_matcher)
+#         text = self._whitespace_matcher.sub(' ', text).strip()
+#         pout.v(text)
+#         lines = super()._split_lines(text, width)
+#         pout.v(lines)
+#         return lines
+
 
 
 class Router(object):
@@ -488,9 +530,11 @@ class Router(object):
 class ArgumentParser(argparse.ArgumentParser):
     """This class is used to create parsers in Router and shouldn't ever be
     used outside of the Router context
+
+    https://github.com/python/cpython/blob/3.11/Lib/argparse.py
     """
     def __init__(self, **kwargs):
-        # https://docs.python.org/2/library/argparse.html#conflict-handler
+        # https://docs.python.org/3/library/argparse.html#conflict-handler
         self.handler_added = False
 
         kwargs.setdefault("formatter_class", HelpFormatter)
