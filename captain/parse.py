@@ -283,7 +283,7 @@ class Router(object):
                 aliases = []
                 command_class = subcommand_info["command_class"]
                 if command_class:
-                    desc = command_class.reflect().desc
+                    desc = command_class.reflect().get_help(self.command_class)
                     aliases = command_class.aliases
                     version = command_class.version
 

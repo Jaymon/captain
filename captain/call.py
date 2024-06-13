@@ -9,17 +9,14 @@ from .decorators import classproperty
 from .reflection import ReflectCommand, Argument
 from .io import Output, Input
 from . import exception
-from . import logging
 
 
-logger = logging.getLogger(__name__)
-
-
-# This is the base class of custom commands, any captain command needs to 
-# extend this class and define handle(), basically, every captain script will
-# go through a child of this class's handle() method, this class can't have a
-# docblock because that screws up reflection's docblock finder
 class Command(object):
+    """This is the base class of all commands and subcommands, any custom
+    command should extend this class and define the .handle() method,
+    basically, every script will go through a child of this class's handle()
+    method
+    """
     output_class = Output
 
     input_class = Input

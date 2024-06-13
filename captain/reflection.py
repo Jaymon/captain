@@ -70,6 +70,23 @@ class ReflectCommand(object):
         for pa in self.method().arguments():
             yield pa
 
+    def get_help(self, parent_class=None):
+        """Get the help doc for self.command_class
+
+        :param parent_class: Command, ignore self.command_class's help doc
+            if it is the same as the help doc of this class, this is mainly
+            used to ignore the docblock on Command
+        :returns: str
+        """
+        desc = self.desc
+        if desc and parent_class:
+            # we only want to use the docblock if it is defined
+            # on the command
+            if desc == parent_class.reflect().desc:
+                desc = ""
+
+        return desc
+
 
 class ReflectMethod(object):
     @property
