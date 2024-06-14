@@ -1,0 +1,50 @@
+[project]
+requires-python = ">=3.10"
+description = "Python cli scripts for humans"
+authors = [
+  { name = "Jay Marcyes", email = "jay@marcyes.com" }
+]
+keywords = [
+  "cli console"
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3"
+]
+dependencies = [
+  "datatypes"
+]
+name = "captain"
+dynamic = [
+  "version"
+]
+readme = "README.md"
+license = { file = "LICENSE.txt" }
+
+[project.urls]
+Homepage = "http://github.com/jaymon/captain"
+Repository = "https://github.com/Jaymon/captain"
+
+[build-system]
+requires = [
+  "setuptools>=62.3.0"
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+exclude = [
+  "tests*",
+  "example*",
+  "*_test*",
+  "docs*"
+]
+include = [
+  "captain*"
+]
+
+[tool.setuptools.dynamic]
+version = { attr = "captain.__version__" }
+
