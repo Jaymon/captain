@@ -160,17 +160,17 @@ class OutputTest(TestCase):
         o.hr()
         o.out("text after")
 
-    def test_quote(self):
+    def test_blockquote(self):
         o = Output()
 
         with testdata.capture() as r:
-            o.quote("line 1\nline 2\nline 3")
+            o.blockquote("line 1\nline 2\nline 3")
         self.assertTrue("  line 1" in r)
         self.assertTrue("  line 2" in r)
         self.assertTrue("  line 3" in r)
 
         with testdata.capture() as r:
-            o.quote("this is the string")
+            o.blockquote("this is the string")
         self.assertTrue("  this" in r)
 
     def test_headers(self):

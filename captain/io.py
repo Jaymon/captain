@@ -126,8 +126,9 @@ class Output(io.IOBase):
     """An instance of this class will be available in a handle() method using
     self.output, it contains handy outputting format methods
 
-    This is handy for captain scripts to be able to route their prints through and it
-    will obey the passed in --quiet commmand line argument automatically"""
+    This is handy for captain scripts to be able to route their prints through
+    and it will obey the passed in --quiet commmand line argument
+    automatically"""
     def __init__(self, stdout=None, stderr=None, **kwargs):
         self.stdout = stdout or logging.stdout
         self.stderr = stderr or logging.stderr
@@ -156,23 +157,22 @@ class Output(io.IOBase):
         return self.prefix(format_msg, *args, **kwargs)
 
     def increment(self, itr, n=1, format_msg="{}. "):
-        """Similar to enumerate but will set format_msg.format(n) into the prefix on
-        each iteration
+        """Similar to enumerate but will set format_msg.format(n) into the
+        prefix on each iteration
 
         :Example:
             for v in increment(["foo", "bar"]):
                 echo.out(v) # 1. foo\n2. bar
 
-        :param itr: iterator, any iterator you want to set a numeric prefix on on every
-            iteration
+        :param itr: iterator, any iterator you want to set a numeric prefix on
+            on every iteration
         :param n: integer, the starting integer for the numeric prefix
-        :param format_msg: string, this will basically do: format_msg.format(n) so there
-            should only be one set of curly brackets
+        :param format_msg: string, this will basically do: format_msg.format(n)
+            so there should only be one set of curly brackets
         :returns: yield generator
         """
         for i, v in enumerate(itr, n):
             with self.prefix(format_msg, i):
-            #self._prefix = format_msg.format(i)
                 yield v
 
     def incr(self, *args, **kwargs):
@@ -180,6 +180,33 @@ class Output(io.IOBase):
 
     def enumerate(self, *args, **kwargs):
         return self.increment(*args, **kwargs)
+
+    def wrap(self, value, prefix="\"", postfix=""):
+        """Wrap value in prefix and postfix, if postfix is not defined it will
+        default to prefix
+
+        :param value: str, the value to wrap
+        :param prefix: str, defaults to double-quote
+        :param postfix: str, defaults to paren match or prefix
+        :returns: str, the value wrapped in prefix and postfix
+        """
+        if not postfix:
+            if prefix == "[":
+                postfix = "]"
+
+            elif prefix == "(":
+                postfix = ")"
+
+            elif prefix == "{":
+                postfix = "}"
+
+            elif prefix == "<":
+                postfix = ">"
+
+            else:
+                postfix = prefix
+
+        return f"{prefix}{value}{postfix}"
 
     @contextmanager
     def progress(self, length=100, **kwargs):
@@ -378,7 +405,7 @@ class Output(io.IOBase):
     def newline(self, count=1):
         return self.br(count=count)
 
-    def quote(self, format_msg, *args, **kwargs):
+    def blockquote(self, format_msg, *args, **kwargs):
         prefix = kwargs.pop("prefix", "  ")
 
         msg = self.format(format_msg, *args, **kwargs)
