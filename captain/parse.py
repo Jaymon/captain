@@ -167,6 +167,10 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
 
     http://stackoverflow.com/questions/12151306/argparse-way-to-include-default-values-in-help
     https://docs.python.org/2/library/argparse.html#formatter-class
+
+    This is another implementation I found that might handle line wrapping
+    better:
+        https://gist.github.com/panzi/b4a51b3968f67b9ff4c99459fb9c5b3d
     """
     def _fill_text(self, text, width, indent):
         """Overridden to not get rid of newlines"""
@@ -445,7 +449,6 @@ class Router(object):
         })
 
         command_classes = self.command_class.command_classes
-
         for classpath, command_class in command_classes.items():
             rn = ReflectName(classpath)
             subcommands = []

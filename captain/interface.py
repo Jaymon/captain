@@ -61,8 +61,7 @@ class Application(object):
             script name, if not passed in then sys.argv[1:] will be used
         :returns: int, the return code you want the script to exit with
         """
-        router = self.create_router()
-        command = router.create_command(argv)
+        command = self.router.create_command(argv)
         return await command.run()
 
     def __call__(self):

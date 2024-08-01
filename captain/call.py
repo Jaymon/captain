@@ -57,7 +57,11 @@ class Command(object):
     @classproperty
     def module(cls):
         """The module the child class is defined in"""
-        return sys.modules[cls.__module__]
+        try:
+            return sys.modules[cls.__module__]
+
+        except KeyError as e:
+            raise AttributeError("module") from e
 
     @classmethod
     def reflect(cls):
