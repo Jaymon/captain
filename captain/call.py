@@ -46,13 +46,15 @@ class Command(object):
         will both trigger the subcommand) then you can return the aliases, this
         can be set in a child class or set aliases = [] to completely remove
         any aliases in a subclass"""
-        aliases = set()
-        for name in [cls.__name__, cls.name]:
-            for n in NamingConvention(name).variations():
-                aliases.add(n)
-                aliases.add(n.lower())
-
-        return aliases
+        return set()
+#         aliases = set()
+#         if not self.is_private():
+#             for name in [cls.__name__, cls.name]:
+#                 for n in NamingConvention(name).variations():
+#                     aliases.add(n)
+#                     aliases.add(n.lower())
+# 
+#         return aliases
 
     @classproperty
     def module(cls):

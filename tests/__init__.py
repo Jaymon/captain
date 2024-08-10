@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
-import inspect
 
 import testdata
 from testdata.test import TestCase
 
 from captain.compat import *
 from captain import Application, Command
-from captain.reflection import ReflectMethod, ReflectCommand
 
 
 class FileScript(object):
@@ -14,15 +12,17 @@ class FileScript(object):
     def parser(self):
         return Application(command_prefixes=[self.path]).router.parser
 
-    def __init__(self, body="", **kwargs):
-
-        # we reset the command classes everytime we create a new script
+    @classmethod
+    def reset_command_classes(cls):
         Command.command_classes = {}
+
+    def __init__(self, body="", **kwargs):
+        # we reset the command classes everytime we create a new script
+        self.reset_command_classes()
 
         self.body = self.get_body(body, **kwargs)
         self.path = self.create_script(self.body, **kwargs)
         self.cwd = self.path.basedir
-
 
     def get_body(self, body, **kwargs):
         if not body:
@@ -46,15 +46,13 @@ class FileScript(object):
 
             if "from captain" not in body:
                 header += "\n".join([
-                    #"#!/usr/bin/env python",
-                    #"import sys",
-                    #"sys.path.insert(0, '{}')".format(self.cwd),
                     "from captain import (",
                     "    Command,",
                     "    Argument,",
                     "    arg,",
                     "    args,",
                     "    exception,",
+                    "    Application",
                     ")",
                     "",
                 ])
@@ -102,8 +100,10 @@ class FileScript(object):
             body += "\n".join([
                 "",
                 "",
+                "application = Application()",
+                "",
                 "if __name__ == '__main__':",
-                "    captain.Application()()",
+                "    application()",
             ])
 
         return body
@@ -147,4 +147,11 @@ class FileScript(object):
             cwd=self.cwd,
             **kwargs
         ).strip()
+
+
+class TestCase(TestCase):
+    def setUp(self):
+        # command classes need to be reset between tests otherwise one
+        # test can step on another
+        FileScript.reset_command_classes()
 

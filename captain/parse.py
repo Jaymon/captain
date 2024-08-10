@@ -3,6 +3,7 @@ import argparse
 import textwrap
 import re
 import sys
+from collections import defaultdict
 
 from datatypes import (
     ArgvParser as UnknownParser,
@@ -193,7 +194,8 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         elif isinstance(action, argparse._SubParsersAction):
             choices = set()
             for parser in action.choices.values():
-                choices.add(parser._defaults["_parser_name"])
+                if parser._defaults["_parser_name"]:
+                    choices.add(parser._defaults["_parser_name"])
 
             choices = list(choices)
             choices.sort()
@@ -234,6 +236,106 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         return lines
 
 
+
+class Pathfinder(DictTree):
+    """Internal class to Router. This handles setting the subcommand hierarchy,
+    this is used to create all the parsers in the Router.
+    """
+    def __init__(self, command_prefixes, command_class):
+        """
+        :param command_prefixes: list[str]
+        :param command_class: Command, this is used internally to check
+            subclass suitability
+        """
+        super().__init__()
+
+        self.command_prefixes = command_prefixes
+        self.command_class = command_class
+
+        self.set([], self._get_node_value())
+
+    def create_instance(self):
+        """Internal method that makes sure creating sub-instances of this
+        class when creating nodes doesn't error out"""
+        return type(self)(
+            self.command_prefixes,
+            self.command_class
+        )
+
+    def _get_node_key(self, key):
+        """Internal method. Get the normalized key and possible aliases for
+        the key
+
+        :param key: str, this will be normalized
+        :returns: tuple(str, set[str]), the actual key value figured out from
+            the passed in key and then all the potential aliases for that
+            key
+        """
+        nc = NamingConvention(key)
+        return nc.kebabcase(), nc.variations()
+
+    def _get_node_value(self, **kwargs):
+        """Internal method. Gets the node value"""
+        value = {
+            "command_class": self.command_class,
+            "parser": None,
+            "subparsers": None,
+            "aliases": set(),
+            **kwargs
+        }
+
+        if issubclass(value["command_class"], self.command_class):
+            if aliases := value["command_class"].aliases:
+                value["aliases"] = aliases
+
+        else:
+            value["command_class"] = self.command_class
+
+        return value
+
+    def _get_node_values(self, classpath):
+        """Internal method. This yields the keys and values that will be
+        used to create new nodes in this tree
+
+        :param classpath: str, the full modpath:classpath
+        :returns: generator[tuple(list[str], dict)]
+        """
+        rn = ReflectName(classpath)
+        keys = []
+
+        for command_prefix in self.command_prefixes:
+            if classpath.startswith(command_prefix):
+                for modname in rn.relative_module_parts(command_prefix):
+                    key, aliases = self._get_node_key(modname)
+                    value = self._get_node_value(aliases=aliases)
+                    keys.append(key)
+                    yield keys, value
+
+                break
+
+        for command_class in rn.get_classes():
+            if command_class.__name__ == "Default":
+                value = self._get_node_value(command_class=command_class)
+
+            else:
+                key, aliases = self._get_node_key(command_class.__name__)
+                keys.append(key)
+                value = self._get_node_value(
+                    command_class=command_class,
+                    aliases=aliases
+                )
+
+            yield keys, value
+
+    def add_classpath(self, classpath):
+        """This is the method that is called from Router.create_pathfinder
+
+        :param classpath: str, the full modpath:classpath
+        """
+        for keys, value in self._get_node_values(classpath):
+            self.set(keys, value)
+
+
 class Router(object):
     """The glue that connects the Application and the passed in arguments
     to the ArgumentParser and the Command instance that will ultimately
@@ -245,6 +347,7 @@ class Router(object):
 
         self.parser_class = kwargs.get("parser_class", ArgumentParser)
         self.command_class = kwargs.get("command_class", Command)
+        self.pathfinder_class = kwargs.get("pathfinder_class", Pathfinder)
 
         self.parser = self.create_parser(**kwargs)
 
@@ -259,7 +362,7 @@ class Router(object):
         parsed = self.parser.parse_args(argv)
         return parsed._command_class(parsed)
 
-    def create_parsers(self, subcommands, common_parser):
+    def create_parsers(self, common_parser):
         """Go through subcommands and create all the downstream parsers
 
         :param subcommands: list[str], the subcommand path to get to the
@@ -273,29 +376,21 @@ class Router(object):
         :returns: list[argparse.ArgumentParser]
         """
         parsers = []
-        tree = self.pathfinder
 
-        for subcommand in subcommands:
-            if subcommand:
-                tree = tree[subcommand]
-
-            subcommand_info = tree[""]
-            parser = subcommand_info["parser"]
+        for keys, n in self.pathfinder.nodes():
+            value = n.value
+            parser = value["parser"]
+            subcommand = keys[-1] if keys else ""
             if not parser:
-                version = ""
-                desc = ""
-                aliases = []
-                command_class = subcommand_info["command_class"]
-                if command_class:
-                    desc = command_class.reflect().get_help(self.command_class)
-                    aliases = command_class.aliases
-                    version = command_class.version
+                command_class = value["command_class"]
+                desc = command_class.reflect().get_help(self.command_class)
+                version = command_class.version
 
-                if tp := tree.tree_parent:
-                    subparsers = tp[""]["subparsers"]
+                if parent_n := n.parent:
+                    subparsers = parent_n.value["subparsers"]
                     if not subparsers:
-                        subparsers = tp[""]["parser"].add_subparsers()
-                        tp[""]["subparsers"] = subparsers
+                        subparsers = parent_n.value["parser"].add_subparsers()
+                        parent_n.value["subparsers"] = subparsers
 
                     parser = subparsers.add_parser(
                         subcommand,
@@ -303,7 +398,7 @@ class Router(object):
                         help=desc,
                         description=desc,
                         conflict_handler="resolve",
-                        aliases=aliases,
+                        aliases=value["aliases"],
                     )
 
                 else:
@@ -325,7 +420,7 @@ class Router(object):
                     _parser_name=subcommand,
                     _parser=parser,
                 )
-                subcommand_info["parser"] = parser
+                value["parser"] = parser
 
             parsers.append(parser)
 
@@ -335,12 +430,9 @@ class Router(object):
         """This creates and returns the root parser"""
         self.load_commands(**kwargs)
         self.pathfinder = self.create_pathfinder(**kwargs)
-
         common_parser = self.create_common_parser(**kwargs)
-        for subcommands, subcommand_info in self.pathfinder.leaves():
-            self.create_parsers(subcommands, common_parser)
-
-        return self.pathfinder[""]["parser"]
+        self.create_parsers(common_parser)
+        return self.pathfinder.value["parser"]
 
     def create_common_parser(self, **kwargs):
         """Creates the common Parser that all other parsers will use as a base
@@ -440,58 +532,14 @@ class Router(object):
         This is used to figure out how routing should happen when you are
         loading a whole bunch of commands modules
         """
-        pathfinder = DictTree({
-            "": {
-                "command_class": None,
-                "parser": None,
-                "subparsers": None,
-            },
-        })
+        pathfinder = self.pathfinder_class(
+            self.command_prefixes,
+            self.command_class
+        )
 
         command_classes = self.command_class.command_classes
-        for classpath, command_class in command_classes.items():
-            rn = ReflectName(classpath)
-            subcommands = []
-
-            for command_prefix in self.command_prefixes:
-                if classpath.startswith(command_prefix):
-                    subcommands = rn.relative_module_parts(command_prefix)
-                    break
-
-            if rn.class_name == "Default":
-                subcommands.append("")
-
-            else:
-                subcommands.extend(rn.class_names)
-                subcommands.append("")
-
-            subcommands = [sc.lower() for sc in subcommands]
-
-            pathfinder.set(
-                subcommands,
-                {
-                    "command_class": command_class,
-                    "parser": None,
-                    "subparsers": None,
-                },
-            )
-
-            # we want to make sure our datastructure looks the same all the
-            # way down the chain
-            index = -2
-            while scs := subcommands[:index]:
-                if "" not in pathfinder.get(scs):
-                    scs.append("")
-                    pathfinder.set(
-                        scs,
-                        {
-                            "command_class": self.command_class,
-                            "parser": None,
-                            "subparsers": None,
-                        },
-                    )
-
-                index -= 1
+        for classpath in command_classes.keys():
+            pathfinder.add_classpath(classpath)
 
         return pathfinder
 
