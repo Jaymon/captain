@@ -293,7 +293,7 @@ class Pathfinder(DictTree):
 
         return value
 
-    def _get_node_values(self, classpath):
+    def _get_node_values(self, classpath, command_class):
         """Internal method. This yields the keys and values that will be
         used to create new nodes in this tree
 
@@ -313,26 +313,47 @@ class Pathfinder(DictTree):
 
                 break
 
-        for command_class in rn.get_classes():
-            if command_class.__name__ == "Default":
-                value = self._get_node_value(command_class=command_class)
+        # we can't use rn.get_classes() here because classpath could be
+        # something like: `<run_path>:ClassPrefix.Command` and so we can't
+        # actually get the module
+        command_class_i = len(rn.class_names) - 1
+        for i, class_name in enumerate(rn.class_names):
+
+            node_kwargs = {}
+            if command_class_i == i:
+                node_kwargs["command_class"] = command_class
+
+            if class_name == "Default":
+                value = self._get_node_value(**node_kwargs)
 
             else:
-                key, aliases = self._get_node_key(command_class.__name__)
+                key, aliases = self._get_node_key(class_name)
+                node_kwargs["aliases"] = aliases
                 keys.append(key)
-                value = self._get_node_value(
-                    command_class=command_class,
-                    aliases=aliases
-                )
+                value = self._get_node_value(**node_kwargs)
 
             yield keys, value
 
-    def add_classpath(self, classpath):
+#         for command_class in rn.get_classes():
+#             if command_class.__name__ == "Default":
+#                 value = self._get_node_value(command_class=command_class)
+# 
+#             else:
+#                 key, aliases = self._get_node_key(command_class.__name__)
+#                 keys.append(key)
+#                 value = self._get_node_value(
+#                     command_class=command_class,
+#                     aliases=aliases
+#                 )
+# 
+#             yield keys, value
+
+    def add_class(self, classpath, command_class):
         """This is the method that is called from Router.create_pathfinder
 
         :param classpath: str, the full modpath:classpath
         """
-        for keys, value in self._get_node_values(classpath):
+        for keys, value in self._get_node_values(classpath, command_class):
             self.set(keys, value)
 
 
@@ -538,8 +559,8 @@ class Router(object):
         )
 
         command_classes = self.command_class.command_classes
-        for classpath in command_classes.keys():
-            pathfinder.add_classpath(classpath)
+        for classpath, command_class in command_classes.items():
+            pathfinder.add_class(classpath, command_class)
 
         return pathfinder
 

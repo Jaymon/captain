@@ -10,27 +10,27 @@ from . import TestCase, FileScript
 
 
 class PathfinderTest(TestCase):
-    def test_add_classpath(self):
-        prefix = self.get_module_name(2, "commands")
-        p = self.create_modules({
-            prefix: {
-                "foo_bar": [
-                    "from captain import Command",
-                    "",
-                    "class CheBoo(Command):",
-                    "    def handle(self):",
-                    "        self.output.out('foo-bar che-boo')",
-                    "",
-                    "class Default(Command):",
-                    "    def handle(self):",
-                    "        self.output.out('foo-bar')",
-                ],
-            }
-        })
+    def test_add_class(self):
+        modpath = self.get_module_name(2, "commands")
+        self.create_module(
+            [
+                "from captain import Command",
+                "",
+                "class CheBoo(Command):",
+                "    def handle(self):",
+                "        self.output.out('foo-bar che-boo')",
+                "",
+                "class Default(Command):",
+                "    def handle(self):",
+                "        self.output.out('foo-bar')",
+            ],
+            modpath=modpath + ".foo_bar",
+            load=True
+        )
 
-        pf = Pathfinder([prefix], Command)
-        pf.add_classpath(f"{prefix}.foo_bar:CheBoo")
-        pf.add_classpath(f"{prefix}.foo_bar:Default")
+        pf = Pathfinder([modpath], Command)
+        for classpath, command_class in Command.command_classes.items():
+            pf.add_class(classpath, command_class)
 
         value = pf.get(["foo-bar"])
         self.assertEqual("Default", value["command_class"].__name__)
@@ -55,8 +55,8 @@ class PathfinderTest(TestCase):
         ], load=True)
 
         pf = Pathfinder([modpath], Command)
-        for classpath in Command.command_classes.keys():
-            pf.add_classpath(classpath)
+        for classpath, command_class in Command.command_classes.items():
+            pf.add_class(classpath, command_class)
 
         self.assertEqual(2, len(pf))
         self.assertEqual("Che", pf.get("che")["command_class"].__name__)
