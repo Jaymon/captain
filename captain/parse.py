@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import argparse
 import textwrap
+import os
 import re
 import sys
 from collections import defaultdict
@@ -743,4 +744,23 @@ class ArgumentParser(argparse.ArgumentParser):
             _arg_count=_arg_count,
             _groups=_groups,
         )
+
+    def add_argument(self, *args, **kwargs):
+        """
+        """
+        flags = []
+        environ_names = []
+        for i, arg in enumerate(args):
+            if arg[0] == "$":
+                environ_names.append(arg[1:])
+
+            else:
+                flags.append(arg)
+
+        environ = kwargs.pop("environ", os.environ)
+        for environ_name in environ_names:
+            if environ_name in environ:
+                kwargs["default"] = environ[environ_name]
+
+        return super().add_argument(*flags, **kwargs)
 

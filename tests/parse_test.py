@@ -536,3 +536,24 @@ class ArgumentParserTest(TestCase):
         self.assertTrue("foo-bar" in r)
         self.assertTrue("foobar" not in r)
 
+    def test_environ_arg(self):
+        """
+        https://github.com/Jaymon/captain/issues/77
+        """
+        s = FileScript([
+            "class Default(Command):",
+            "    @arg('--foo', '$FOO', default=1)",
+            "    def handle(self, foo):",
+            "        self.out(foo)",
+        ])
+
+        r = s.run("")
+        self.assertEqual("1", r)
+
+        with self.environ(FOO="2"):
+            r = s.run("")
+            self.assertEqual("2", r)
+
+            r = s.run("--foo=3")
+            self.assertEqual("3", r)
+
