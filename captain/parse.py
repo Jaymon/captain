@@ -746,7 +746,25 @@ class ArgumentParser(argparse.ArgumentParser):
         )
 
     def add_argument(self, *args, **kwargs):
-        """
+        """Overrides parent to allow for environment names to be placed into
+        the option_strings, an environ_name is an option_string that begins
+        with the money sign (eg "$FOO") and it means that value can be sourced
+        from the environment
+
+        add_argument([dest|environ_name], ..., name=value, ...)
+        add_argument([option_string|environ_name], ..., name=value, ...)
+
+        Precedence order:
+
+            1. A passed in optional/positional
+            2. An environment variable
+            3. The default value of the argument
+
+        :param *args: tuple[str, ...]
+            The dest name for a positional argument (eg "foo").
+            The option string (eg "--foo")
+            The environ name (eg "$FOO")
+        :param **kwargs: all the keyword settings for this argument
         """
         flags = []
         environ_names = []
