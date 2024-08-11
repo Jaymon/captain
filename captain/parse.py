@@ -334,20 +334,6 @@ class Pathfinder(DictTree):
 
             yield keys, value
 
-#         for command_class in rn.get_classes():
-#             if command_class.__name__ == "Default":
-#                 value = self._get_node_value(command_class=command_class)
-# 
-#             else:
-#                 key, aliases = self._get_node_key(command_class.__name__)
-#                 keys.append(key)
-#                 value = self._get_node_value(
-#                     command_class=command_class,
-#                     aliases=aliases
-#                 )
-# 
-#             yield keys, value
-
     def add_class(self, classpath, command_class):
         """This is the method that is called from Router.create_pathfinder
 
