@@ -63,7 +63,8 @@ class ReflectCommand(object):
 
         # first get all the class property arguments
         pas = self.command_class.arguments()
-        for pa in pas.values():
+        for pk, pa in pas.items():
+            pa.add_name(pk)
             yield pa
 
         # second get all the method arguments
@@ -229,6 +230,33 @@ class Argument(tuple):
                 return True
         return False
 
+    def add_name(self, name):
+        """Adds name to the list of flags (the args)
+
+        :param name: str, the flag to add, if it doesn't start with a dash
+            then one or two dashes will be added
+        """
+        if not name:
+            raise ValueError(f"name {name} is empty")
+
+        if name.startswith("-"):
+            self[0].append(name)
+
+        else:
+            if len(name) > 1:
+                for n in self._get_name_variations(name):
+                    self[0].append(f"--{n}")
+
+            else:
+                self[0].append(f"-{name}")
+
+    def _get_name_variations(self, name):
+        seen = set()
+        for n in (name.replace('_', '-'), name.replace('-', '_')):
+            if n not in seen:
+                seen.add(n)
+                yield n
+
     def merge_signature(self, sig):
         """merge a signature into self
 
@@ -273,7 +301,7 @@ class Argument(tuple):
             names.add(ns)
 
             if is_named and len(ns) > 1:
-                for n2 in (ns.replace('_', '-'), ns.replace('-', '_')):
+                for n2 in self._get_name_variations(ns):
                     if n2 not in names:
                         self[0].append("--{}".format(n2))
                         names.add(n2)

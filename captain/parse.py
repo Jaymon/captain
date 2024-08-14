@@ -361,7 +361,7 @@ class Router(object):
 
     def create_command(self, argv=None):
         """This command is used by the Application instance to get the
-        command that will ultimately handle the reuqest
+        command that will ultimately handle the request
 
         :param argv: list[str], a list of argument strings, if this isn't
             passed in then it will use sys.argv
@@ -702,8 +702,14 @@ class ArgumentParser(argparse.ArgumentParser):
         return parsed, parsed_unknown
 
     def add_handler(self, command_class):
-        """Every Command subclass will be added through this method, this is
-        automatically called when .parse_known_args is called
+        """All the Command handler arguments will be added through this
+        method, this is automatically called when .parse_known_args is called
+
+        This adds arguments to self from @arg, @args, and Argument class
+        properties. These are arguments aren't all added when self is created
+        because that would be a lot of work if you have a lot of parsers, so
+        it is done at the last possible moment when the correct parser has
+        been chosen
 
         :param command_class: Command, this is the Command subclass that is
             going to be added to this parser

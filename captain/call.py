@@ -47,14 +47,6 @@ class Command(object):
         can be set in a child class or set aliases = [] to completely remove
         any aliases in a subclass"""
         return set()
-#         aliases = set()
-#         if not self.is_private():
-#             for name in [cls.__name__, cls.name]:
-#                 for n in NamingConvention(name).variations():
-#                     aliases.add(n)
-#                     aliases.add(n.lower())
-# 
-#         return aliases
 
     @classproperty
     def module(cls):
