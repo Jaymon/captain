@@ -560,7 +560,7 @@ class ArgumentParser(argparse.ArgumentParser):
     """
     def __init__(self, **kwargs):
         # https://docs.python.org/3/library/argparse.html#conflict-handler
-        self.handler_added = False
+        self.command_class_added = False
 
         kwargs.setdefault("formatter_class", HelpFormatter)
         super().__init__(**kwargs)
@@ -631,7 +631,7 @@ class ArgumentParser(argparse.ArgumentParser):
         return arg_strings
 
     def parse_known_args(self, args=None, namespace=None):
-        self.add_handler(self._defaults["_command_class"])
+        self.add_command_arguments(self._defaults["_command_class"])
 
         parsed, parsed_unknown = super().parse_known_args(args, namespace)
 
@@ -701,12 +701,12 @@ class ArgumentParser(argparse.ArgumentParser):
 
         return parsed, parsed_unknown
 
-    def add_handler(self, command_class):
-        """All the Command handler arguments will be added through this
+    def add_command_arguments(self, command_class):
+        """All the defined Command arguments will be added through this
         method, this is automatically called when .parse_known_args is called
 
         This adds arguments to self from @arg, @args, and Argument class
-        properties. These are arguments aren't all added when self is created
+        properties. These arguments aren't all added on parser creation
         because that would be a lot of work if you have a lot of parsers, so
         it is done at the last possible moment when the correct parser has
         been chosen
@@ -714,13 +714,14 @@ class ArgumentParser(argparse.ArgumentParser):
         :param command_class: Command, this is the Command subclass that is
             going to be added to this parser
         """
-        if self.handler_added:
+        if self.command_class_added:
             return
 
-        self.handler_added = True
+        self.command_class_added = True
         _groups = {} # holds the arguments that belong to each group
         sig = {}
         _arg_count = 0
+        pa_actions = []
 
         if command_class:
             rc = command_class.reflect()
@@ -740,7 +741,28 @@ class ArgumentParser(argparse.ArgumentParser):
                     _groups[groupname].append(pa.name)
 
                 else:
-                    self.add_argument(*pa[0], **pa[1])
+                    action = self.add_argument(*pa[0], **pa[1])
+                    pa_actions.append((pa, action))
+
+        # now that all the arguments have been set and the actions created
+        # let's add variations, we don't do this earlier so we don't risk
+        # overriding a valid user defined flag with our computed alternatives
+        for pa, action in pa_actions:
+            # add the variations for this argument, this allows
+            # --foo_bar to work for foo-bar but they won't appear
+            # in the help output
+            if action.option_strings:
+                for name in pa.names:
+                    if len(name) == 1:
+                        flag = f"-{name}"
+
+                    else:
+                        flag = f"--{name}"
+
+                    if flag not in self._option_string_actions:
+                        # see the ._add_action method for how I figured this
+                        # out
+                        self._option_string_actions[flag] = action
 
         self.set_defaults(
             _command_class=command_class,
@@ -787,4 +809,9 @@ class ArgumentParser(argparse.ArgumentParser):
                 kwargs["default"] = environ[environ_name]
 
         return super().add_argument(*flags, **kwargs)
+
+#     def _add_action(self, action):
+#         action = super()._add_action(action)
+#         pout.v(action.option_strings)
+#         return action
 

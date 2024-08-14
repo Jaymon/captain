@@ -4,6 +4,8 @@ import inspect
 import types
 import argparse
 
+from datatypes import NamingConvention
+
 from .compat import *
 
 
@@ -64,7 +66,7 @@ class ReflectCommand(object):
         # first get all the class property arguments
         pas = self.command_class.arguments()
         for pk, pa in pas.items():
-            pa.add_name(pk)
+            #pa.add_name(pk)
             yield pa
 
         # second get all the method arguments
@@ -219,6 +221,7 @@ class Argument(tuple):
         if self.is_named():
             self.name = name
             self[1]["dest"] = name
+            self.names.update(NamingConvention(name).variations())
 
     def is_positional(self):
         return not self.is_named()
@@ -230,32 +233,61 @@ class Argument(tuple):
                 return True
         return False
 
-    def add_name(self, name):
-        """Adds name to the list of flags (the args)
+#     def variations(self):
+#         variations = set()
+#         if self.is_named():
+#             for name 
+# 
+# 
+#     def xvariations(self):
+#         variations = set()
+# 
+#         if self.is_named():
+#             for option_string in self[0]:
+#                 prefix = ""
+#                 prefix_ch = option_string[0]
+#                 while option_string[0] == prefix_ch:
+#                     prefix += option_string[0]
+#                     option_string = option_string[1:]
+# 
+#                 if len(option_string) > 1:
+#                     nc = NamingConvention(option_string)
+#                     for v in nc.variations():
+#                         variations.add(f"{prefix}{v}")
+# 
+#             if dest := self[1].get("dest", ""):
+#                 nc = NamingConvention(dest)
+#                 for v in nc.variations():
+#                     variations.add(f"--{v}")
+# 
+#         return variations
 
-        :param name: str, the flag to add, if it doesn't start with a dash
-            then one or two dashes will be added
-        """
-        if not name:
-            raise ValueError(f"name {name} is empty")
+#     def add_name(self, name):
+#         """Adds name to the list of flags (the args)
+# 
+#         :param name: str, the flag to add, if it doesn't start with a dash
+#             then one or two dashes will be added
+#         """
+#         if not name:
+#             raise ValueError(f"name {name} is empty")
+# 
+#         if name.startswith("-"):
+#             self[0].append(name)
+# 
+#         else:
+#             if len(name) > 1:
+#                 for n in self._get_name_variations(name):
+#                     self[0].append(f"--{n}")
+# 
+#             else:
+#                 self[0].append(f"-{name}")
 
-        if name.startswith("-"):
-            self[0].append(name)
-
-        else:
-            if len(name) > 1:
-                for n in self._get_name_variations(name):
-                    self[0].append(f"--{n}")
-
-            else:
-                self[0].append(f"-{name}")
-
-    def _get_name_variations(self, name):
-        seen = set()
-        for n in (name.replace('_', '-'), name.replace('-', '_')):
-            if n not in seen:
-                seen.add(n)
-                yield n
+#     def _get_name_variations(self, name):
+#         seen = set()
+#         for n in (name.replace('_', '-'), name.replace('-', '_')):
+#             if n not in seen:
+#                 seen.add(n)
+#                 yield n
 
     def merge_signature(self, sig):
         """merge a signature into self
@@ -299,12 +331,13 @@ class Argument(tuple):
                 longest_name = ns
 
             names.add(ns)
+            names.update(NamingConvention(ns).variations())
 
-            if is_named and len(ns) > 1:
-                for n2 in self._get_name_variations(ns):
-                    if n2 not in names:
-                        self[0].append("--{}".format(n2))
-                        names.add(n2)
+#             if is_named and len(ns) > 1:
+#                 for n2 in self._get_name_variations(ns):
+#                     if n2 not in names:
+#                         self[0].append("--{}".format(n2))
+#                         names.add(n2)
 
         # we need to compensate for: "ValueError: dest supplied twice for
         # positional argument" It looks like if there is one arg and it is a
@@ -313,8 +346,10 @@ class Argument(tuple):
         # https://docs.python.org/3/library/argparse.html#dest
         dest = self[1].get("dest", "")
         if dest:
-            names.add(dest)
+#             names.add(dest)
             self.name = dest
+            names.update(NamingConvention(dest).variations())
+
             if not is_named:
                 # ok, we have a positional and a dest, that will fail, so let's
                 # do some manipulation

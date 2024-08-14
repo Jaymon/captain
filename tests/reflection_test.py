@@ -74,6 +74,15 @@ class ReflectCommandTest(TestCase):
         ], header="").command_class())
         self.assertEqual("the description on module doc", cbi.desc)
 
+    def test_property_argument(self):
+        rc = ReflectCommand(FileScript([
+            "class Default(Command):",
+            "    foo = Argument('--bar')",
+            "    def handle(self): pass",
+        ]).command_class())
+
+        self.assertEqual(1, len(list(rc.arguments())))
+
 
 class ReflectMethodTest(TestCase):
     def test_signature_info(self):
@@ -160,7 +169,7 @@ class ReflectMethodTest(TestCase):
 class ArgumentTest(TestCase):
     def test___new__(self):
         pa = Argument("--foo-bar", "--foo", "-f", default=2, help="foo value")
-        self.assertTrue("--foo_bar" in pa[0])
+        self.assertTrue("--foo" in pa[0])
         self.assertEqual("foo-bar", pa.name)
 
         pa = Argument(
@@ -169,7 +178,7 @@ class ArgumentTest(TestCase):
             default=2,
             help="foo value"
         )
-        self.assertTrue("--foo_bar" in pa[0])
+        self.assertTrue("--foo-bar" in pa[0])
         self.assertEqual("foo", pa.name)
 
     def test_merge_signature_1(self):
@@ -219,4 +228,10 @@ class ArgumentTest(TestCase):
         self.assertTrue("foo: 1" in r)
         self.assertTrue("bar: True" in r)
         self.assertTrue("che=che" in r)
+
+    def test_names(self):
+        pa = Argument("--foo-b", "--fb", "-f", dest="foo_bar")
+        vs = pa.names
+        for v in ["foo_bar", "FOO_BAR", "foo-bar"]:
+            self.assertTrue(v in vs)
 

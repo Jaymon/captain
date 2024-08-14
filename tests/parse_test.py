@@ -557,3 +557,23 @@ class ArgumentParserTest(TestCase):
             r = s.run("--foo=3")
             self.assertEqual("3", r)
 
+    def test_option_string_variations(self):
+        s = FileScript([
+            "class Default(Command):",
+            "    foo_bar = Argument('--fb', '--fo-bo')",
+            "    @arg('--remote-dir', dest='remote_directory')",
+            "    def handle(self, remote_directory):",
+            "        self.out(self.foo_bar)",
+            "        self.out(remote_directory)",
+        ])
+
+        r = s.run("--help")
+        self.assertFalse("remote_directory" in r)
+        self.assertFalse("foo-bar" in r)
+
+        v1 = "other"
+        v2 = "something"
+        r = s.run(f"--foo_bar={v1} --remote-directory {v2}")
+        self.assertTrue(v1 in r)
+        self.assertTrue(v2 in r)
+
