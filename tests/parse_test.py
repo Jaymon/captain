@@ -418,7 +418,7 @@ class ArgumentParserTest(TestCase):
             "",
             "class FooAction(argparse.Action):",
             "    def parse_args(self, parser, arg_strings): return arg_strings",
-            "    def get_value(self, value): return int(value) + 1",
+            "    def get_value(self, value): pout.v(value); return int(value) + 1",
             "    def __call__(self, parser, namespace, values, option_string):",
             "        setattr(namespace, self.dest, values)",
             "",
@@ -534,7 +534,18 @@ class ArgumentParserTest(TestCase):
 
         r = s.run("--help")
         self.assertTrue("foo-bar" in r)
-        self.assertTrue("foobar" not in r)
+        self.assertFalse("FooBar" in r)
+
+    def test_subcommand_variations(self):
+        s = FileScript([
+            "class FooBar(Command):",
+            "    def handle(self): self.out('FooBar')",
+            "",
+            "class BarChe(Command):",
+            "    def handle(self): self.out('BarChe')",
+        ])
+
+        r = s.run("foobar")
 
     def test_environ_arg(self):
         """

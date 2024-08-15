@@ -178,38 +178,38 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         """Overridden to not get rid of newlines"""
         return "\n".join(self._split_lines(text, width, indent))
 
-    def _metavar_formatter(self, action, default_metavar):
-        """Overrides the default formatter in order hide the aliases
-
-        https://github.com/python/cpython/blob/3.11/Lib/argparse.py#L1189
-
-        NOTE -- this relies on knowing how the parent's version of this
-        method works and duck types the action to get the desired output
-        """
-        if isinstance(action, argparse._SubParsersAction._ChoicesPseudoAction):
-            fake_action = argparse.Namespace(
-                metavar=None,
-                choices=None,
-            )
-
-        elif isinstance(action, argparse._SubParsersAction):
-            choices = set()
-            for parser in action.choices.values():
-                if parser._defaults["_parser_name"]:
-                    choices.add(parser._defaults["_parser_name"])
-
-            choices = list(choices)
-            choices.sort()
-
-            fake_action = argparse.Namespace(
-                metavar=None,
-                choices=choices,
-            )
-
-        else:
-            fake_action = action
-
-        return super()._metavar_formatter(fake_action, default_metavar)
+#     def _metavar_formatter(self, action, default_metavar):
+#         """Overrides the default formatter in order hide the aliases
+# 
+#         https://github.com/python/cpython/blob/3.11/Lib/argparse.py#L1189
+# 
+#         NOTE -- this relies on knowing how the parent's version of this
+#         method works and duck types the action to get the desired output
+#         """
+#         if isinstance(action, argparse._SubParsersAction._ChoicesPseudoAction):
+#             fake_action = argparse.Namespace(
+#                 metavar=None,
+#                 choices=None,
+#             )
+# 
+#         elif isinstance(action, argparse._SubParsersAction):
+#             choices = set()
+#             for parser in action.choices.values():
+#                 if parser._defaults["_parser_name"]:
+#                     choices.add(parser._defaults["_parser_name"])
+# 
+#             choices = list(choices)
+#             choices.sort()
+# 
+#             fake_action = argparse.Namespace(
+#                 metavar=None,
+#                 choices=choices,
+#             )
+# 
+#         else:
+#             fake_action = action
+# 
+#         return super()._metavar_formatter(fake_action, default_metavar)
 
     def _split_lines(self, text, width, indent=""):
         """Overridden to not get rid of newlines
@@ -552,6 +552,57 @@ class Router(object):
         return pathfinder
 
 
+
+class SubParsersAction(argparse._SubParsersAction):
+#     @property
+#     def choices(self):
+#         pout.h()
+#         return self._name_parser_map
+# 
+#     @choices.setter
+#     def choices(self, v):
+#         pass
+
+    def __init__(self, *args, **kwargs):
+        self._alias_map = {}
+        super().__init__(*args, **kwargs)
+
+    def add_parser(self, name, **kwargs):
+        """
+        https://github.com/python/cpython/blob/3.11/Lib/argparse.py#L1189
+        """
+        self._alias_map[name] = kwargs.pop("aliases", [])
+        return super().add_parser(name, **kwargs)
+
+#         parser = super().add_parser(name, **kwargs)
+# 
+# #         for alias in aliases:
+# #             self._alias_map[alias] = name
+# 
+#         self._alias_map[name] = aliases
+# 
+# #         for alias in aliases:
+# #             self._name_parser_map[alias] = parser
+# 
+#         return parser
+
+#     def __call__(self, parser, namespace, values, option_string=None):
+# 
+#         #pout.v(namespace, values, option_string)
+#         pout.h()
+# 
+#         return super().__call__(parser, namespace, values, option_string)
+
+    def get_arg_string(self, name):
+        if name not in self._alias_map:
+            for n, aliases in self._alias_map.items():
+                if name in aliases:
+                    name = n
+                    break
+
+        return name
+
+
 class ArgumentParser(argparse.ArgumentParser):
     """This class is used to create parsers in Router and shouldn't ever be
     used outside of the Router context
@@ -565,6 +616,8 @@ class ArgumentParser(argparse.ArgumentParser):
         kwargs.setdefault("formatter_class", HelpFormatter)
         super().__init__(**kwargs)
 
+        self.register('action', 'parsers', SubParsersAction)
+
     def _get_value(self, action, arg_string):
         """By default, there is no easy way to do something with a value after
         it is set, regardless of it being set by .default, .const, or an actual
@@ -576,10 +629,20 @@ class ArgumentParser(argparse.ArgumentParser):
         is a String, I have no idea why, but a custom action using this needs
         to have string default values
         """
+
+        cb = getattr(action, "get_arg_string", None)
+        if cb:
+            arg_string = cb(arg_string)
+
+#         if isinstance(action, SubParsersAction):
+#             arg_string = action.get_name(arg_string)
+
         ret = super()._get_value(action, arg_string)
+
         cb = getattr(action, "get_value", None)
         if cb:
             ret = cb(ret)
+
         return ret
 
     def _parse_action_args(self, arg_strings):
@@ -810,8 +873,15 @@ class ArgumentParser(argparse.ArgumentParser):
 
         return super().add_argument(*flags, **kwargs)
 
-#     def _add_action(self, action):
-#         action = super()._add_action(action)
-#         pout.v(action.option_strings)
-#         return action
+#     def _check_value(self, action, value):
+#         pout.v(type(action), value)
+#         return super()._check_value(action, value)
+
+#     def _get_value(self, action, arg_string):
+#         #pout.v(type(action), arg_string)
+# 
+#         if isinstance(action, SubParsersAction):
+#             arg_string = action.get_name(arg_string)
+# 
+#         return super()._get_value(action, arg_string)
 
