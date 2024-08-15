@@ -178,39 +178,6 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         """Overridden to not get rid of newlines"""
         return "\n".join(self._split_lines(text, width, indent))
 
-#     def _metavar_formatter(self, action, default_metavar):
-#         """Overrides the default formatter in order hide the aliases
-# 
-#         https://github.com/python/cpython/blob/3.11/Lib/argparse.py#L1189
-# 
-#         NOTE -- this relies on knowing how the parent's version of this
-#         method works and duck types the action to get the desired output
-#         """
-#         if isinstance(action, argparse._SubParsersAction._ChoicesPseudoAction):
-#             fake_action = argparse.Namespace(
-#                 metavar=None,
-#                 choices=None,
-#             )
-# 
-#         elif isinstance(action, argparse._SubParsersAction):
-#             choices = set()
-#             for parser in action.choices.values():
-#                 if parser._defaults["_parser_name"]:
-#                     choices.add(parser._defaults["_parser_name"])
-# 
-#             choices = list(choices)
-#             choices.sort()
-# 
-#             fake_action = argparse.Namespace(
-#                 metavar=None,
-#                 choices=choices,
-#             )
-# 
-#         else:
-#             fake_action = action
-# 
-#         return super()._metavar_formatter(fake_action, default_metavar)
-
     def _split_lines(self, text, width, indent=""):
         """Overridden to not get rid of newlines
 
@@ -235,7 +202,6 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
                 lines.append(line)
 
         return lines
-
 
 
 class Pathfinder(DictTree):
@@ -552,17 +518,13 @@ class Router(object):
         return pathfinder
 
 
-
 class SubParsersAction(argparse._SubParsersAction):
-#     @property
-#     def choices(self):
-#         pout.h()
-#         return self._name_parser_map
-# 
-#     @choices.setter
-#     def choices(self, v):
-#         pass
+    """This is what is returned from ArgumentParser.add_subparsers and only
+    exists to hide aliases from the help output
 
+    https://github.com/python/cpython/blob/3.11/Lib/argparse.py#L793
+    https://github.com/python/cpython/blob/3.11/Lib/argparse.py#L1154
+    """
     def __init__(self, *args, **kwargs):
         self._alias_map = {}
         super().__init__(*args, **kwargs)
@@ -574,33 +536,21 @@ class SubParsersAction(argparse._SubParsersAction):
         self._alias_map[name] = kwargs.pop("aliases", [])
         return super().add_parser(name, **kwargs)
 
-#         parser = super().add_parser(name, **kwargs)
-# 
-# #         for alias in aliases:
-# #             self._alias_map[alias] = name
-# 
-#         self._alias_map[name] = aliases
-# 
-# #         for alias in aliases:
-# #             self._name_parser_map[alias] = parser
-# 
-#         return parser
+    def get_arg_string(self, arg_string):
+        """This is where the magic happens. This is called from
+        ArgumentParser._get_value and normalizes the flag name if needed
 
-#     def __call__(self, parser, namespace, values, option_string=None):
-# 
-#         #pout.v(namespace, values, option_string)
-#         pout.h()
-# 
-#         return super().__call__(parser, namespace, values, option_string)
-
-    def get_arg_string(self, name):
-        if name not in self._alias_map:
+        :param name: str, the arg string
+        :returns: str, either the arg_string untouched or the actual name
+            of the subparser if arg_string was an alias
+        """
+        if arg_string not in self._alias_map:
             for n, aliases in self._alias_map.items():
-                if name in aliases:
-                    name = n
+                if arg_string in aliases:
+                    arg_string = n
                     break
 
-        return name
+        return arg_string
 
 
 class ArgumentParser(argparse.ArgumentParser):
@@ -630,12 +580,10 @@ class ArgumentParser(argparse.ArgumentParser):
         to have string default values
         """
 
+        # this normalizes subcommand aliases (see SubParserAction)
         cb = getattr(action, "get_arg_string", None)
         if cb:
             arg_string = cb(arg_string)
-
-#         if isinstance(action, SubParsersAction):
-#             arg_string = action.get_name(arg_string)
 
         ret = super()._get_value(action, arg_string)
 
@@ -872,16 +820,4 @@ class ArgumentParser(argparse.ArgumentParser):
                 kwargs["default"] = environ[environ_name]
 
         return super().add_argument(*flags, **kwargs)
-
-#     def _check_value(self, action, value):
-#         pout.v(type(action), value)
-#         return super()._check_value(action, value)
-
-#     def _get_value(self, action, arg_string):
-#         #pout.v(type(action), arg_string)
-# 
-#         if isinstance(action, SubParsersAction):
-#             arg_string = action.get_name(arg_string)
-# 
-#         return super()._get_value(action, arg_string)
 
