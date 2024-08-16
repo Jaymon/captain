@@ -276,29 +276,9 @@ class Argument(tuple):
             names.add(ns)
             names.update(NamingConvention(ns).variations())
 
-        # we need to compensate for: "ValueError: dest supplied twice for
-        # positional argument" It looks like if there is one arg and it is a
-        # positional (eg, no -- prefix) then it will use that as the dest and
-        # you can't set a dest kwarg
-        # https://docs.python.org/3/library/argparse.html#dest
-        dest = self[1].get("dest", "")
-        if dest:
+        if dest := self[1].get("dest", ""):
             self.name = dest
             names.update(NamingConvention(dest).variations())
-
-#             raise ValueError(
-#                 f"Positional argument {self[0][0]} has dest {dest} but"
-#                 " positional arguments cannot have a dest keyword because"
-#                 " the first argument is the dest"
-#             )
-
-#             if not is_named:
-#                 # positional arguments can't have the dest keyword because the
-#                 # first argument is the dest but we have a positional and a
-#                 # dest, that will fail, so let's do some manipulation
-#                 self[1].setdefault("metavar", self[0][0])
-#                 self[0][0] = dest
-#                 self[1].pop("dest")
 
         else:
             if is_named:
