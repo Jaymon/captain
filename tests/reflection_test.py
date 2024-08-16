@@ -69,7 +69,7 @@ class ReflectCommandTest(TestCase):
 
         cbi = ReflectCommand(FileScript([
             '"""the description on module doc"""',
-            "from captain import Command",
+            "from captain import Command, Application",
             "class Default(Command): pass",
         ], header="").command_class())
         self.assertEqual("the description on module doc", cbi.desc)
@@ -89,14 +89,14 @@ class ReflectMethodTest(TestCase):
         cbi = ReflectCommand(FileScript([
             "class Default(Command):",
             "    def handle(self, foo, bar=1, che=3, **kwargs): pass",
-        ]).command_class()).method()
+        ]).command_class()).reflect_method()
 
-        sig = cbi.signature
+        sig = cbi.get_signature_info()
         self.assertEqual(set(["foo"]), sig["required"])
         self.assertEqual(["foo", "bar", "che"], sig["names"])
         self.assertEqual(1, sig["defaults"]["bar"])
         self.assertEqual("kwargs", sig["**_name"])
-        self.assertIsNone(sig["*_name"])
+        self.assertEqual("", sig["*_name"])
 
     def test_arguments(self):
         cbi = ReflectCommand(FileScript([
@@ -104,7 +104,7 @@ class ReflectMethodTest(TestCase):
             "    @arg('--foo', '-f', default=2, help='foo value')",
             "    @arg('--bang-one', '-b', default=4, help='bang value')",
             "    def handle(self, foo, bar=1, che=3, **kwargs): pass",
-        ]).command_class()).method()
+        ]).command_class()).reflect_method()
 
         args = list(cbi.arguments())
         self.assertEqual("foo", args[0][1]["dest"])
@@ -136,7 +136,7 @@ class ReflectMethodTest(TestCase):
             "    @args(Baz, omit=['baz-foo'])",
             "    def handle(self, **kwargs):",
             "        print('kwargs: {}'.format(kwargs))",
-        ]).command_class()).method("Bam")
+        ]).command_class("Bam")).reflect_method()
 
         contains = set(["baz-bar", "foo-bar", "che-foo"])
 
@@ -159,7 +159,7 @@ class ReflectMethodTest(TestCase):
             "    @args(Foo)",
             "    @arg('foo', nargs='+')",
             "    def handle(self, **kwargs): pass",
-        ]).command_class()).method("Bar")
+        ]).command_class("Bar")).reflect_method()
 
         pas = list(mi.arguments())
         self.assertEqual(1, len(pas))

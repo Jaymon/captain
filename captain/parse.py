@@ -357,7 +357,7 @@ class Router(object):
             subcommand = keys[-1] if keys else ""
             if not parser:
                 command_class = value["command_class"]
-                desc = command_class.reflect().get_help(self.command_class)
+                desc = command_class.reflect().desc
                 version = command_class.version
 
                 if parent_n := n.parent:
@@ -736,7 +736,7 @@ class ArgumentParser(argparse.ArgumentParser):
 
         if command_class:
             rc = command_class.reflect()
-            sig = rc.method().signature
+            sig = rc.reflect_method().get_signature_info()
 
             groups = {} # holds the group parser instance
 
