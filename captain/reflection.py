@@ -286,12 +286,19 @@ class Argument(tuple):
             self.name = dest
             names.update(NamingConvention(dest).variations())
 
-            if not is_named:
-                # ok, we have a positional and a dest, that will fail, so let's
-                # do some manipulation
-                self[1].setdefault("metavar", self[0][0])
-                self[0][0] = dest
-                self[1].pop("dest")
+#             raise ValueError(
+#                 f"Positional argument {self[0][0]} has dest {dest} but"
+#                 " positional arguments cannot have a dest keyword because"
+#                 " the first argument is the dest"
+#             )
+
+#             if not is_named:
+#                 # positional arguments can't have the dest keyword because the
+#                 # first argument is the dest but we have a positional and a
+#                 # dest, that will fail, so let's do some manipulation
+#                 self[1].setdefault("metavar", self[0][0])
+#                 self[0][0] = dest
+#                 self[1].pop("dest")
 
         else:
             if is_named:

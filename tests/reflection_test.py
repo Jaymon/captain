@@ -59,7 +59,7 @@ class ReflectCommandTest(TestCase):
             '# -*- coding: utf-8 -*-',
             '# the description on module comment',
             "# and the second line",
-            "from captain import Command",
+            "from captain import Command, Application",
             "class Default(Command): pass",
         ], header="").command_class())
         self.assertEqual(
@@ -194,6 +194,44 @@ class ArgumentTest(TestCase):
         self.assertFalse(pa[1]["required"])
         self.assertEqual("foo", pa[1]["dest"])
         self.assertEqual(1, pa[1]["default"])
+
+    def test_merge_error(self):
+        """
+        https://github.com/Jaymon/captain/issues/75
+
+        Turns out, this isn't actually a bug and merging is working correctly,
+        previously I was compensating for a positional argument having an
+        arg ("foos") and a dest ("foo_names") by moving the arg to the metavar
+        and then setting the dest as the arg, so the signature switched to
+        `"foo_names", metavar="foos"` and then when the arguments were merged
+        the "foos" metavar would override the "FOO" metavar. I think it's
+        better to adhere to the default behavior rather than compensate for
+        a bad signature
+        """
+        s = FileScript("""
+            class Foo(Command):
+                @arg(
+                    "foos",
+                    #metavar="FOO",
+                    nargs="*",
+                    dest="foo_names",
+                    help="foo help 1"
+                )
+                def handle(self, *args, **kwargs): pass
+
+            class Bar(Command):
+                @args(Foo)
+                @arg(
+                    "foos",
+                    nargs="+",
+                    dest="foo_names",
+                    help="foo help 2"
+                )
+                def handle(self, *args, **kwargs): pass
+        """)
+
+        with self.assertRaises(RuntimeError):
+            s.run("bar --help")
 
     def test_default(self):
         pa = Argument('foo')

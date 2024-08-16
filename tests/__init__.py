@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import textwrap
 
 import testdata
 from testdata.test import TestCase
@@ -28,7 +29,10 @@ class FileScript(object):
         if not body:
             body = ""
 
-        if not isinstance(body, basestring):
+        if isinstance(body, basestring):
+            body = textwrap.dedent(body)
+
+        else:
             body = "\n".join(body)
 
         if "header" in kwargs:
