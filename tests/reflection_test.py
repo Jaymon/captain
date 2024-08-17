@@ -18,7 +18,7 @@ class ReflectCommandTest(TestCase):
                 pass
 
         cbi = ReflectCommand(Default)
-        self.assertEqual("the description on method doc", cbi.desc)
+        self.assertEqual("the description on method doc", cbi.get_docblock())
 
         class Default(Command):
             # the description on method comment
@@ -29,7 +29,7 @@ class ReflectCommandTest(TestCase):
         cbi = ReflectCommand(Default)
         self.assertEqual(
             "the description on method comment\nand the second line",
-            cbi.desc
+            cbi.get_docblock()
         )
 
     def test_desc_class(self):
@@ -39,7 +39,7 @@ class ReflectCommandTest(TestCase):
                 pass
 
         cbi = ReflectCommand(Default)
-        self.assertEqual("the description on class doc", cbi.desc)
+        self.assertEqual("the description on class doc", cbi.get_docblock())
 
         cbi = ReflectCommand(FileScript([
             "# the description on class comment",
@@ -50,7 +50,7 @@ class ReflectCommandTest(TestCase):
 
         self.assertEqual(
             "the description on class comment\nand the second line",
-            cbi.desc
+            cbi.get_docblock()
         )
 
     def test_desc_module(self):
@@ -64,7 +64,7 @@ class ReflectCommandTest(TestCase):
         ], header="").command_class())
         self.assertEqual(
             "the description on module comment\nand the second line",
-            cbi.desc
+            cbi.get_docblock()
         )
 
         cbi = ReflectCommand(FileScript([
@@ -72,7 +72,7 @@ class ReflectCommandTest(TestCase):
             "from captain import Command, Application",
             "class Default(Command): pass",
         ], header="").command_class())
-        self.assertEqual("the description on module doc", cbi.desc)
+        self.assertEqual("the description on module doc", cbi.get_docblock())
 
     def test_property_argument(self):
         rc = ReflectCommand(FileScript([

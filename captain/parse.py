@@ -357,7 +357,8 @@ class Router(object):
             subcommand = keys[-1] if keys else ""
             if not parser:
                 command_class = value["command_class"]
-                desc = command_class.reflect().desc
+#                 desc = command_class.reflect().get_help(self.command_class)
+                desc = command_class.reflect().get_docblock()
                 version = command_class.version
 
                 if parent_n := n.parent:

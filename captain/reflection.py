@@ -20,63 +20,26 @@ class ReflectCommand(ReflectClass):
     def reflect_method_class(self):
         return ReflectMethod
 
-    @property
-    def desc(self):
-        """Get the description for the command
-
-        this will first try and get the comment for the handle() method, if
-        that fails then it will try the Command class, if that fails it will
-        try to get the module's docblock
-        """
-        rm = self.reflect_method()
-        doc = rm.get_docblock()
-        if not doc:
-            doc = self.get_docblock()
-
-        if not doc:
-            doc = self.reflect_module().get_docblock()
-
-        return doc
-
-#         def get_desc(o):
-#             desc = ""
-#             comment_regex = re.compile(r"^\s*#\s*", flags=re.M)
+#     @property
+#     def desc(self):
+#         """Get the description for the command
 # 
-#             desc = inspect.getdoc(o)
-#             if not desc:
-#                 desc = inspect.getcomments(o)
-#                 if desc:
-#                     desc = comment_regex.sub("", desc).strip()
-#                     desc = re.sub(
-#                         r"^(?:\s*#\s*)?\-\*\-.*",
-#                         "",
-#                         desc,
-#                         flags=re.M
-#                     ).strip()
+#         this will first try and get the comment for the handle() method, if
+#         that fails then it will try the Command class, if that fails it will
+#         try to get the module's docblock
+#         """
+#         rm = self.reflect_method()
+#         doc = rm.get_docblock()
+#         if not doc:
+#             doc = self.get_docblock()
 # 
-#             return desc
+#         if not doc:
+#             doc = self.reflect_module().get_docblock()
 # 
-#         desc = get_desc(self.command_class.handle)
-#         if not desc:
-#             desc = get_desc(self.command_class)
-#             if not desc:
-#                 desc = get_desc(self.command_class.module)
-# 
-#         if not desc:
-#             desc = ""
-# 
-#         return desc
-
-#     def __init__(self, command):
-#         if inspect.isclass(command):
-#             self.command_class = command
-# 
-#         else:
-#             self.command_class = command.__class__
+#         return doc
 
     def reflect_method(self, method_name="handle"):
         return ReflectMethod(self.get(method_name))
-        #return super().reflect_method(method_name)
 
     def arguments(self):
         """yield all the Argument instances of the arguments defined for this
@@ -91,56 +54,40 @@ class ReflectCommand(ReflectClass):
         for pa in self.reflect_method().arguments():
             yield pa
 
+    def get_docblock(self):
+        doc = ""
+        if not self.obj.is_private():
+            rm = self.reflect_method()
+            doc = rm.get_docblock()
+            if not doc:
+                doc = super().get_docblock()
+
+            if not doc:
+                doc = self.reflect_module().get_docblock()
+
+        return doc
+
 #     def get_help(self, parent_class=None):
-#         """Get the help doc for self.command_class
+#         """Get the help doc for self
 # 
 #         :param parent_class: Command, ignore self.command_class's help doc
 #             if it is the same as the help doc of this class, this is mainly
 #             used to ignore the docblock on Command
 #         :returns: str
 #         """
-#         desc = self.desc
-#         if desc and parent_class:
-#             # we only want to use the docblock if it is defined
-#             # on the command
-#             if desc == parent_class.reflect().desc:
-#                 desc = ""
+#         desc = ""
+# 
+#         if parent_class:
+#             if self.obj is not parent_class:
+#                 desc = self.desc
+# 
+#         else:
+#             desc = self.desc
 # 
 #         return desc
 
 
 class ReflectMethod(ReflectCallable):
-#     @property
-#     def signature(self):
-#         """Get the call signature of the reflected method"""
-#         signature = getfullargspec(self.method)
-# 
-#         # remove self which will always get passed in automatically
-#         args = signature[0][1:]
-#         if not args:
-#             args = []
-# 
-#         args_default = {}
-#         if signature[3]:
-#             start = len(args) - len(signature[3])
-#             args_default = dict(zip(args[start:], signature[3]))
-# 
-#         args_required = set()
-#         for arg in args:
-#             if arg not in args_default:
-#                 args_required.add(String(arg))
-# 
-#         args_name = signature[1]
-#         kwargs_name = signature[2]
-# 
-#         return {
-#             "names": list(map(String, args)),
-#             "required": args_required,
-#             "defaults": args_default,
-#             "*_name": String(args_name) if args_name else args_name,
-#             "**_name": String(kwargs_name) if kwargs_name else kwargs_name,
-#         }
-
     def decorator_args(self):
         """Iterate through all the @arg decorator calls
 
@@ -159,9 +106,6 @@ class ReflectMethod(ReflectCallable):
         args = reversed(self.obj.__dict__.get('inherit_args', []))
         return args
 
-#     def __init__(self, method):
-#         self.method = method
-
     def arguments(self):
         """Return all the Argument instances that should be added to the
         ArgumentParser instance that will validate all the arguments that want
@@ -170,7 +114,6 @@ class ReflectMethod(ReflectCallable):
         :returns: list[Argument], all the found arguments for this method
         """
         pas = {}
-#         sig = self.signature
         sig = self.get_signature_info()
 
         # the values injected via @args decorator

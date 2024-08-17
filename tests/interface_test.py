@@ -57,8 +57,8 @@ class ApplicationTest(TestCase):
         r = s.run("foo --bar=1")
         self.assertTrue("success foo" in r)
 
-        with self.assertRaises(subprocess.CalledProcessError):
-            s.run()
+        r = s.run()
+        self.assertTrue("usage" in r)
 
     def test_handle_error(self):
         s = FileScript([

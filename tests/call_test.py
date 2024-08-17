@@ -47,20 +47,12 @@ class CommandTest(TestCase):
     def test_aliases(self):
         s = FileScript([
             "class FooOne(Command):",
+            "    aliases = ['bar']",
             "    def handle(self, **kwargs): pass",
         ])
 
-        a = set([
-            "fooone",
-            "Foo_One",
-            "foo_one",
-            "Foo-One",
-            "foo-one",
-            "foo_one",
-            "FooOne"
-        ])
         c_class = s.command_class("foo-one")
-        self.assertEqual(a, c_class.aliases)
+        self.assertEqual(["bar"], c_class.aliases)
 
     def test_unnamed_arg(self):
         """https://github.com/Jaymon/captain/issues/64"""

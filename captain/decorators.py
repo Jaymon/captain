@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
-
 from datatypes import classproperty
 
 from .compat import *
 
 
 def arg(*parser_args, **parser_kwargs):
-    """decorator that adds support for the full argparse.ArgumentParser.add_argument
-    api
+    """decorator that adds support for the full
+    argparse.ArgumentParser.add_argument api
 
     :Example:
         class Default(Command):
@@ -28,12 +26,14 @@ def arg(*parser_args, **parser_kwargs):
 
     :param *parser_args: name or flags (eg, "--foo", "foo", "-f")
     :param **parser_kwargs: (eg, action, nargs, const, type, required, etc)
-        -group: str, if you pass in a group on one or more @arg calls then those
-        names will be bundled into that group name parameter
+        - group: str, if you pass in a group on one or more @arg calls then
+            those names will be bundled into that group name parameter
     """
     def wrap(handle_method):
         handle_method.__dict__.setdefault('decorator_args', [])
-        handle_method.__dict__['decorator_args'].append((parser_args, parser_kwargs))
+        handle_method.__dict__['decorator_args'].append(
+            (parser_args, parser_kwargs)
+        )
         return handle_method
     return wrap 
 
@@ -57,7 +57,6 @@ def args(*subcommands, **kwargs):
     """
     def wrap(handle_method):
         handle_method.__dict__.setdefault('inherit_args', [])
-        #handle_method.__dict__['inherit_args'].extend((reversed(subcommands), kwargs))
         handle_method.__dict__['inherit_args'].append((subcommands, kwargs))
         return handle_method
     return wrap 

@@ -100,12 +100,12 @@ class ArgsTest(TestCase):
 
         s = FileScript([
             "class Default(Command):",
-            "    @arg('foo', dest='f', type=int)",
+            "    @arg('f', type=int)",
             "    def handle(self, f): print(f)",
         ])
 
         r = s.run("--help")
-        self.assertTrue("foo" in r)
+        self.assertRegex(r, r"\s+f\s+")
 
         r = s.run("1234567")
         self.assertTrue("1234567" in r)
