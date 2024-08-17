@@ -20,24 +20,6 @@ class ReflectCommand(ReflectClass):
     def reflect_method_class(self):
         return ReflectMethod
 
-#     @property
-#     def desc(self):
-#         """Get the description for the command
-# 
-#         this will first try and get the comment for the handle() method, if
-#         that fails then it will try the Command class, if that fails it will
-#         try to get the module's docblock
-#         """
-#         rm = self.reflect_method()
-#         doc = rm.get_docblock()
-#         if not doc:
-#             doc = self.get_docblock()
-# 
-#         if not doc:
-#             doc = self.reflect_module().get_docblock()
-# 
-#         return doc
-
     def reflect_method(self, method_name="handle"):
         return ReflectMethod(self.get(method_name))
 
@@ -66,25 +48,6 @@ class ReflectCommand(ReflectClass):
                 doc = self.reflect_module().get_docblock()
 
         return doc
-
-#     def get_help(self, parent_class=None):
-#         """Get the help doc for self
-# 
-#         :param parent_class: Command, ignore self.command_class's help doc
-#             if it is the same as the help doc of this class, this is mainly
-#             used to ignore the docblock on Command
-#         :returns: str
-#         """
-#         desc = ""
-# 
-#         if parent_class:
-#             if self.obj is not parent_class:
-#                 desc = self.desc
-# 
-#         else:
-#             desc = self.desc
-# 
-#         return desc
 
 
 class ReflectMethod(ReflectCallable):
