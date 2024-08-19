@@ -42,12 +42,6 @@ class FileScript(object):
 
         else:
             header = ""
-            if "# -*-" not in body:
-                header += "\n".join([
-                    "# -*- coding: utf-8 -*-",
-                    "",
-                ])
-
             if "from captain" not in body:
                 header += "\n".join([
                     "from captain import (",

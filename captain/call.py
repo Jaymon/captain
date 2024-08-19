@@ -139,6 +139,8 @@ class Command(object):
     async def get_handle_params(self, *args, **kwargs):
         """Called right before the command's handle method is called.
 
+        passed in args and kwargs will be merged with .parsed
+
         :param *args: will override any matching .parsed args
         :param **kwargs: will override any matching .parsed values
         :returns: tuple[tuple, dict], whatever is returned from this method is
@@ -180,13 +182,8 @@ class Command(object):
         """Wrapper around the internal handle methods, this should be
         considered the correct external method to call
 
-        this could be easily overridden so you can easily do something before
-        or after the handle calls
-
         The handle methods should be considered "internal" to the Captain class
         that are interacted with through this method
-
-        passed in args and kwargs will be merged with .parsed
 
         :param *args: all positional values passed in through the command line
             passed through any configured parsers, merged with .parsed
@@ -196,14 +193,34 @@ class Command(object):
         """
         try:
             args, kwargs = await self.get_handle_params(*args, **kwargs)
-            ret_code = self.handle(*args, **kwargs)
+            ret_code = await self.handle_call(*args, **kwargs)
 
         except Exception as e:
-            ret_code = self.handle_error(e)
+            ret_code = await self.handle_error(e)
 
-        finally:
-            while inspect.iscoroutine(ret_code):
-                ret_code = await ret_code
+        return ret_code
+
+    async def handle_call(self, *args, **kwargs):
+        """Run the main .handle method
+
+        this could be easily overridden so you can easily do something before
+        or after the handle calls. This exists so there is an easy hook for
+        context managers or the like after the parameters have been shaken out
+        (which is why .run didn't work for things like context managers).
+
+        See: https://github.com/Jaymon/captain/issues/90
+
+        :param *args: the positional arguments that will be passed to .handle
+            because they've already been normalized with .get_handle_params
+        :param *kwargs: the keyword arguments that will be passed to .handle
+            because they've already been normalized with .get_handle_params
+        :returns: int, the return code
+        """
+        # child classes without async handle methods is common so we
+        # don't await and instead await if we know it's a coroutine
+        ret_code = self.handle(*args, **kwargs)
+        while inspect.iscoroutine(ret_code):
+            ret_code = await ret_code
 
         return ret_code
 
