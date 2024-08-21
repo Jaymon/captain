@@ -291,19 +291,6 @@ class Pathfinder(DictTree):
 
                 break
 
-#             if classpath.startswith(command_prefix):
-#                 for modname in rn.relative_module_parts(command_prefix):
-# 
-#                     rm = ReflectModule(modname, command_prefix)
-#                     pout.v(rm.get_docblock())
-# 
-#                     key, aliases = self._get_node_key(modname)
-#                     value = self._get_node_value(aliases=aliases)
-#                     keys.append(key)
-#                     yield keys, value
-# 
-#                 break
-
         # we can't use rn.get_classes() here because classpath could be
         # something like: `<run_path>:ClassPrefix.Command` and so we can't
         # actually get the module
@@ -380,10 +367,6 @@ class Router(object):
             parser = value["parser"]
             subcommand = keys[-1] if keys else ""
             if not parser:
-#                 command_class = value["command_class"]
-#                 desc = command_class.reflect().get_docblock()
-#                 version = command_class.version
-
                 if parent_n := n.parent:
                     subparsers = parent_n.value["subparsers"]
                     if not subparsers:
