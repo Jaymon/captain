@@ -53,26 +53,26 @@ class ReflectCommandTest(TestCase):
             cbi.get_docblock()
         )
 
-    def test_desc_module(self):
-        cbi = ReflectCommand(FileScript([
-            '#!/usr/bin/env python',
-            '# -*- coding: utf-8 -*-',
-            '# the description on module comment',
-            "# and the second line",
-            "from captain import Command, Application",
-            "class Default(Command): pass",
-        ], header="").command_class())
-        self.assertEqual(
-            "the description on module comment\nand the second line",
-            cbi.get_docblock()
-        )
-
-        cbi = ReflectCommand(FileScript([
-            '"""the description on module doc"""',
-            "from captain import Command, Application",
-            "class Default(Command): pass",
-        ], header="").command_class())
-        self.assertEqual("the description on module doc", cbi.get_docblock())
+#     def test_desc_module(self):
+#         cbi = ReflectCommand(FileScript([
+#             '#!/usr/bin/env python',
+#             '# -*- coding: utf-8 -*-',
+#             '# the description on module comment',
+#             "# and the second line",
+#             "from captain import Command, Application",
+#             "class Default(Command): pass",
+#         ], header="").command_class())
+#         self.assertEqual(
+#             "the description on module comment\nand the second line",
+#             cbi.get_docblock()
+#         )
+# 
+#         cbi = ReflectCommand(FileScript([
+#             '"""the description on module doc"""',
+#             "from captain import Command, Application",
+#             "class Default(Command): pass",
+#         ], header="").command_class())
+#         self.assertEqual("the description on module doc", cbi.get_docblock())
 
     def test_property_argument(self):
         rc = ReflectCommand(FileScript([

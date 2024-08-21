@@ -258,6 +258,13 @@ class Pathfinder(DictTree):
         else:
             value["command_class"] = self.command_class
 
+        command_class = value["command_class"]
+
+        value["version"] = command_class.version
+
+        if not value.get("description", ""):
+            value["description"] = command_class.reflect().get_docblock()
+
         return value
 
     def _get_node_values(self, classpath, command_class):
@@ -271,14 +278,31 @@ class Pathfinder(DictTree):
         keys = []
 
         for command_prefix in self.command_prefixes:
-            if classpath.startswith(command_prefix):
-                for modname in rn.relative_module_parts(command_prefix):
-                    key, aliases = self._get_node_key(modname)
-                    value = self._get_node_value(aliases=aliases)
-                    keys.append(key)
-                    yield keys, value
+            if rn.is_module_relative_to(command_prefix):
+                if modname := rn.relative_module_name(command_prefix):
+                    for rm in rn.reflect_modules(modname):
+                        key, aliases = self._get_node_key(rm.module_basename)
+                        value = self._get_node_value(
+                            aliases=aliases,
+                            description=rm.get_docblock()
+                        )
+                        keys.append(key)
+                        yield keys, value
 
                 break
+
+#             if classpath.startswith(command_prefix):
+#                 for modname in rn.relative_module_parts(command_prefix):
+# 
+#                     rm = ReflectModule(modname, command_prefix)
+#                     pout.v(rm.get_docblock())
+# 
+#                     key, aliases = self._get_node_key(modname)
+#                     value = self._get_node_value(aliases=aliases)
+#                     keys.append(key)
+#                     yield keys, value
+# 
+#                 break
 
         # we can't use rn.get_classes() here because classpath could be
         # something like: `<run_path>:ClassPrefix.Command` and so we can't
@@ -356,9 +380,9 @@ class Router(object):
             parser = value["parser"]
             subcommand = keys[-1] if keys else ""
             if not parser:
-                command_class = value["command_class"]
-                desc = command_class.reflect().get_docblock()
-                version = command_class.version
+#                 command_class = value["command_class"]
+#                 desc = command_class.reflect().get_docblock()
+#                 version = command_class.version
 
                 if parent_n := n.parent:
                     subparsers = parent_n.value["subparsers"]
@@ -369,28 +393,28 @@ class Router(object):
                     parser = subparsers.add_parser(
                         subcommand,
                         parents=[common_parser],
-                        help=desc,
-                        description=desc,
+                        help=value["description"],
+                        description=value["description"],
                         conflict_handler="resolve",
                         aliases=value["aliases"],
                     )
 
                 else:
                     parser = self.parser_class(
-                        description=desc,
+                        description=value["description"],
                         parents=[common_parser],
                         conflict_handler="resolve",
                     )
 
-                if version:
+                if value["version"]:
                     parser.add_argument(
                         "--version", "-V",
                         action='version',
-                        version="%(prog)s {}".format(version)
+                        version="%(prog)s {}".format(value["version"])
                     )
 
                 parser.set_defaults(
-                    _command_class=command_class,
+                    _command_class=value["command_class"],
                     _parser_name=subcommand,
                     _parser=parser,
                 )

@@ -62,6 +62,38 @@ class PathfinderTest(TestCase):
         self.assertEqual("Che", pf.get("che")["command_class"].__name__)
         self.assertEqual("Bam", pf.get("bam")["command_class"].__name__)
 
+    def test_module_description(self):
+        modpath = self.create_module({
+            "foo": {
+                "": "'''bundles foo subcommands'''",
+                "bar": """
+                    '''bundles bar subcommands'''
+                    from captain import Command
+                    class Che(Command): pass
+                """,
+            }
+        }, load=True)
+
+        pf = Pathfinder([modpath], Command)
+        for classpath, command_class in Command.command_classes.items():
+            pf.add_class(classpath, command_class)
+
+        self.assertTrue("foo subcommands" in pf["foo"]["description"])
+        self.assertTrue("bar subcommands" in pf["foo", "bar"]["description"])
+        self.assertEqual("", pf["foo", "bar", "che"]["description"])
+
+    def test__get_node_values(self):
+        s = FileScript([
+            "class Default(Command):",
+            "    def handle(self, foo, bar):",
+            "        print('foo: {}'.format(foo))",
+            "        print('bar: {}'.format(bar))",
+        ])
+
+        r = s.run("--bar 1 --foo=2")
+        self.assertTrue("bar: 1" in r)
+        self.assertTrue("foo: 2" in r)
+
 
 class RouterTest(TestCase):
     def test_only_default(self):

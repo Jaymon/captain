@@ -44,8 +44,8 @@ class ReflectCommand(ReflectClass):
             if not doc:
                 doc = super().get_docblock()
 
-            if not doc:
-                doc = self.reflect_module().get_docblock()
+#             if not doc:
+#                 doc = self.reflect_module().get_docblock()
 
         return doc
 
