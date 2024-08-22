@@ -398,8 +398,8 @@ class Router(object):
 
                 parser.set_defaults(
                     _command_class=value["command_class"],
-                    _parser_name=subcommand,
                     _parser=parser,
+                    _parser_node=n,
                 )
                 value["parser"] = parser
 
@@ -640,6 +640,15 @@ class ArgumentParser(argparse.ArgumentParser):
         """
         arg_strings = self._parse_action_args(arg_strings)
         return super()._parse_known_args(arg_strings, namespace)
+#         parsed, parsed_unknown = super()._parse_known_args(
+#             arg_strings,
+#             namespace
+#         )
+# 
+#         # we save the original arg strings so call can work
+#         parsed._arg_strings = arg_strings
+# 
+#         return parsed, parsed_unknown
 
     def _read_args_from_files(self, arg_strings):
         """Overridden to add call to _parse_action_args which allows customized
@@ -667,7 +676,7 @@ class ArgumentParser(argparse.ArgumentParser):
             parsed_unknown = []
 
             if unknown_kwargs:
-                if parsed._has_handle_kwargs:
+                if parsed._handle_signature["**_name"]:
                     for k, v in unknown_kwargs.items():
                         setattr(parsed, k, v)
 
@@ -690,7 +699,7 @@ class ArgumentParser(argparse.ArgumentParser):
                     else:
                         break
 
-                if parsed._has_handle_args:
+                if parsed._handle_signature["*_name"]:
                     setattr(
                         parsed,
                         parsed._handle_signature["*_name"],
@@ -784,8 +793,6 @@ class ArgumentParser(argparse.ArgumentParser):
 
         self.set_defaults(
             _command_class=command_class,
-            _has_handle_args=True if sig.get("*_name") else False,
-            _has_handle_kwargs=True if sig.get("**_name") else False,
             _handle_signature=sig,
             _arg_count=_arg_count,
             _groups=_groups,

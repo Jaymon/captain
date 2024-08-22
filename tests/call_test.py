@@ -122,3 +122,24 @@ class CommandTest(TestCase):
         self.assertTrue("child foo" in args["foo"][1]["help"])
         self.assertTrue("parent bar" in args["bar"][1]["help"])
 
+    def test_call(self):
+        s = FileScript("""
+            class Foo(Command):
+                class Bar(Command):
+                    class Che(Command):
+                        async def handle(self, subcommands):
+                            await self.call(subcommands)
+                    class Boo(Command):
+                        async def handle(self):
+                            print("success")
+        """)
+
+        r = s.run("foo bar che \"foo bar boo\"")
+        self.assertTrue("success" in r)
+
+        r = s.run("foo bar che \"bar boo\"")
+        self.assertTrue("success" in r)
+
+        r = s.run("foo bar che \"boo\"")
+        self.assertTrue("success" in r)
+

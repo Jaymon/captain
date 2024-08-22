@@ -201,7 +201,7 @@ class RouterTest(TestCase):
 
         r = Router(paths=[p])
         parsed = r.parser.parse_args(["foo-bar", "che-boo"])
-        self.assertEqual("che-boo", parsed._parser_name)
+        self.assertEqual("CheBoo", parsed._command_class.__name__)
 
 
 class ArgumentParserTest(TestCase):
@@ -386,7 +386,6 @@ class ArgumentParserTest(TestCase):
         self.assertTrue("critical" in r)
 
     def test_quiet_default(self):
-
         s = FileScript([
             "import sys",
             "import logging",
