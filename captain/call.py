@@ -161,9 +161,6 @@ class Command(object):
                     if k in c_argnames:
                         setattr(self, k, v)
 
-#                         if k in m_argnames:
-#                             ckwargs[k] = v
-
                     if k in m_argnames:
                         ckwargs[k] = v
 
@@ -173,11 +170,6 @@ class Command(object):
                     elif k == parsed._handle_signature["*_name"]:
                         ckwargs[k] = v
 
-#                     else:
-#                         #ckwargs[k] = v
-#                         if k in m_argnames or parsed._handle_signature["**_name"]:
-#                             ckwargs[k] = v
-
             ckwargs.update(kwargs)
 
             if args_name := parsed._handle_signature["*_name"]:
@@ -185,10 +177,6 @@ class Command(object):
 
             cargs.extend(args)
 
-#             args = cargs
-#             kwargs = ckwargs
-
-#         pout.v(cargs, ckwargs, parsed._handle_signature)
         return cargs, ckwargs
 
     async def run(self, *args, **kwargs):
@@ -335,11 +323,6 @@ class Command(object):
         parsed._handle_signature = sig
 
         command = command_class(parsed)
-
-#         command_argnames = set(command.arguments.keys())
-#         for k in self.arguments().keys():
-#             if k in command_argnames and k not in kwargs:
-#                 kwargs[k] = getattr(self, k)
 
         return await command.run(*args, **kwargs)
 

@@ -640,15 +640,6 @@ class ArgumentParser(argparse.ArgumentParser):
         """
         arg_strings = self._parse_action_args(arg_strings)
         return super()._parse_known_args(arg_strings, namespace)
-#         parsed, parsed_unknown = super()._parse_known_args(
-#             arg_strings,
-#             namespace
-#         )
-# 
-#         # we save the original arg strings so call can work
-#         parsed._arg_strings = arg_strings
-# 
-#         return parsed, parsed_unknown
 
     def _read_args_from_files(self, arg_strings):
         """Overridden to add call to _parse_action_args which allows customized
