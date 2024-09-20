@@ -16,19 +16,19 @@ from .compat import *
 class ReflectCommand(ReflectClass):
     """Provides some handy helper introspection methods for dealing with the
     Command class"""
-    @property
-    def reflect_method_class(self):
-        return ReflectMethod
-
     def reflect_method(self, method_name="handle"):
-        return ReflectMethod(self.get(method_name))
+        if method_name == "handle":
+            return ReflectMethod(self.get(method_name))
+
+        else:
+            return super().reflect_method(method_name)
 
     def arguments(self):
         """yield all the Argument instances of the arguments defined for this
         command"""
 
         # first get all the class property arguments
-        pas = self.obj.arguments()
+        pas = self.get_target().arguments()
         for pk, pa in pas.items():
             yield pa
 
@@ -38,7 +38,7 @@ class ReflectCommand(ReflectClass):
 
     def get_docblock(self):
         doc = ""
-        if not self.obj.is_private():
+        if not self.get_target().is_private():
             rm = self.reflect_method()
             doc = rm.get_docblock()
             if not doc:
@@ -54,7 +54,7 @@ class ReflectMethod(ReflectCallable):
         :returns: generator, this will yield in the order the @arg were added
             from top to bottom
         """
-        args = reversed(self.obj.__dict__.get('decorator_args', []))
+        args = reversed(self.get_target().__dict__.get('decorator_args', []))
         return args
 
     def inherit_args(self):
@@ -63,7 +63,7 @@ class ReflectMethod(ReflectCallable):
         :returns: generator, this will yield in the order the @args were added
             from top to bottom
         """
-        args = reversed(self.obj.__dict__.get('inherit_args', []))
+        args = reversed(self.get_target().__dict__.get('inherit_args', []))
         return args
 
     def arguments(self):
