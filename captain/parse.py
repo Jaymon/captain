@@ -11,9 +11,6 @@ from datatypes import (
     NamingConvention,
     Dirpath,
     ReflectModule,
-    ReflectPath,
-    ReflectName,
-    DictTree,
     ClasspathFinder,
 )
 
@@ -205,129 +202,11 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         return lines
 
 
-class XPathfinder(DictTree):
-    """Internal class to Router. This handles setting the subcommand hierarchy,
-    this is used to create all the parsers in the Router.
-    """
-    def __init__(self, command_prefixes, command_class):
-        """
-        :param command_prefixes: list[str]
-        :param command_class: Command, this is used internally to check
-            subclass suitability
-        """
-        super().__init__()
-
-        self.command_prefixes = command_prefixes
-        self.command_class = command_class
-
-        self.set([], self._get_node_value())
-
-    def create_instance(self):
-        """Internal method that makes sure creating sub-instances of this
-        class when creating nodes doesn't error out"""
-        return type(self)(
-            self.command_prefixes,
-            self.command_class
-        )
-
-    def _get_node_key(self, key):
-        """Internal method. Get the normalized key and possible aliases for
-        the key
-
-        :param key: str, this will be normalized
-        :returns: tuple(str, set[str]), the actual key value figured out from
-            the passed in key and then all the potential aliases for that
-            key
-        """
-        nc = NamingConvention(key)
-        return nc.kebabcase(), nc.variations()
-
-    def _get_node_value(self, **kwargs):
-        """Internal method. Gets the node value"""
-        value = {
-            "command_class": self.command_class,
-            "parser": None,
-            "subparsers": None,
-            "aliases": set(),
-            **kwargs
-        }
-
-        if issubclass(value["command_class"], self.command_class):
-            if aliases := value["command_class"].aliases:
-                value["aliases"] = aliases
-
-        else:
-            value["command_class"] = self.command_class
-
-        command_class = value["command_class"]
-
-        value["version"] = command_class.version
-
-        if not value.get("description", ""):
-            value["description"] = command_class.reflect().get_docblock()
-
-        return value
-
-    def _get_node_values(self, classpath, command_class):
-        """Internal method. This yields the keys and values that will be
-        used to create new nodes in this tree
-
-        :param classpath: str, the full modpath:classpath
-        :returns: generator[tuple(list[str], dict)]
-        """
-        rn = ReflectName(classpath)
-        keys = []
-
-        for command_prefix in self.command_prefixes:
-            if rn.is_module_relative_to(command_prefix):
-                if modname := rn.relative_module_name(command_prefix):
-                    for rm in rn.reflect_modules(modname):
-                        key, aliases = self._get_node_key(rm.module_basename)
-                        value = self._get_node_value(
-                            aliases=aliases,
-                            description=rm.get_docblock()
-                        )
-                        keys.append(key)
-                        yield keys, value
-
-                break
-
-        # we can't use rn.get_classes() here because classpath could be
-        # something like: `<run_path>:ClassPrefix.Command` and so we can't
-        # actually get the module
-        command_class_i = len(rn.class_names) - 1
-        for i, class_name in enumerate(rn.class_names):
-
-            node_kwargs = {}
-            if command_class_i == i:
-                node_kwargs["command_class"] = command_class
-
-            if class_name == "Default":
-                value = self._get_node_value(**node_kwargs)
-
-            else:
-                key, aliases = self._get_node_key(class_name)
-                node_kwargs["aliases"] = aliases
-                keys.append(key)
-                value = self._get_node_value(**node_kwargs)
-
-            yield keys, value
-
-    def add_class(self, classpath, command_class):
-        """This is the method that is called from Router.create_pathfinder
-
-        :param classpath: str, the full modpath:classpath
-        """
-        for keys, value in self._get_node_values(classpath, command_class):
-            self.set(keys, value)
-
-
 class Pathfinder(ClasspathFinder):
-#     def set(self, keys, value):
-#         pout.v(keys, value)
-#         return super().set(keys, value)
-
+    """Internal class to Router. This handles setting the subcommand hierarchy,
+    this is used to create all the parsers in the Router."""
     def _get_node_default_value(self, **kwargs):
+        """The default value for any node that isn't a module or class"""
         return {
             "command_class": self.kwargs["command_class"],
             "parser": None,
@@ -338,46 +217,41 @@ class Pathfinder(ClasspathFinder):
         }
 
     def _get_node_module_info(self, key, **kwargs):
-        """Handle normalizing each module key to kebabcase"""
+        """All modules loaded from command prefixes go through this method.
+        Handle normalizing each module key to kebabcase"""
         nc = NamingConvention(key)
         key, value = super()._get_node_module_info(nc.kebabcase(), **kwargs)
 
         value["aliases"] = nc.variations()
-        value["command_class"] = self.kwargs["command_class"]
 
         rm = ReflectModule(value["module"])
         value["description"] = rm.get_docblock()
         value["version"] = rm.get("__version__", "")
-        value["parser"] = None
-        value["subparsers"] = None
 
         return key, value
 
     def _get_node_class_info(self, key, **kwargs):
-        """Handle normalizing each class key. If it's the destination key
-        then it will use the controller class's .get_name method for the
-        key. If it's a waypoint key then it will normalize to kebab case
-        """
-        if key in self.kwargs["ignore_class_keys"]:
-            key = None
+        """All user defined Command children go through this method"""
+        if "class" in kwargs:
+            if key in self.kwargs["ignore_class_keys"]:
+                key = None
 
-        else:
-            key = kwargs["class"].name
+            else:
+                key = kwargs["class"].name
 
         key, value = super()._get_node_class_info(key, **kwargs)
 
-        if aliases := value["class"].aliases:
-            value["aliases"] = aliases
+        if "class" in value:
+            if aliases := value["class"].aliases:
+                value["aliases"] = aliases
 
-        else:
-            nc = NamingConvention(kwargs["class"].__name__)
-            value["aliases"] = nc.variations()
+            else:
+                nc = NamingConvention(value["class"].__name__)
+                value["aliases"] = nc.variations()
 
-        value["description"] = value["class"].reflect().get_docblock()
-        value["version"] = value["class"].version
-        value["command_class"] = value["class"]
-        value["parser"] = None
-        value["subparsers"] = None
+            value["description"] = value["class"].reflect().get_docblock()
+            value["version"] = value["class"].version
+            value["command_class"] = value["class"]
 
         return key, value
 
@@ -429,17 +303,6 @@ class Router(object):
                 pathfinder.add_class(command_class)
 
         return pathfinder
-
-#         pathfinder = self.pathfinder_class(
-#             self.command_prefixes,
-#             self.command_class
-#         )
-# 
-#         command_classes = self.command_class.command_classes
-#         for classpath, command_class in command_classes.items():
-#             pathfinder.add_class(classpath, command_class)
-# 
-#         return pathfinder
 
     def create_command(self, argv=None):
         """This command is used by the Application instance to get the
@@ -514,8 +377,6 @@ class Router(object):
 
     def create_parser(self, **kwargs):
         """This creates and returns the root parser"""
-#         self.load_commands(**kwargs)
-#         self.pathfinder = self.create_pathfinder(**kwargs)
         common_parser = self.create_common_parser(**kwargs)
         self.create_parsers(common_parser)
         return self.pathfinder.value["parser"]
@@ -576,40 +437,6 @@ class Router(object):
             )
 
         return parser
-
-#     def load_commands(self, **kwargs):
-#         """All the routing magic happens here"""
-#         self.command_modules = {}
-#         seen = set(self.command_modules)
-# 
-#         if self.command_prefixes:
-#             for command_prefix in self.command_prefixes:
-#                 rm = ReflectModule(command_prefix)
-#                 for m in rm.get_modules():
-#                     if m.__name__ not in seen:
-#                         self.command_modules[m.__name__] = m
-#                         seen.add(m.__name__)
-# 
-#         else:
-#             if not self.paths:
-#                 if not self.command_class.command_classes:
-#                     self.paths = [Dirpath.cwd()]
-# 
-#             for path in self.paths:
-#                 rp = ReflectPath(path)
-#                 for m in rp.find_modules(environ.AUTODISCOVER_NAME):
-#                     if m.__name__ not in seen:
-#                         rn = ReflectName(m.__name__)
-#                         command_prefix = rn.absolute_module_name(
-#                             environ.AUTODISCOVER_NAME
-#                         )
-# 
-#                         if command_prefix not in seen:
-#                             self.command_prefixes.append(command_prefix)
-#                             seen.add(command_prefix)
-# 
-#                         self.command_modules[m.__name__] = m
-#                         seen.add(m.__name__)
 
 
 class SubParsersAction(argparse._SubParsersAction):

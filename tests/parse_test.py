@@ -30,10 +30,6 @@ class PathfinderTest(TestCase):
 
         pf = Router([modpath]).pathfinder
 
-#         pf = Pathfinder([modpath], command_class=Command)
-#         for classpath, command_class in Command.command_classes.items():
-#             pf.add_class(classpath, command_class)
-
         value = pf.get(["foo-bar"])
         self.assertEqual("Default", value["command_class"].__name__)
 
@@ -58,10 +54,6 @@ class PathfinderTest(TestCase):
 
         pf = Router([modpath]).pathfinder
 
-#         pf = Pathfinder([modpath], Command)
-#         for classpath, command_class in Command.command_classes.items():
-#             pf.add_class(classpath, command_class)
-
         self.assertEqual(2, len(pf))
         self.assertEqual("Che", pf.get("che")["command_class"].__name__)
         self.assertEqual("Bam", pf.get("bam")["command_class"].__name__)
@@ -79,10 +71,6 @@ class PathfinderTest(TestCase):
         }, load=True)
 
         pf = Router([modpath]).pathfinder
-
-#         pf = Pathfinder([modpath], Command)
-#         for classpath, command_class in Command.command_classes.items():
-#             pf.add_class(classpath, command_class)
 
         self.assertTrue("foo subcommands" in pf["foo"]["description"])
         self.assertTrue("bar subcommands" in pf["foo", "bar"]["description"])
