@@ -14,6 +14,7 @@ from datatypes import (
     ReflectPath,
     ReflectName,
     DictTree,
+    ClasspathFinder,
 )
 
 from .compat import *
@@ -204,7 +205,7 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         return lines
 
 
-class Pathfinder(DictTree):
+class XPathfinder(DictTree):
     """Internal class to Router. This handles setting the subcommand hierarchy,
     this is used to create all the parsers in the Router.
     """
@@ -321,6 +322,66 @@ class Pathfinder(DictTree):
             self.set(keys, value)
 
 
+class Pathfinder(ClasspathFinder):
+#     def set(self, keys, value):
+#         pout.v(keys, value)
+#         return super().set(keys, value)
+
+    def _get_node_default_value(self, **kwargs):
+        return {
+            "command_class": self.kwargs["command_class"],
+            "parser": None,
+            "subparsers": None,
+            "aliases": set(),
+            "description": "",
+            "version": "",
+        }
+
+    def _get_node_module_info(self, key, **kwargs):
+        """Handle normalizing each module key to kebabcase"""
+        nc = NamingConvention(key)
+        key, value = super()._get_node_module_info(nc.kebabcase(), **kwargs)
+
+        value["aliases"] = nc.variations()
+        value["command_class"] = self.kwargs["command_class"]
+
+        rm = ReflectModule(value["module"])
+        value["description"] = rm.get_docblock()
+        value["version"] = rm.get("__version__", "")
+        value["parser"] = None
+        value["subparsers"] = None
+
+        return key, value
+
+    def _get_node_class_info(self, key, **kwargs):
+        """Handle normalizing each class key. If it's the destination key
+        then it will use the controller class's .get_name method for the
+        key. If it's a waypoint key then it will normalize to kebab case
+        """
+        if key in self.kwargs["ignore_class_keys"]:
+            key = None
+
+        else:
+            key = kwargs["class"].name
+
+        key, value = super()._get_node_class_info(key, **kwargs)
+
+        if aliases := value["class"].aliases:
+            value["aliases"] = aliases
+
+        else:
+            nc = NamingConvention(kwargs["class"].__name__)
+            value["aliases"] = nc.variations()
+
+        value["description"] = value["class"].reflect().get_docblock()
+        value["version"] = value["class"].version
+        value["command_class"] = value["class"]
+        value["parser"] = None
+        value["subparsers"] = None
+
+        return key, value
+
+
 class Router(object):
     """The glue that connects the Application and the passed in arguments
     to the ArgumentParser and the Command instance that will ultimately
@@ -334,7 +395,51 @@ class Router(object):
         self.command_class = kwargs.get("command_class", Command)
         self.pathfinder_class = kwargs.get("pathfinder_class", Pathfinder)
 
+        self.pathfinder = self.create_pathfinder(
+            prefixes=command_prefixes,
+            paths=paths,
+            **kwargs
+        )
         self.parser = self.create_parser(**kwargs)
+
+    def create_pathfinder(self, prefixes, paths, **kwargs):
+        """The pathfinder is a DictTree that will always have a "" key to
+        represent the command class for that particular tree
+
+        This is used to figure out how routing should happen when you are
+        loading a whole bunch of commands modules
+        """
+        if not paths and not self.command_class.command_classes:
+            paths = [Dirpath.cwd()]
+
+        self.command_modules = self.pathfinder_class.find_modules(
+            prefixes,
+            paths,
+            kwargs.get("autodiscover_name", environ.AUTODISCOVER_NAME)
+        )
+
+        pathfinder = self.pathfinder_class(
+            list(self.command_modules.keys()),
+            command_class=self.command_class,
+            ignore_class_keys=set(["Default"])
+        )
+
+        for command_class in self.command_class.command_classes.values():
+            if not command_class.is_private():
+                pathfinder.add_class(command_class)
+
+        return pathfinder
+
+#         pathfinder = self.pathfinder_class(
+#             self.command_prefixes,
+#             self.command_class
+#         )
+# 
+#         command_classes = self.command_class.command_classes
+#         for classpath, command_class in command_classes.items():
+#             pathfinder.add_class(classpath, command_class)
+# 
+#         return pathfinder
 
     def create_command(self, argv=None):
         """This command is used by the Application instance to get the
@@ -409,8 +514,8 @@ class Router(object):
 
     def create_parser(self, **kwargs):
         """This creates and returns the root parser"""
-        self.load_commands(**kwargs)
-        self.pathfinder = self.create_pathfinder(**kwargs)
+#         self.load_commands(**kwargs)
+#         self.pathfinder = self.create_pathfinder(**kwargs)
         common_parser = self.create_common_parser(**kwargs)
         self.create_parsers(common_parser)
         return self.pathfinder.value["parser"]
@@ -472,57 +577,39 @@ class Router(object):
 
         return parser
 
-    def load_commands(self, **kwargs):
-        """All the routing magic happens here"""
-        self.command_modules = {}
-        seen = set(self.command_modules)
-
-        if self.command_prefixes:
-            for command_prefix in self.command_prefixes:
-                rm = ReflectModule(command_prefix)
-                for m in rm.get_modules():
-                    if m.__name__ not in seen:
-                        self.command_modules[m.__name__] = m
-                        seen.add(m.__name__)
-
-        else:
-            if not self.paths:
-                if not self.command_class.command_classes:
-                    self.paths = [Dirpath.cwd()]
-
-            for path in self.paths:
-                rp = ReflectPath(path)
-                for m in rp.find_modules(environ.AUTODISCOVER_NAME):
-                    if m.__name__ not in seen:
-                        rn = ReflectName(m.__name__)
-                        command_prefix = rn.absolute_module_name(
-                            environ.AUTODISCOVER_NAME
-                        )
-
-                        if command_prefix not in seen:
-                            self.command_prefixes.append(command_prefix)
-                            seen.add(command_prefix)
-
-                        self.command_modules[m.__name__] = m
-                        seen.add(m.__name__)
-
-    def create_pathfinder(self, **kwargs):
-        """The pathfinder is a DictTree that will always have a "" key to
-        represent the command class for that particular tree
-
-        This is used to figure out how routing should happen when you are
-        loading a whole bunch of commands modules
-        """
-        pathfinder = self.pathfinder_class(
-            self.command_prefixes,
-            self.command_class
-        )
-
-        command_classes = self.command_class.command_classes
-        for classpath, command_class in command_classes.items():
-            pathfinder.add_class(classpath, command_class)
-
-        return pathfinder
+#     def load_commands(self, **kwargs):
+#         """All the routing magic happens here"""
+#         self.command_modules = {}
+#         seen = set(self.command_modules)
+# 
+#         if self.command_prefixes:
+#             for command_prefix in self.command_prefixes:
+#                 rm = ReflectModule(command_prefix)
+#                 for m in rm.get_modules():
+#                     if m.__name__ not in seen:
+#                         self.command_modules[m.__name__] = m
+#                         seen.add(m.__name__)
+# 
+#         else:
+#             if not self.paths:
+#                 if not self.command_class.command_classes:
+#                     self.paths = [Dirpath.cwd()]
+# 
+#             for path in self.paths:
+#                 rp = ReflectPath(path)
+#                 for m in rp.find_modules(environ.AUTODISCOVER_NAME):
+#                     if m.__name__ not in seen:
+#                         rn = ReflectName(m.__name__)
+#                         command_prefix = rn.absolute_module_name(
+#                             environ.AUTODISCOVER_NAME
+#                         )
+# 
+#                         if command_prefix not in seen:
+#                             self.command_prefixes.append(command_prefix)
+#                             seen.add(command_prefix)
+# 
+#                         self.command_modules[m.__name__] = m
+#                         seen.add(m.__name__)
 
 
 class SubParsersAction(argparse._SubParsersAction):

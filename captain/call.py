@@ -39,7 +39,7 @@ class Command(object):
         be overridden in child classes but has no effect if the child class is
         named Default"""
         n = NamingConvention(cls.__name__)
-        return n.dash().lower()
+        return n.kebabcase()
 
     @classproperty
     def aliases(cls):
@@ -120,8 +120,7 @@ class Command(object):
         https://peps.python.org/pep-0487/
         """
         super().__init_subclass__()
-        if not cls.is_private():
-            cls.command_classes[f"{cls.__module__}:{cls.__qualname__}"] = cls
+        cls.command_classes[f"{cls.__module__}:{cls.__qualname__}"] = cls
 
     def __getattr__(self, k):
         """Makes the .input and .output interfaces a little more fluid, output

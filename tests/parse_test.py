@@ -28,9 +28,11 @@ class PathfinderTest(TestCase):
             load=True
         )
 
-        pf = Pathfinder([modpath], Command)
-        for classpath, command_class in Command.command_classes.items():
-            pf.add_class(classpath, command_class)
+        pf = Router([modpath]).pathfinder
+
+#         pf = Pathfinder([modpath], command_class=Command)
+#         for classpath, command_class in Command.command_classes.items():
+#             pf.add_class(classpath, command_class)
 
         value = pf.get(["foo-bar"])
         self.assertEqual("Default", value["command_class"].__name__)
@@ -54,9 +56,11 @@ class PathfinderTest(TestCase):
             "        print('kwargs: {}'.format(kwargs))",
         ], load=True)
 
-        pf = Pathfinder([modpath], Command)
-        for classpath, command_class in Command.command_classes.items():
-            pf.add_class(classpath, command_class)
+        pf = Router([modpath]).pathfinder
+
+#         pf = Pathfinder([modpath], Command)
+#         for classpath, command_class in Command.command_classes.items():
+#             pf.add_class(classpath, command_class)
 
         self.assertEqual(2, len(pf))
         self.assertEqual("Che", pf.get("che")["command_class"].__name__)
@@ -74,15 +78,17 @@ class PathfinderTest(TestCase):
             }
         }, load=True)
 
-        pf = Pathfinder([modpath], Command)
-        for classpath, command_class in Command.command_classes.items():
-            pf.add_class(classpath, command_class)
+        pf = Router([modpath]).pathfinder
+
+#         pf = Pathfinder([modpath], Command)
+#         for classpath, command_class in Command.command_classes.items():
+#             pf.add_class(classpath, command_class)
 
         self.assertTrue("foo subcommands" in pf["foo"]["description"])
         self.assertTrue("bar subcommands" in pf["foo", "bar"]["description"])
         self.assertEqual("", pf["foo", "bar", "che"]["description"])
 
-    def test__get_node_values(self):
+    def test_default_node(self):
         s = FileScript([
             "class Default(Command):",
             "    def handle(self, foo, bar):",
