@@ -581,7 +581,7 @@ class ArgumentParser(argparse.ArgumentParser):
             parsed_unknown = []
 
             if unknown_kwargs:
-                if parsed._handle_signature["**_name"]:
+                if parsed._handle_signature["keywords_name"]:
                     for k, v in unknown_kwargs.items():
                         setattr(parsed, k, v)
 
@@ -604,10 +604,10 @@ class ArgumentParser(argparse.ArgumentParser):
                     else:
                         break
 
-                if parsed._handle_signature["*_name"]:
+                if parsed._handle_signature["positionals_name"]:
                     setattr(
                         parsed,
-                        parsed._handle_signature["*_name"],
+                        parsed._handle_signature["positionals_name"],
                         unknown_args
                     )
 

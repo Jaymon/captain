@@ -163,15 +163,15 @@ class Command(object):
                     if k in m_argnames:
                         ckwargs[k] = v
 
-                    elif parsed._handle_signature["**_name"]:
+                    elif parsed._handle_signature["keywords_name"]:
                         ckwargs[k] = v
 
-                    elif k == parsed._handle_signature["*_name"]:
+                    elif k == parsed._handle_signature["positionals_name"]:
                         ckwargs[k] = v
 
             ckwargs.update(kwargs)
 
-            if args_name := parsed._handle_signature["*_name"]:
+            if args_name := parsed._handle_signature["positionals_name"]:
                 cargs.extend(ckwargs.pop(args_name, []))
 
             cargs.extend(args)

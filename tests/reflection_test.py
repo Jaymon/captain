@@ -74,8 +74,8 @@ class ReflectMethodTest(TestCase):
         self.assertEqual(set(["foo"]), sig["required"])
         self.assertEqual(["foo", "bar", "che"], sig["names"])
         self.assertEqual(1, sig["defaults"]["bar"])
-        self.assertEqual("kwargs", sig["**_name"])
-        self.assertEqual("", sig["*_name"])
+        self.assertEqual("kwargs", sig["keywords_name"])
+        self.assertEqual("", sig["positionals_name"])
 
     def test_arguments(self):
         cbi = ReflectCommand(FileScript([
