@@ -72,7 +72,7 @@ class ReflectMethodTest(TestCase):
 
         sig = cbi.get_signature_info()
         self.assertEqual(set(["foo"]), sig["required"])
-        self.assertEqual(["foo", "bar", "che"], sig["names"])
+        self.assertEqual(["foo", "bar", "che", "kwargs"], sig["names"])
         self.assertEqual(1, sig["defaults"]["bar"])
         self.assertEqual("kwargs", sig["keywords_name"])
         self.assertEqual("", sig["positionals_name"])

@@ -531,7 +531,7 @@ class ArgumentParser(argparse.ArgumentParser):
 
         return arg_strings
 
-    def _parse_known_args(self, arg_strings, namespace):
+    def _parse_known_args(self, arg_strings, namespace, intermixed=False):
         """Overridden to add call to _parse_action_args which allows customized
         actions and makes QuietAction work
 
@@ -553,7 +553,11 @@ class ArgumentParser(argparse.ArgumentParser):
         possible to manipulate the arg_strings
         """
         arg_strings = self._parse_action_args(arg_strings)
-        return super()._parse_known_args(arg_strings, namespace)
+        return super()._parse_known_args(
+            arg_strings,
+            namespace,
+            intermixed=intermixed
+        )
 
     def _read_args_from_files(self, arg_strings):
         """Overridden to add call to _parse_action_args which allows customized
@@ -597,6 +601,14 @@ class ArgumentParser(argparse.ArgumentParser):
                 # we try and line our unknown args with names in the handle
                 # signature
                 for name in parsed._handle_signature["names"]:
+                    # if we've ran into the positional or keyword catchall
+                    # we're done checking arguments by name
+                    if (
+                        name == parsed._handle_signature["positionals_name"]
+                        or name == parsed._handle_signature["keywords_name"]
+                    ):
+                        break
+
                     if unknown_args:
                         if name not in parsed:
                             setattr(parsed, name, unknown_args.pop(0))
