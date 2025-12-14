@@ -62,6 +62,7 @@ class Application(object):
         :returns: int, the return code you want the script to exit with
         """
         command = self.router.create_command(argv)
+        command.application = self
         return await command.run()
 
     def __call__(self):
