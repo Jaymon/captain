@@ -11,7 +11,7 @@ from captain import Application, Command
 class FileScript(object):
     @property
     def parser(self):
-        return Application(command_prefixes=[self.path]).router.parser
+        return Application(command_prefixes=[self.path]).parser
 
     @classmethod
     def reset_command_classes(cls):
@@ -60,6 +60,12 @@ class FileScript(object):
                     "import captain",
                     "",
                 ])
+
+            header += "\n".join([
+                "from typing import *",
+                "from collections.abc import *",
+            ])
+
 
             header += "\n".join([
                 "",

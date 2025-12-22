@@ -8,7 +8,7 @@ def arg(*parser_args, **parser_kwargs):
     """decorator that adds support for the full
     argparse.ArgumentParser.add_argument api
 
-    :Example:
+    :example:
         class Default(Command):
             @arg("--foo", "-f", dest="foo", default=1, help="the foo value")
             def handle(self, foo): pass
@@ -41,7 +41,7 @@ def arg(*parser_args, **parser_kwargs):
 def args(*subcommands, **kwargs):
     """Decorator that makes another Command's flags active on this command also
 
-    :Example:
+    :example:
         class Foo(Command):
             @arg("--che", "-c", dest="che", default=1, help="the che value")
             def handle(self, che): pass

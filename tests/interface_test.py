@@ -97,3 +97,112 @@ class ApplicationTest(TestCase):
         r = s.run("foo_two")
         self.assertTrue("foo_two" in r)
 
+###############################################################################
+# from RouterTest
+    def test_only_default(self):
+        p = self.create_module([
+            "from captain import Command",
+            "",
+            "class Default(Command):",
+            "    def handle(self, *args, **kwargs):",
+            "        self.output.out('default')",
+        ])
+
+        r = Router(command_prefixes=[p])
+
+        parsed = r.parser.parse_args(["foo", "--one=1", "--two=2"])
+
+        self.assertEqual(["foo"], parsed.args)
+        self.assertEqual("1", parsed.one)
+        self.assertEqual("2", parsed.two)
+
+    def test_only_subcommands(self):
+        p = self.create_module([
+            "from captain import Command",
+            "",
+            "class Foo(Command):",
+            "    def handle(self, *args, **kwargs):",
+            "        self.output.out('foo')",
+            "",
+            "class Bar(Command):",
+            "    def handle(self, *args, **kwargs):",
+            "        self.output.out('bar')",
+        ])
+
+        r = Router(command_prefixes=[p])
+
+        parsed = r.parser.parse_args(["foo", "--one=1", "--two=2"])
+        self.assertEqual("1", parsed.one)
+        self.assertEqual("2", parsed.two)
+
+    def test_prefixes(self):
+        p = self.create_modules({
+            "far.commands": {
+                "foo": [
+                    "from captain import Command",
+                    "",
+                    "class Default(Command):",
+                    "    def handle(self):",
+                    "        self.output.out('foo')",
+                    "",
+                    "class Bar(Command):",
+                    "    def handle(self):",
+                    "        self.output.out('foo bar')",
+                ],
+                "__init__": [
+                    "from captain import Command",
+                    "",
+                    "class Default(Command):",
+                    "    def handle(self):",
+                    "        self.output.out('foo')",
+                ],
+                "che": {
+                    "__init__": [
+                        "from captain import Command",
+                        "",
+                        "class Default(Command):",
+                        "    def handle(self):",
+                        "        self.output.out('che')",
+                    ],
+                    "boo": [
+                        "from captain import Command",
+                        "",
+                        "class Default(Command):",
+                        "    def handle(self):",
+                        "        self.output.out('che boo')",
+                    ],
+                },
+            },
+        })
+
+        r = Router(paths=[p])
+
+        value = r.pathfinder.get(["che", "boo"])
+        self.assertIsNotNone(value["parser"])
+
+        value = r.pathfinder.get(["foo", "bar"])
+        self.assertIsNotNone(value["parser"])
+
+        value = r.pathfinder.get(["foo"])
+        self.assertIsNotNone(value["parser"])
+
+    def test_dash_underscore_subcommands(self):
+        p = self.create_modules(
+            {
+                "commands": {
+                    "foo_bar": [
+                        "from captain import Command",
+                        "",
+                        "class CheBoo(Command):",
+                        "    def handle(self):",
+                        "        self.output.out('foo-bar che-boo')",
+                    ],
+                }
+            },
+            modpath=self.get_module_name()
+        )
+
+        r = Router(paths=[p])
+        parsed = r.parser.parse_args(["foo-bar", "che-boo"])
+        self.assertEqual("CheBoo", parsed._command_class.__name__)
+

@@ -15,7 +15,7 @@ def application(*args, **kwargs):
     """Factory method to create and call the Application in order to answer
     CLI requests
 
-    :Example:
+    :example:
         from captain import application
 
         if __name__ == "__main__":

@@ -4,8 +4,9 @@ import argparse
 from captain.reflection import (
     ReflectCommand,
     Argument,
+    Pathfinder,
 )
-from captain import Command
+from captain import Command, Application
 
 from . import TestCase, FileScript
 
@@ -60,7 +61,9 @@ class ReflectCommandTest(TestCase):
             "    def handle(self): pass",
         ]).command_class())
 
-        self.assertEqual(1, len(list(rc.arguments())))
+        args = list(rc.get_arguments())
+        self.assertEqual(1, len(args))
+        self.assertEqual("foo", args[0].name)
 
 
 class ReflectMethodTest(TestCase):
@@ -144,6 +147,21 @@ class ReflectMethodTest(TestCase):
         self.assertEqual(1, len(pas))
         self.assertEqual("+", pas[0].kwargs["nargs"])
 
+    def test_annotation_1(self):
+        #def handle(self, a1: int, a2: str, /, *, k1: str, k2: bool = False)
+        rm = ReflectCommand(FileScript("""
+            class Foo(Command):
+                def handle(self, a1: int, /, *, k1: str, k2: bool = False):
+                    pass
+        """).command_class("Foo")).reflect_method()
+
+        for a in rm.get_arguments():
+            pout.v(a)
+
+        raise ValueError("ADD ASSERTS!!!!!!!!!")
+#         for rp in rm.reflect_params():
+#             pout.v(rp.get_argparse_keywords())
+
 
 class ArgumentTest(TestCase):
     def test___new__(self):
@@ -173,6 +191,15 @@ class ArgumentTest(TestCase):
         self.assertFalse(pa[1]["required"])
         self.assertEqual("foo", pa[1]["dest"])
         self.assertEqual(1, pa[1]["default"])
+
+    def test_merge_environment(self):
+        """Make sure an environment variable argument merges correctly"""
+        a1 = Argument("--foo", dest="foo", required=True)
+        a2 = Argument("--foo", "$FOO", default=1)
+
+        a1.merge(a2)
+        self.assertEqual("foo", a1.name)
+        self.assertTrue("default" in a1[1])
 
     def test_merge_error(self):
         """
@@ -251,4 +278,114 @@ class ArgumentTest(TestCase):
         vs = pa.names
         for v in ["foo_bar", "FOO_BAR", "foo-bar"]:
             self.assertTrue(v in vs)
+
+    def test_no_names(self):
+        c = FileScript("""
+            class Default(Command):
+                a1 = Argument(type=int)
+                def handle(self): pass
+        """).command_class()
+
+        self.assertEqual("a1", c.a1[1]["dest"])
+        self.assertTrue("--a1", c.a1[0])
+
+        a2 = Argument(dest="foo")
+        self.assertEqual("foo", a2[1]["dest"])
+        self.assertTrue("--foo", a2[0])
+
+    def test_infer_dest_positional(self):
+        a = Argument("a1")
+        self.assertFalse("dest" in a[1])
+
+    def test_get_keywords(self):
+        a = Argument("--foo-bar")
+        keywords = a.get_keywords()
+        self.assertEqual(4, len(keywords))
+        self.assertTrue("--foo-bar" in keywords)
+        self.assertTrue("--foo_bar" in keywords)
+
+        a = Argument("foo-bar")
+        keywords = a.get_keywords()
+        self.assertEqual(0, len(keywords))
+
+
+class PathfinderTest(TestCase):
+    def test_add_class(self):
+        modpath = self.get_module_name(2, "commands")
+        self.create_module(
+            [
+                "from captain import Command",
+                "",
+                "class CheBoo(Command):",
+                "    def handle(self):",
+                "        pass",
+                #"        self.output.out('foo-bar che-boo')",
+                "",
+                "class Default(Command):",
+                "    def handle(self):",
+                "        pass",
+                #"        self.output.out('foo-bar')",
+            ],
+            modpath=modpath + ".foo_bar",
+            load=True
+        )
+
+        pf = Application([modpath]).pathfinder
+
+        value = pf.get(["foo-bar"])
+        self.assertEqual("Default", value["command_class"].__name__)
+
+        value = pf.get(["foo-bar", "che-boo"])
+        self.assertEqual("CheBoo", value["command_class"].__name__)
+        self.assertTrue(issubclass(pf.get([])["command_class"], Command))
+
+    def test_multi(self):
+        modpath = self.create_module([
+            "from captain import Command",
+            "",
+            "class Che(Command):",
+            "    def handle(self, foo: int, bar: int = 1):",
+            "        pass",
+            "",
+            "class Bam(Command):",
+            "    def handle(self, **kwargs):",
+            "        pass",
+        ], load=True)
+
+        pf = Application([modpath]).pathfinder
+
+        self.assertEqual(2, len(pf))
+        self.assertEqual("Che", pf.get("che")["command_class"].__name__)
+        self.assertEqual("Bam", pf.get("bam")["command_class"].__name__)
+
+    def test_module_description(self):
+        modpath = self.create_module({
+            "foo": {
+                "": "'''bundles foo subcommands'''",
+                "bar": """
+                    '''bundles bar subcommands'''
+                    from captain import Command
+                    class Che(Command): pass
+                """,
+            }
+        }, load=True)
+
+        pf = Application([modpath]).pathfinder
+
+        self.assertTrue("foo subcommands" in pf["foo"]["description"])
+        self.assertTrue("bar subcommands" in pf["foo", "bar"]["description"])
+        self.assertEqual("", pf["foo", "bar", "che"]["description"])
+
+    def test_default_node(self):
+        s = FileScript([
+            "class Default(Command):",
+            "    def handle(self, foo, bar):",
+            "        print(f'foo: {foo}')",
+            "        print(f'bar: {bar}')",
+        ])
+
+        r = s.run("--bar 1 --foo=2")
+        self.assertTrue("bar: 1" in r)
+        self.assertTrue("foo: 2" in r)
+
 

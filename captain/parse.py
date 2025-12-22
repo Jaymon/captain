@@ -9,9 +9,7 @@ from collections import defaultdict
 from datatypes import (
     ArgvParser as UnknownParser,
     NamingConvention,
-    Dirpath,
-    ReflectModule,
-    ClasspathFinder,
+    #Dirpath,
 )
 
 from .compat import *
@@ -202,241 +200,208 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         return lines
 
 
-class Pathfinder(ClasspathFinder):
-    """Internal class to Router. This handles setting the subcommand hierarchy,
-    this is used to create all the parsers in the Router."""
-    def _get_node_default_value(self, **kwargs):
-        """The default value for any node that isn't a module or class"""
-        return {
-            "command_class": self.kwargs["command_class"],
-            "parser": None,
-            "subparsers": None,
-            "aliases": set(),
-            "description": "",
-            "version": "",
-        }
-
-    def _get_node_module_info(self, key, **kwargs):
-        """All modules loaded from command prefixes go through this method.
-        Handle normalizing each module key to kebabcase"""
-        nc = NamingConvention(key)
-        key, value = super()._get_node_module_info(nc.kebabcase(), **kwargs)
-
-        value["aliases"] = nc.variations()
-
-        rm = ReflectModule(value["module"])
-        value["description"] = rm.get_docblock()
-        value["version"] = rm.get("__version__", "")
-
-        return key, value
-
-    def _get_node_class_info(self, key, **kwargs):
-        """All user defined Command children go through this method"""
-        if "class" in kwargs:
-            if key in self.kwargs["ignore_class_keys"]:
-                key = None
-
-            else:
-                key = kwargs["class"].name
-
-        key, value = super()._get_node_class_info(key, **kwargs)
-
-        if "class" in value:
-            if aliases := value["class"].aliases:
-                value["aliases"] = aliases
-
-            else:
-                nc = NamingConvention(value["class"].__name__)
-                value["aliases"] = nc.variations()
-
-            value["description"] = value["class"].reflect().get_docblock()
-            value["version"] = value["class"].version
-            value["command_class"] = value["class"]
-
-        return key, value
-
-
-class Router(object):
-    """The glue that connects the Application and the passed in arguments
-    to the ArgumentParser and the Command instance that will ultimately
-    handle the request
-    """
-    def __init__(self, command_prefixes=None, paths=None, **kwargs):
-        self.command_prefixes = command_prefixes or []
-        self.paths = paths or []
-
-        self.parser_class = kwargs.get("parser_class", ArgumentParser)
-        self.command_class = kwargs.get("command_class", Command)
-        self.pathfinder_class = kwargs.get("pathfinder_class", Pathfinder)
-
-        self.pathfinder = self.create_pathfinder(
-            prefixes=command_prefixes,
-            paths=paths,
-            **kwargs
-        )
-        self.parser = self.create_parser(**kwargs)
-
-    def create_pathfinder(self, prefixes, paths, **kwargs):
-        """The pathfinder is a DictTree that will always have a "" key to
-        represent the command class for that particular tree
-
-        This is used to figure out how routing should happen when you are
-        loading a whole bunch of commands modules
-        """
-        if not paths and not self.command_class.command_classes:
-            paths = [Dirpath.cwd()]
-
-        self.command_modules = self.pathfinder_class.find_modules(
-            prefixes,
-            paths,
-            kwargs.get("autodiscover_name", environ.AUTODISCOVER_NAME)
-        )
-
-        pathfinder = self.pathfinder_class(
-            list(self.command_modules.keys()),
-            command_class=self.command_class,
-            ignore_class_keys=set(["Default"])
-        )
-
-        for command_class in self.command_class.command_classes.values():
-            if not command_class.is_private():
-                pathfinder.add_class(command_class)
-
-        return pathfinder
-
-    def create_command(self, argv=None):
-        """This command is used by the Application instance to get the
-        command that will ultimately handle the request
-
-        :param argv: list[str], a list of argument strings, if this isn't
-            passed in then it will use sys.argv
-        :returns: Command
-        """
-        parsed = self.parser.parse_args(argv)
-        return parsed._command_class(parsed)
-
-    def create_parsers(self, common_parser):
-        """Go through subcommands and create all the downstream parsers
-
-        :param subcommands: list[str], the subcommand path to get to the
-            final parser. To explain this better, it would be something like
-            ["foo", "bar", "che"] meaning on the command line you would have
-            to call `<SCRIPT> foo bar che` to reach the `che` parser, but
-            `foo` and `bar` need to have parsers also to correctly route to
-            `che`
-        :param common_parser: argparse.ArgumentParser, the parent parser that
-            all the other parser will wrap
-        :returns: list[argparse.ArgumentParser]
-        """
-        parsers = []
-
-        for keys, n in self.pathfinder.nodes():
-            value = n.value
-            parser = value["parser"]
-            subcommand = keys[-1] if keys else ""
-            if not parser:
-                if parent_n := n.parent:
-                    subparsers = parent_n.value["subparsers"]
-                    if not subparsers:
-                        subparsers = parent_n.value["parser"].add_subparsers()
-                        parent_n.value["subparsers"] = subparsers
-
-                    parser = subparsers.add_parser(
-                        subcommand,
-                        parents=[common_parser],
-                        help=value["description"],
-                        description=value["description"],
-                        conflict_handler="resolve",
-                        aliases=value["aliases"],
-                    )
-
-                else:
-                    parser = self.parser_class(
-                        description=value["description"],
-                        parents=[common_parser],
-                        conflict_handler="resolve",
-                    )
-
-                if value["version"]:
-                    parser.add_argument(
-                        "--version", "-V",
-                        action='version',
-                        version="%(prog)s {}".format(value["version"])
-                    )
-
-                parser.set_defaults(
-                    _command_class=value["command_class"],
-                    _parser=parser,
-                    _parser_node=n,
-                )
-                value["parser"] = parser
-
-            parsers.append(parser)
-
-        return parsers
-
-    def create_parser(self, **kwargs):
-        """This creates and returns the root parser"""
-        common_parser = self.create_common_parser(**kwargs)
-        self.create_parsers(common_parser)
-        return self.pathfinder.value["parser"]
-
-    def create_common_parser(self, **kwargs):
-        """Creates the common Parser that all other parsers will use as a base
-
-        This is useful to make sure there are certain flags that can be passed
-        both before and after the subcommand. By default, if you had something
-        like
-        --version, you could do:
-
-            $ script.py --version
-
-        But not:
-
-            $ script.py SUBCOMMAND --version
-
-        This fixes that problem by creating this common instance and using it
-        as a base, the subcommand will inherit the common flags/arguments also,
-        so the flags will work the same way on the left or right side of the
-        SUBCOMMAND
-
-        :param **kwargs:
-            - version: str, the version of the script
-            - quiet: bool, default is True, pass in False if you don't want the 
-              default quiet functionality to be active
-        :returns: ArgumentParser
-        """
-        parser = self.parser_class(add_help=False)
-        # !!! you can't have a normal group and mutually exclusive group
-
-        version = kwargs.get("version", "")
-        if not version:
-            if m := sys.modules.get("__main__"):
-                version = getattr(m, "__version__", "")
-
-        if version:
-            parser.add_argument(
-                "--version", "-V",
-                action='version',
-                version="%(prog)s {}".format(version)
-            )
-
-        quiet = kwargs.get("quiet", True)
-        if quiet:
-            # https://docs.python.org/3/library/argparse.html#mutual-exclusion
-            me_group = parser.add_mutually_exclusive_group()
-
-            me_group.add_argument(
-                "--quiet", "-Q",
-                action=QuietAction,
-            )
-
-            me_group.add_argument(
-                "-q",
-                action=QuietAction,
-            )
-
-        return parser
+# class Router(object):
+#     """The glue that connects the Application and the passed in arguments
+#     to the ArgumentParser and the Command instance that will ultimately
+#     handle the request
+#     """
+#     def __init__(self, command_prefixes=None, paths=None, **kwargs):
+# #         self.command_prefixes = command_prefixes or []
+# #         self.paths = paths or []
+# 
+#         self.parser_class = kwargs.get("parser_class", ArgumentParser)
+#         self.command_class = kwargs.get("command_class", Command)
+#         self.pathfinder_class = kwargs.get("pathfinder_class", Pathfinder)
+# 
+#         self.command_modules = self._find_modules(
+#             prefixes=command_prefixes,
+#             paths=paths,
+#             **kwargs,
+#         )
+# 
+#         self.pathfinder = self._create_pathfinder(**kwargs)
+#         self.parser = self._create_parser(**kwargs)
+# 
+#     def _find_modules(self, prefixes, paths, **kwargs):
+#         if not paths and not self.command_class.command_classes:
+#             paths = [Dirpath.cwd()]
+# 
+#         return self.pathfinder_class.find_modules(
+#             prefixes,
+#             paths,
+#             kwargs.get("autodiscover_name", environ.AUTODISCOVER_NAME),
+#         )
+# 
+#     def _create_pathfinder(self, **kwargs):
+#         """Internal method. Create the tree that will be used to resolve a
+#         requested path to a found controller
+# 
+#         :returns: DictTree, basically a dictionary of dictionaries where each
+#             key represents a part of a path, the final key will contain the
+#             controller class that can answer a request
+#         """
+#         pathfinder = self.pathfinder_class(
+#             list(self.command_modules.keys()),
+#             command_class=self.command_class,
+#         )
+# 
+# #         pathfinder = self.pathfinder_class(
+# #             list(self.command_modules.keys()),
+# #         )
+# 
+#         for command_class in self.command_class.command_classes.values():
+#             if not command_class.is_private():
+#                 pathfinder.add_class(command_class)
+# 
+#         return pathfinder
+# 
+# #     def create_pathfinder(self, prefixes, paths, **kwargs):
+# #         """The pathfinder is a DictTree that will always have a "" key to
+# #         represent the command class for that particular tree
+# # 
+# #         This is used to figure out how routing should happen when you are
+# #         loading a whole bunch of commands modules
+# #         """
+# #         if not paths and not self.command_class.command_classes:
+# #             paths = [Dirpath.cwd()]
+# # 
+# #         self.command_modules = self.pathfinder_class.find_modules(
+# #             prefixes,
+# #             paths,
+# #             kwargs.get("autodiscover_name", environ.AUTODISCOVER_NAME)
+# #         )
+# # 
+# #         pathfinder = self.pathfinder_class(
+# #             list(self.command_modules.keys()),
+# #             command_class=self.command_class,
+# #             ignore_class_keys=set(["Default"])
+# #         )
+# # 
+# #         for command_class in self.command_class.command_classes.values():
+# #             if not command_class.is_private():
+# #                 pathfinder.add_class(command_class)
+# # 
+# #         return pathfinder
+# 
+#     def create_command(self, argv=None):
+#         """This command is used by the Application instance to get the
+#         command that will ultimately handle the request
+# 
+#         :param argv: list[str], a list of argument strings, if this isn't
+#             passed in then it will use sys.argv
+#         :returns: Command
+#         """
+#         parsed = self.parser.parse_args(argv)
+#         return parsed._command_class(parsed)
+# 
+#     def _create_parser(self, **kwargs):
+#         """This creates and returns the root parser
+# 
+#         It goes through subcommands and creates all the downstream parsers.
+#         When this command is done, every node in `.pathfinder` will have
+#         a parser set
+#         """
+#         common_parser = self._create_common_parser(**kwargs)
+# 
+#         for keys, n in self.pathfinder.nodes():
+#             value = n.value
+#             parser = value["parser"]
+#             subcommand = keys[-1] if keys else ""
+#             if not parser:
+#                 if parent_n := n.parent:
+#                     subparsers = parent_n.value["subparsers"]
+#                     if not subparsers:
+#                         subparsers = parent_n.value["parser"].add_subparsers()
+#                         parent_n.value["subparsers"] = subparsers
+# 
+#                     parser = subparsers.add_parser(
+#                         subcommand,
+#                         parents=[common_parser],
+#                         help=value["description"],
+#                         description=value["description"],
+#                         conflict_handler="resolve",
+#                         aliases=value["aliases"],
+#                     )
+# 
+#                 else:
+#                     parser = self.parser_class(
+#                         description=value["description"],
+#                         parents=[common_parser],
+#                         conflict_handler="resolve",
+#                     )
+# 
+#                 if value["version"]:
+#                     parser.add_argument(
+#                         "--version", "-V",
+#                         action='version',
+#                         version="%(prog)s {}".format(value["version"])
+#                     )
+# 
+#                 parser.set_defaults(
+#                     _command_class=value["command_class"],
+#                     _parser=parser,
+#                     _parser_node=n,
+#                 )
+#                 value["parser"] = parser
+# 
+#         return self.pathfinder.value["parser"]
+# 
+#     def _create_common_parser(self, **kwargs):
+#         """Creates the common Parser that all other parsers will use as a base
+# 
+#         This is useful to make sure there are certain flags that can be passed
+#         both before and after the subcommand. By default, if you had something
+#         like
+#         --version, you could do:
+# 
+#             $ script.py --version
+# 
+#         But not:
+# 
+#             $ script.py SUBCOMMAND --version
+# 
+#         This fixes that problem by creating this common instance and using it
+#         as a base, the subcommand will inherit the common flags/arguments also,
+#         so the flags will work the same way on the left or right side of the
+#         SUBCOMMAND
+# 
+#         :param **kwargs:
+#             - version: str, the version of the script
+#             - quiet: bool, default is True, pass in False if you don't want the 
+#               default quiet functionality to be active
+#         :returns: ArgumentParser
+#         """
+#         parser = self.parser_class(add_help=False)
+#         # !!! you can't have a normal group and mutually exclusive group
+# 
+#         version = kwargs.get("version", "")
+#         if not version:
+#             if m := sys.modules.get("__main__"):
+#                 version = getattr(m, "__version__", "")
+# 
+#         if version:
+#             parser.add_argument(
+#                 "--version", "-V",
+#                 action='version',
+#                 version="%(prog)s {}".format(version)
+#             )
+# 
+#         quiet = kwargs.get("quiet", True)
+#         if quiet:
+#             # https://docs.python.org/3/library/argparse.html#mutual-exclusion
+#             me_group = parser.add_mutually_exclusive_group()
+# 
+#             me_group.add_argument(
+#                 "--quiet", "-Q",
+#                 action=QuietAction,
+#             )
+# 
+#             me_group.add_argument(
+#                 "-q",
+#                 action=QuietAction,
+#             )
+# 
+#         return parser
 
 
 class SubParsersAction(argparse._SubParsersAction):
@@ -474,6 +439,21 @@ class SubParsersAction(argparse._SubParsersAction):
         return arg_string
 
 
+class GroupAction(argparse.Action):
+    """Mutually exclusive actions with a positional and optional with
+    defaults and the same dest will overwrite the optional value with the
+    default of the positional, so this custom action makes sure a non-default
+    value in the namespace isn't overwritten by a default value
+    """
+    def __call__(self, parser, namespace, values, option_string=None):
+        if self.dest in namespace:
+            if values != self.default:
+                setattr(namespace, self.dest, values)
+
+        else:
+            setattr(namespace, self.dest, values)
+
+
 class ArgumentParser(argparse.ArgumentParser):
     """This class is used to create parsers in Router and shouldn't ever be
     used outside of the Router context
@@ -494,22 +474,21 @@ class ArgumentParser(argparse.ArgumentParser):
         it is set, regardless of it being set by .default, .const, or an actual
         passed in value. This gets around that for custom actions by running
         get_value() if the action has one, it's similar to what we are doing
-        _parse_action_args()
+        with _parse_action_args()
 
-        NOTE -- For some reason this only gets called on default if the value
-        is a String, I have no idea why, but a custom action using this needs
-        to have string default values
+        .. note:: For some reason this only gets called on default if the
+        value is a String, I have no idea why, but a custom action using this
+        needs to have string default values
         """
 
         # this normalizes subcommand aliases (see SubParserAction)
-        cb = getattr(action, "get_arg_string", None)
-        if cb:
+        if cb := getattr(action, "get_arg_string", None):
             arg_string = cb(arg_string)
 
         ret = super()._get_value(action, arg_string)
 
-        cb = getattr(action, "get_value", None)
-        if cb:
+        # see QuietAction
+        if cb := getattr(action, "get_value", None):
             ret = cb(ret)
 
         return ret
@@ -530,6 +509,22 @@ class ArgumentParser(argparse.ArgumentParser):
                 seen_flags.update(action.option_strings)
 
         return arg_strings
+
+#     def __getattribute__(self, k):
+#         if k.startswith("__"):
+#             return super().__getattribute__(k)
+# 
+#         if k.startswith("_defaults"):
+#             return super().__getattribute__(k)
+# 
+# 
+#         if defaults := getattr(self, "_defaults", {}):
+#             if defaults["_command_class"].get_name() == "bam":
+#                 pout.v(k)
+# 
+# #         if self._defaults["_command_class"].get_name() == "bam":
+# #             pout.v(k)
+#         return super().__getattribute__(k)
 
     def _parse_known_args(self, arg_strings, namespace, intermixed=False):
         """Overridden to add call to _parse_action_args which allows customized
@@ -567,85 +562,64 @@ class ArgumentParser(argparse.ArgumentParser):
         return arg_strings
 
     def parse_known_args(self, args=None, namespace=None):
-        self.add_command_arguments(self._defaults["_command_class"])
+        command_class = self._defaults["_command_class"]
+        self._add_command_arguments(command_class)
 
         parsed, parsed_unknown = super().parse_known_args(args, namespace)
 
-        unknown_args = []
-        unknown_kwargs = {}
-
         if parsed_unknown:
+            rm = command_class.reflect().reflect_method()
+
             unknown = UnknownParser(
                 parsed_unknown,
                 hyphen_to_underscore=True,
                 infer_type=True,
             )
-            unknown_args = unknown.positionals()
-            unknown_kwargs = unknown.unwrap_optionals()
-            parsed_unknown = []
 
-            if unknown_kwargs:
-                if parsed._handle_signature["keywords_name"]:
-                    for k, v in unknown_kwargs.items():
-                        setattr(parsed, k, v)
+            positionals_name, keywords_name = rm.get_catchall_names()
 
-                else:
-                    for k in parsed._handle_signature["names"]:
-                        if k in unknown_kwargs:
-                            setattr(parsed, k, unknown_kwargs.pop(k))
-
-                    for k, v in unknown_kwargs.items():
-                        parsed_unknown.extend(unknown.info[k]["arg_strings"])
-
-            if unknown_args:
-                # we try and line our unknown args with names in the handle
-                # signature
-                for name in parsed._handle_signature["names"]:
-                    # if we've ran into the positional or keyword catchall
-                    # we're done checking arguments by name
-                    if (
-                        name == parsed._handle_signature["positionals_name"]
-                        or name == parsed._handle_signature["keywords_name"]
-                    ):
-                        break
-
-                    if unknown_args:
-                        if name not in parsed:
-                            setattr(parsed, name, unknown_args.pop(0))
-
-                    else:
-                        break
-
-                if parsed._handle_signature["positionals_name"]:
+            if positionals_name or keywords_name:
+                if positionals_name:
                     setattr(
                         parsed,
-                        parsed._handle_signature["positionals_name"],
-                        unknown_args
+                        positionals_name,
+                        #argparse._UNRECOGNIZED_ARGS_ATTR,
+                        unknown.positionals(),
                     )
+
+                if keywords_name:
+                    for k, v in unknown.unwrap_keywords().items():
+                        setattr(parsed, k, v)
+
+                if not positionals_name:
+                    parsed_unknown = unknown.get_positional_strings()
+
+                elif not keywords_name:
+                    parsed_unknown = unknown.get_keyword_strings()
+
 
                 else:
-                    parsed_unknown.extend(unknown_args)
+                    parsed_unknown = []
 
-        # re-organize to be in defined groups. If you set a group then you
-        # have to use the group in the signature because this makes sure the
-        # arguments are grouped into their defined groups
-        for groupname, names in parsed._groups.items():
-            for name in names:
-                if name in parsed:
-                    if groupname not in parsed:
-                        setattr(parsed, groupname, type(parsed)())
 
-                    setattr(
-                        getattr(parsed, groupname),
-                        name,
-                        getattr(parsed, name)
-                    )
+#             if rm.has_keywords_catchall():
+#                 unknown = UnknownParser(
+#                     parsed_unknown,
+#                     hyphen_to_underscore=True,
+#                     infer_type=True,
+#                 )
+#                 for k, v in unknown.unwrap_optionals().items():
+#                     setattr(parsed, k, v)
+# 
+#                 # because the method has a keyword catchall (eg, **kwargs)
+#                 # the only unknown arguments are the positionals
+#                 parsed_unknown = unknown.positionals()
 
-                    delattr(parsed, name)
-
+#         pout.b()
+#         pout.v(parsed, parsed_unknown)
         return parsed, parsed_unknown
 
-    def add_command_arguments(self, command_class):
+    def _add_command_arguments(self, command_class):
         """All the defined Command arguments will be added through this
         method, this is automatically called when .parse_known_args is called
 
@@ -662,31 +636,34 @@ class ArgumentParser(argparse.ArgumentParser):
             return
 
         self.command_class_added = True
-        _groups = {} # holds the arguments that belong to each group
-        sig = {}
-        _arg_count = 0
+        #sig = {}
         pa_actions = []
 
-        if command_class:
-            rc = command_class.reflect()
-            sig = rc.reflect_method().get_signature_info()
+        rc = command_class.reflect()
+        #sig = rc.reflect_method().get_signature_info()
 
-            groups = {} # holds the group parser instance
+        # add class properties
+        for pas in rc.get_arguments():
+            if len(pas) > 1:
+                group = self.add_mutually_exclusive_group(
+                    required=("default" not in pas[0][1]),
+                )
 
-            for _arg_count, pa in enumerate(rc.arguments(), 1):
-                if pa.group:
-                    group = NamingConvention(pa.group)
-                    groupname = group.varname()
-                    if groupname not in groups:
-                        groups[groupname] = self.add_argument_group(group)
-                        _groups[groupname] = []
-
-                    groups[groupname].add_argument(*pa[0], **pa[1])
-                    _groups[groupname].append(pa.name)
-
-                else:
-                    action = self.add_argument(*pa[0], **pa[1])
+                for pa in pas:
+                    pa[1].setdefault("action", GroupAction)
+                    action = group.add_argument(*pa[0], **pa[1])
                     pa_actions.append((pa, action))
+
+            else:
+                pa = pas[0]
+                action = self.add_argument(*pa[0], **pa[1])
+                pa_actions.append((pa, action))
+
+
+
+#         for pa in rc.get_arguments():
+#             action = self.add_argument(*pa[0], **pa[1])
+#             pa_actions.append((pa, action))
 
         # now that all the arguments have been set and the actions created
         # let's add variations, we don't do this earlier so we don't risk
@@ -696,23 +673,16 @@ class ArgumentParser(argparse.ArgumentParser):
             # --foo_bar to work for foo-bar but they won't appear
             # in the help output
             if action.option_strings:
-                for name in pa.names:
-                    if len(name) == 1:
-                        flag = f"-{name}"
-
-                    else:
-                        flag = f"--{name}"
-
-                    if flag not in self._option_string_actions:
+                for keyword in pa.get_keywords():
+                    if keyword not in self._option_string_actions:
                         # see the ._add_action method for how I figured this
                         # out
-                        self._option_string_actions[flag] = action
+                        self._option_string_actions[keyword] = action
 
         self.set_defaults(
             _command_class=command_class,
-            _handle_signature=sig,
-            _arg_count=_arg_count,
-            _groups=_groups,
+            #_has_keywords_catchall=rc.has_keywords_catchall(),
+            #_handle_signature=sig,
         )
 
     def add_argument(self, *args, **kwargs):

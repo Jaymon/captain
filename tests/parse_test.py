@@ -3,199 +3,9 @@ import subprocess
 
 from captain.compat import *
 from captain.logging import QuietFilter
-from captain.parse import Router, Pathfinder
 from captain.call import Command
 
 from . import TestCase, FileScript
-
-
-class PathfinderTest(TestCase):
-    def test_add_class(self):
-        modpath = self.get_module_name(2, "commands")
-        self.create_module(
-            [
-                "from captain import Command",
-                "",
-                "class CheBoo(Command):",
-                "    def handle(self):",
-                "        self.output.out('foo-bar che-boo')",
-                "",
-                "class Default(Command):",
-                "    def handle(self):",
-                "        self.output.out('foo-bar')",
-            ],
-            modpath=modpath + ".foo_bar",
-            load=True
-        )
-
-        pf = Router([modpath]).pathfinder
-
-        value = pf.get(["foo-bar"])
-        self.assertEqual("Default", value["command_class"].__name__)
-
-        value = pf.get(["foo-bar", "che-boo"])
-        self.assertEqual("CheBoo", value["command_class"].__name__)
-        self.assertTrue(issubclass(pf.get([])["command_class"], Command))
-
-    def test_multi(self):
-        modpath = self.create_module([
-            "from captain import Command, arg",
-            "",
-            "class Che(Command):",
-            "    @arg('--foo', default='1')",
-            "    @arg('--bar', type=int)",
-            "    def handle(self, foo, bar):",
-            "        print('foo: {}, bar: {}'.format(foo, bar))",
-            "",
-            "class Bam(Command):",
-            "    def handle(self, **kwargs):",
-            "        print('kwargs: {}'.format(kwargs))",
-        ], load=True)
-
-        pf = Router([modpath]).pathfinder
-
-        self.assertEqual(2, len(pf))
-        self.assertEqual("Che", pf.get("che")["command_class"].__name__)
-        self.assertEqual("Bam", pf.get("bam")["command_class"].__name__)
-
-    def test_module_description(self):
-        modpath = self.create_module({
-            "foo": {
-                "": "'''bundles foo subcommands'''",
-                "bar": """
-                    '''bundles bar subcommands'''
-                    from captain import Command
-                    class Che(Command): pass
-                """,
-            }
-        }, load=True)
-
-        pf = Router([modpath]).pathfinder
-
-        self.assertTrue("foo subcommands" in pf["foo"]["description"])
-        self.assertTrue("bar subcommands" in pf["foo", "bar"]["description"])
-        self.assertEqual("", pf["foo", "bar", "che"]["description"])
-
-    def test_default_node(self):
-        s = FileScript([
-            "class Default(Command):",
-            "    def handle(self, foo, bar):",
-            "        print('foo: {}'.format(foo))",
-            "        print('bar: {}'.format(bar))",
-        ])
-
-        r = s.run("--bar 1 --foo=2")
-        self.assertTrue("bar: 1" in r)
-        self.assertTrue("foo: 2" in r)
-
-
-class RouterTest(TestCase):
-    def test_only_default(self):
-        p = self.create_module([
-            "from captain import Command",
-            "",
-            "class Default(Command):",
-            "    def handle(self, *args, **kwargs):",
-            "        self.output.out('default')",
-        ])
-
-        r = Router(command_prefixes=[p])
-
-        parsed = r.parser.parse_args(["foo", "--one=1", "--two=2"])
-
-        self.assertEqual(["foo"], parsed.args)
-        self.assertEqual("1", parsed.one)
-        self.assertEqual("2", parsed.two)
-
-    def test_only_subcommands(self):
-        p = self.create_module([
-            "from captain import Command",
-            "",
-            "class Foo(Command):",
-            "    def handle(self, *args, **kwargs):",
-            "        self.output.out('foo')",
-            "",
-            "class Bar(Command):",
-            "    def handle(self, *args, **kwargs):",
-            "        self.output.out('bar')",
-        ])
-
-        r = Router(command_prefixes=[p])
-
-        parsed = r.parser.parse_args(["foo", "--one=1", "--two=2"])
-        self.assertEqual("1", parsed.one)
-        self.assertEqual("2", parsed.two)
-
-    def test_prefixes(self):
-        p = self.create_modules({
-            "far.commands": {
-                "foo": [
-                    "from captain import Command",
-                    "",
-                    "class Default(Command):",
-                    "    def handle(self):",
-                    "        self.output.out('foo')",
-                    "",
-                    "class Bar(Command):",
-                    "    def handle(self):",
-                    "        self.output.out('foo bar')",
-                ],
-                "__init__": [
-                    "from captain import Command",
-                    "",
-                    "class Default(Command):",
-                    "    def handle(self):",
-                    "        self.output.out('foo')",
-                ],
-                "che": {
-                    "__init__": [
-                        "from captain import Command",
-                        "",
-                        "class Default(Command):",
-                        "    def handle(self):",
-                        "        self.output.out('che')",
-                    ],
-                    "boo": [
-                        "from captain import Command",
-                        "",
-                        "class Default(Command):",
-                        "    def handle(self):",
-                        "        self.output.out('che boo')",
-                    ],
-                },
-            },
-        })
-
-        r = Router(paths=[p])
-
-        value = r.pathfinder.get(["che", "boo"])
-        self.assertIsNotNone(value["parser"])
-
-        value = r.pathfinder.get(["foo", "bar"])
-        self.assertIsNotNone(value["parser"])
-
-        value = r.pathfinder.get(["foo"])
-        self.assertIsNotNone(value["parser"])
-
-    def test_dash_underscore_subcommands(self):
-        p = self.create_modules(
-            {
-                "commands": {
-                    "foo_bar": [
-                        "from captain import Command",
-                        "",
-                        "class CheBoo(Command):",
-                        "    def handle(self):",
-                        "        self.output.out('foo-bar che-boo')",
-                    ],
-                }
-            },
-            modpath=self.get_module_name()
-        )
-
-        r = Router(paths=[p])
-        parsed = r.parser.parse_args(["foo-bar", "che-boo"])
-        self.assertEqual("CheBoo", parsed._command_class.__name__)
 
 
 class ArgumentParserTest(TestCase):
@@ -438,25 +248,25 @@ class ArgumentParserTest(TestCase):
         self.assertTrue("foo: 1, bar: 2" in r)
 
     def test_parse_custom_action(self):
-        s = FileScript([
-            "import argparse",
-            "",
-            "class FooAction(argparse.Action):",
-            "    def parse_args(self, parser, arg_strings): return arg_strings",
-            "    def get_value(self, value): pout.v(value); return int(value) + 1",
-            "    def __call__(self, parser, namespace, values, option_string):",
-            "        setattr(namespace, self.dest, values)",
-            "",
-            "class Che(Command):",
-            "    @arg('--foo', default='1', action=FooAction)",
-            "    @arg('--bar', type=int)",
-            "    def handle(self, foo, bar):",
-            "        print('foo: {}, bar: {}'.format(foo, bar))",
-            "",
-            "class Bam(Command):",
-            "    def handle(self, **kwargs):",
-            "        print('kwargs: {}'.format(kwargs))",
-        ])
+        s = FileScript("""
+            import argparse
+
+            class FooAction(argparse.Action):
+                def parse_args(self, parser, arg_strings): return arg_strings
+                def get_value(self, value): return int(value) + 1
+                def __call__(self, parser, namespace, values, option_string):
+                    setattr(namespace, self.dest, values)
+
+            class Che(Command):
+                @arg('--foo', default='1', action=FooAction)
+                @arg('--bar', type=int)
+                def handle(self, foo, bar):
+                    print('foo: {}, bar: {}'.format(foo, bar))
+
+            class Bam(Command):
+                def handle(self, **kwargs):
+                    print('kwargs: {}'.format(kwargs))
+        """)
 
         r = s.run("bam --foo 1 --bar 2")
         self.assertTrue("foo': '1'" in r)
@@ -478,41 +288,6 @@ class ArgumentParserTest(TestCase):
 
         r = s.run("--help foo")
         self.assertTrue("--quiet" in r)
-
-    def test_group_simple(self):
-        s = FileScript([
-            "class Default(Command):",
-            "    @arg('--foo', type=int, group='bar')",
-            "    @arg('--che', action='store_true', group='bar')",
-            "    @arg('--baz', type=int)",
-            "    def handle(self, bar, baz):",
-            "        print('bar group: {}, baz: {}'.format(bar, baz))",
-        ])
-
-        r = s.run("--foo=1 --che --baz=3")
-        self.assertTrue("bar group: Namespace(foo=1, che=True), baz: 3" in r)
-
-        r = s.run("--help")
-        self.assertTrue("bar:" in r)
-
-    def test_group_multiword(self):
-        s = FileScript([
-            "class Default(Command):",
-            "    @arg('--foo', type=int, group='Bar Bam')",
-            "    @arg('--che', action='store_true', group='Bar Bam')",
-            "    def handle(self, bar_bam):",
-            "        print('bar_bam group: {}'.format(bar_bam))",
-            "        print('bar_bam foo: {}'.format(bar_bam.foo))",
-            "        print('bar_bam che: {}'.format(bar_bam.che))",
-        ])
-
-        r = s.run("--foo=1 --che")
-        self.assertTrue("bar_bam group: Namespace(foo=1, che=True)" in r)
-        self.assertTrue("bar_bam foo: 1" in r)
-        self.assertTrue("bar_bam che: True" in r)
-
-        r = s.run("--help")
-        self.assertTrue("Bar Bam:" in r)
 
     def test_parse_undefined_normalization(self):
         s = FileScript([
@@ -537,9 +312,9 @@ class ArgumentParserTest(TestCase):
         self.assertEqual("2", parsed.foo)
         self.assertEqual("1", parsed.bar)
 
-        parsed = parser.parse_args(["1", "--foo=2"])
-        self.assertEqual("2", parsed.foo)
-        self.assertEqual("1", parsed.bar)
+        parsed = parser.parse_args(["1", "--bar=2"])
+        self.assertEqual("1", parsed.foo)
+        self.assertEqual("2", parsed.bar)
 
         parsed = parser.parse_args(["1", "2"])
         self.assertEqual("1", parsed.foo)
@@ -605,11 +380,26 @@ class ArgumentParserTest(TestCase):
 
         r = s.run("--help")
         self.assertFalse("remote_directory" in r)
+        self.assertTrue("remote-directory" in r)
         self.assertFalse("foo-bar" in r)
+
 
         v1 = "other"
         v2 = "something"
         r = s.run(f"--foo_bar={v1} --remote-directory {v2}")
         self.assertTrue(v1 in r)
         self.assertTrue(v2 in r)
+
+    def test_unknown_args(self):
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, *args, **kwargs):
+                    self.out(args)
+                    self.out(kwargs)
+                    pass
+        """)
+
+        r = s.run("--foo 1 --bar 2 3 4")
+        self.assertTrue("('3', '4')" in r)
+        self.assertTrue("{'foo': '1', 'bar': '2'}" in r)
 
