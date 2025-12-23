@@ -136,10 +136,8 @@ class Application(object):
                     )
 
                 parser.set_defaults(
-                    _command_class=value["command_class"],
-                    #_parser=parser,
+                    #_command_class=value["command_class"],
                     _pathfinder_node=n,
-                    #_application=self,
                 )
                 value["parser"] = parser
 
@@ -208,9 +206,11 @@ class Application(object):
         :returns: int, the return code you want the script to exit with
         """
         parsed = self.parser.parse_args(argv)
-        command = parsed._command_class(
+        node_value = parsed._pathfinder_node.value
+        command_class = node_value["command_class"]
+        command = command_class(
             application=self,
-            parser=parsed._pathfinder_node.value["parser"],
+            parser=node_value["parser"],
         )
         args, kwargs = await command.get_parsed_params(parsed)
         return await command.run(*args, **kwargs)
