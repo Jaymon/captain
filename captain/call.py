@@ -114,21 +114,21 @@ class Command(object):
             or cls.__name__.endswith("Command")
         )
 
-    @classmethod
-    def arguments(cls):
-        """Returns all the defined class arguments that will become class
-        properties when the command is ran
-
-        :returns: dict[str, Argument], where the key is the name of the 
-            property and the value is the Argument information that can be
-            used when adding the argument to a parser using
-            parser.add_argument
-        """
-        arguments = {}
-        for k, v in inspect.getmembers(cls, lambda v: isinstance(v, Argument)):
-            arguments[k] = v
-
-        return arguments
+#     @classmethod
+#     def arguments(cls):
+#         """Returns all the defined class arguments that will become class
+#         properties when the command is ran
+# 
+#         :returns: dict[str, Argument], where the key is the name of the 
+#             property and the value is the Argument information that can be
+#             used when adding the argument to a parser using
+#             parser.add_argument
+#         """
+#         arguments = {}
+#         for k, v in inspect.getmembers(cls, lambda v: isinstance(v, Argument)):
+#             arguments[k] = v
+# 
+#         return arguments
 
     def __init__(self, parsed=None, application=None, parser=None):
         self.parsed = parsed
@@ -141,8 +141,8 @@ class Command(object):
         # any class properties should be set to None on this instance since
         # they don't exist and we don't want any instance methods messing with
         # the actual Argument instance
-        for k in self.arguments().keys():
-            setattr(self, k, None)
+#         for k in self.arguments().keys():
+#             setattr(self, k, None)
 
     def __init_subclass__(cls):
         """When a child class is loaded into memory it will be saved into

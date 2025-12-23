@@ -65,6 +65,30 @@ class ReflectCommandTest(TestCase):
         self.assertEqual(1, len(args))
         self.assertEqual("foo", args[0][0].name)
 
+    def test_get_arguments(self):
+        class ParentCommand(Command):
+            foo = Argument(
+                "--foo", "-f",
+                type=int,
+                help="parent foo"
+            )
+            bar = Argument(
+                "--bar", "-b",
+                action="store_true",
+                help="parent bar"
+            )
+
+        class ChildCommand(ParentCommand):
+            foo = Argument("--foo", "-f", help="child foo")
+            che = Argument("--che", "-c", required=True, help="child che")
+
+        am = {}
+        for a in ChildCommand.reflect().get_arguments():
+            am[a[0].name] = a[0]
+
+        self.assertTrue("child foo" in am["foo"][1]["help"])
+        self.assertTrue("parent bar" in am["bar"][1]["help"])
+
 
 class ReflectMethodTest(TestCase):
     def test_get_arguments(self):
@@ -300,5 +324,4 @@ class PathfinderTest(TestCase):
         r = s.run("--bar 1 --foo=2")
         self.assertTrue("bar: 1" in r)
         self.assertTrue("foo: 2" in r)
-
 

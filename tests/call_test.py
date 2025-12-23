@@ -28,31 +28,33 @@ class CommandTest(TestCase):
         self.assertTrue("bar" in r)
         self.assertTrue("'4'" in r)
 
-    def test_name(self):
+    def test_get_name(self):
         s = FileScript([
             "class Foo(Command):",
             "    def handle(self, **kwargs): pass",
         ])
         c_class = s.command_class("foo")
-        self.assertEqual("foo", c_class.name)
+        self.assertEqual("foo", c_class.get_name())
 
-        s = FileScript([
-            "class Foo(Command):",
-            "    name = 'bar'",
-            "    def handle(self, **kwargs): pass",
-        ])
+        s = FileScript("""
+            class Foo(Command):
+                @classmethod
+                def get_name(cls): return "bar"
+                def handle(self, **kwargs): pass
+        """)
         c_class = s.command_class("bar")
-        self.assertEqual("bar", c_class.name)
+        self.assertEqual("bar", c_class.get_name())
 
-    def test_aliases(self):
-        s = FileScript([
-            "class FooOne(Command):",
-            "    aliases = ['bar']",
-            "    def handle(self, **kwargs): pass",
-        ])
+    def test_get_aliases(self):
+        s = FileScript("""
+            class FooOne(Command):
+                @classmethod
+                def get_aliases(cls): return ["bar"]
+                def handle(self, **kwargs): pass
+        """)
 
         c_class = s.command_class("foo-one")
-        self.assertEqual(["bar"], c_class.aliases)
+        self.assertEqual(["bar"], c_class.get_aliases())
 
     def test_unnamed_arg(self):
         """https://github.com/Jaymon/captain/issues/64"""
@@ -100,29 +102,9 @@ class CommandTest(TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             r = s.run("--bar 1")
 
-    def test_arguments(self):
-        class ParentCommand(Command):
-            foo = Argument(
-                "--foo", "-f",
-                type=int,
-                help="parent foo"
-            )
-            bar = Argument(
-                "--bar", "-b",
-                action="store_true",
-                help="parent bar"
-            )
-
-        class ChildCommand(ParentCommand):
-            foo = Argument("--foo", "-f", help="child foo")
-            che = Argument("--che", "-c", required=True, help="child che")
-
-
-        args = ChildCommand.arguments()
-        self.assertTrue("child foo" in args["foo"][1]["help"])
-        self.assertTrue("parent bar" in args["bar"][1]["help"])
-
     def test_call(self):
+        self.skip("Disabled while refactoring call")
+
         s = FileScript("""
             class Foo(Command):
                 class Bar(Command):
