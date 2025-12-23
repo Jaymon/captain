@@ -2,6 +2,7 @@
 import subprocess
 
 from . import TestCase, FileScript
+from captain.interface import Application
 
 
 class ApplicationTest(TestCase):
@@ -97,8 +98,6 @@ class ApplicationTest(TestCase):
         r = s.run("foo_two")
         self.assertTrue("foo_two" in r)
 
-###############################################################################
-# from RouterTest
     def test_only_default(self):
         p = self.create_module([
             "from captain import Command",
@@ -108,9 +107,9 @@ class ApplicationTest(TestCase):
             "        self.output.out('default')",
         ])
 
-        r = Router(command_prefixes=[p])
+        a = Application(command_prefixes=[p])
 
-        parsed = r.parser.parse_args(["foo", "--one=1", "--two=2"])
+        parsed = a.parser.parse_args(["foo", "--one=1", "--two=2"])
 
         self.assertEqual(["foo"], parsed.args)
         self.assertEqual("1", parsed.one)
@@ -129,9 +128,9 @@ class ApplicationTest(TestCase):
             "        self.output.out('bar')",
         ])
 
-        r = Router(command_prefixes=[p])
+        a = Application(command_prefixes=[p])
 
-        parsed = r.parser.parse_args(["foo", "--one=1", "--two=2"])
+        parsed = a.parser.parse_args(["foo", "--one=1", "--two=2"])
         self.assertEqual("1", parsed.one)
         self.assertEqual("2", parsed.two)
 
@@ -175,15 +174,15 @@ class ApplicationTest(TestCase):
             },
         })
 
-        r = Router(paths=[p])
+        a = Application(paths=[p])
 
-        value = r.pathfinder.get(["che", "boo"])
+        value = a.pathfinder.get(["che", "boo"])
         self.assertIsNotNone(value["parser"])
 
-        value = r.pathfinder.get(["foo", "bar"])
+        value = a.pathfinder.get(["foo", "bar"])
         self.assertIsNotNone(value["parser"])
 
-        value = r.pathfinder.get(["foo"])
+        value = a.pathfinder.get(["foo"])
         self.assertIsNotNone(value["parser"])
 
     def test_dash_underscore_subcommands(self):
@@ -202,7 +201,7 @@ class ApplicationTest(TestCase):
             modpath=self.get_module_name()
         )
 
-        r = Router(paths=[p])
-        parsed = r.parser.parse_args(["foo-bar", "che-boo"])
+        a = Application(paths=[p])
+        parsed = a.parser.parse_args(["foo-bar", "che-boo"])
         self.assertEqual("CheBoo", parsed._command_class.__name__)
 

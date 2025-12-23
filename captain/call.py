@@ -34,22 +34,6 @@ class Command(object):
     version = ""
     """Set this as the version for this command"""
 
-#     @classproperty
-#     def name(cls):
-#         """This is the name that will be used to invoke the SUBCOMMAND, it can
-#         be overridden in child classes but has no effect if the child class is
-#         named Default"""
-#         n = NamingConvention(cls.__name__)
-#         return n.kebabcase()
-
-#     @classproperty
-#     def aliases(cls):
-#         """If you want your SUBCOMMAND to have aliases (ie, foo-bar and foo_bar
-#         will both trigger the subcommand) then you can return the aliases, this
-#         can be set in a child class or set aliases = [] to completely remove
-#         any aliases in a subclass"""
-#         return set()
-
     @classproperty
     def module(cls):
         """The module the child class is defined in"""
@@ -114,22 +98,6 @@ class Command(object):
             or cls.__name__.endswith("Command")
         )
 
-#     @classmethod
-#     def arguments(cls):
-#         """Returns all the defined class arguments that will become class
-#         properties when the command is ran
-# 
-#         :returns: dict[str, Argument], where the key is the name of the 
-#             property and the value is the Argument information that can be
-#             used when adding the argument to a parser using
-#             parser.add_argument
-#         """
-#         arguments = {}
-#         for k, v in inspect.getmembers(cls, lambda v: isinstance(v, Argument)):
-#             arguments[k] = v
-# 
-#         return arguments
-
     def __init__(self, parsed=None, application=None, parser=None):
         self.parsed = parsed
         self.input = self.input_class()
@@ -137,12 +105,6 @@ class Command(object):
 
         self.application = application
         self.parser = parser
-
-        # any class properties should be set to None on this instance since
-        # they don't exist and we don't want any instance methods messing with
-        # the actual Argument instance
-#         for k in self.arguments().keys():
-#             setattr(self, k, None)
 
     def __init_subclass__(cls):
         """When a child class is loaded into memory it will be saved into
@@ -168,13 +130,9 @@ class Command(object):
 
         return cb
 
-
     async def get_parsed_params(self, parsed) -> tuple[Iterable, Mapping]:
         args = []
         kwargs = {}
-
-        #self.application = getattr(parsed, "_application", None)
-        #self.parser = getattr(parsed, "_parser", None)
 
         rm = self.reflect().reflect_method()
         parsed_kwargs = {}
@@ -192,11 +150,6 @@ class Command(object):
             elif ra.is_keyword():
                 kwargs.update(ra.get_keyword_values())
 
-        #pout.v(args, kwargs)
-        #pout.v(ckwargs, parsed)
-#         info = rm.get_bind_info(**kwargs)
-#         args = [*info["bound_args"], *info["unbound_args"]]
-#         kwargs = {**info["bound_kwargs"], **info["unbound_kwargs"]}
         return args, kwargs
 
     async def get_method_params(self, *args, **kwargs) -> tuple[Iterable, Mapping]:
@@ -204,46 +157,12 @@ class Command(object):
         rc = self.reflect()
         for pas in rc.get_class_arguments():
             for pa in pas:
+                # any class properties should be set to None on this instance
+                # since they don't exist and we don't want any instance methods
+                # messing with the actual Argument instance
                 setattr(self, pa.name, kwargs.pop(pa.name, None))
 
         return args, kwargs
-
-#     async def get_handle_params(self, *args, **kwargs):
-#         """Called right before the command's handle method is called.
-# 
-#         passed in args and kwargs will be merged with .parsed
-# 
-#         :param *args: will override any matching .parsed args
-#         :param **kwargs: will override any matching .parsed values
-#         :returns: tuple[tuple, dict], whatever is returned from this method is
-#             passed into the .handle method as *args, **kwargs
-#         """
-#         return args, kwargs
-#         cargs = []
-#         ckwargs = {}
-# 
-#         if parsed := self.parsed:
-#             rm = self.reflect().reflect_method()
-#             #pout.v(self.parsed._get_kwargs())
-# 
-#             for k, v in self.parsed._get_kwargs():
-#                 # we filter out private (starts with _) and placeholder
-#                 # (surrounded by <>) keys
-#                 if not k.startswith("_") and not k.startswith("<"):
-#                     ckwargs[k] = v
-# 
-#             #pout.v(ckwargs, parsed)
-#             info = rm.get_bind_info(**ckwargs)
-#             cargs = [*info["bound_args"], *info["unbound_args"], *args]
-#             ckwargs = {
-#                 **info["bound_kwargs"],
-#                 **info["unbound_kwargs"],
-#                 **kwargs,
-#             }
-#             #pout.b()
-#             #pout.v(info)
-# 
-#         return cargs, ckwargs
 
     async def run(self, *args, **kwargs):
         """Wrapper around the internal handle methods, this should be
@@ -273,30 +192,6 @@ class Command(object):
                 ret_code = await ret_code
 
         return ret_code
-
-#     async def handle_call(self, *args, **kwargs):
-#         """Run the main .handle method
-# 
-#         this could be easily overridden so you can easily do something before
-#         or after the handle calls. This exists so there is an easy hook for
-#         context managers or the like after the parameters have been shaken out
-#         (which is why .run didn't work for things like context managers).
-# 
-#         See: https://github.com/Jaymon/captain/issues/90
-# 
-#         :param *args: the positional arguments that will be passed to .handle
-#             because they've already been normalized with .get_handle_params
-#         :param *kwargs: the keyword arguments that will be passed to .handle
-#             because they've already been normalized with .get_handle_params
-#         :returns: int, the return code
-#         """
-#         # child classes without async handle methods is common so we
-#         # don't await and instead await if we know it's a coroutine
-#         ret_code = self.handle(*args, **kwargs)
-#         while inspect.iscoroutine(ret_code):
-#             ret_code = await ret_code
-# 
-#         return ret_code
 
     async def handle(self, *args, **kwargs):
         self.parser.print_help()
