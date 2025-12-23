@@ -9,7 +9,7 @@ from collections import defaultdict
 from datatypes import (
     ArgvParser as UnknownParser,
     NamingConvention,
-    #Dirpath,
+    NormalizeMixin,
 )
 
 from .compat import *
@@ -200,39 +200,65 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         return lines
 
 
+class _SubParsersChoices(NormalizeMixin, dict):
+    """Internal class used by SubParsersAction. Allows setting aliases to a
+    key so that aliases can be used to find subparsers"""
+    def __init__(self, *args, **kwargs):
+        self.key_lookup = {}
+        super().__init__(*args, **kwargs)
+
+    def normalize_key(self, k):
+        return self.key_lookup.get(k, k)
+
+    def add_aliases(self, k, aliases):
+        for ak in aliases:
+            self.key_lookup[ak] = k
+
+
 class SubParsersAction(argparse._SubParsersAction):
     """This is what is returned from ArgumentParser.add_subparsers and only
     exists to hide aliases from the help output
 
     https://github.com/python/cpython/blob/3.11/Lib/argparse.py#L793
     https://github.com/python/cpython/blob/3.11/Lib/argparse.py#L1154
+
+    Sadly, we can't just use `._name_parser_map` and add additional keywords,
+    so we do this instead and built-in support for calling `.get_arg_string`
+    in our ArgumentParser
     """
     def __init__(self, *args, **kwargs):
-        self._alias_map = {}
         super().__init__(*args, **kwargs)
 
-    def add_parser(self, name, **kwargs):
+        # use our custom data structure so we can support aliases without them
+        # showing up in the help output
+        self._name_parser_map = _SubParsersChoices(self._name_parser_map)
+        self.choices = self._name_parser_map
+
+    def add_parser(self, name, aliases: list|None =None, **kwargs):
         """
         https://github.com/python/cpython/blob/3.11/Lib/argparse.py#L1189
         """
-        self._alias_map[name] = kwargs.pop("aliases", [])
-        return super().add_parser(name, **kwargs)
+        parser = super().add_parser(name, **kwargs)
+        if aliases:
+            self.choices.add_aliases(name, aliases)
 
-    def get_arg_string(self, arg_string):
-        """This is where the magic happens. This is called from
-        ArgumentParser._get_value and normalizes the flag name if needed
+        return parser
 
-        :param name: str, the arg string
-        :returns: str, either the arg_string untouched or the actual name
-            of the subparser if arg_string was an alias
-        """
-        if arg_string not in self._alias_map:
-            for n, aliases in self._alias_map.items():
-                if arg_string in aliases:
-                    arg_string = n
-                    break
-
-        return arg_string
+#     def get_arg_string(self, arg_string):
+#         """This is where the magic happens. This is called from
+#         ArgumentParser._get_value and normalizes the flag name if needed
+# 
+#         :param name: str, the arg string
+#         :returns: str, either the arg_string untouched or the actual name
+#             of the subparser if arg_string was an alias
+#         """
+#         if arg_string not in self._alias_map:
+#             for n, aliases in self._alias_map.items():
+#                 if arg_string in aliases:
+#                     arg_string = n
+#                     break
+# 
+#         return arg_string
 
 
 class GroupAction(argparse.Action):
@@ -263,6 +289,8 @@ class ArgumentParser(argparse.ArgumentParser):
         kwargs.setdefault("formatter_class", HelpFormatter)
         super().__init__(**kwargs)
 
+        # whenever `.add_subparsers` is called without a `parsers` keyword use
+        # this class as the default
         self.register('action', 'parsers', SubParsersAction)
 
     def _get_value(self, action, arg_string):
@@ -278,8 +306,8 @@ class ArgumentParser(argparse.ArgumentParser):
         """
 
         # this normalizes subcommand aliases (see SubParserAction)
-        if cb := getattr(action, "get_arg_string", None):
-            arg_string = cb(arg_string)
+#         if cb := getattr(action, "get_arg_string", None):
+#             arg_string = cb(arg_string)
 
         ret = super()._get_value(action, arg_string)
 
