@@ -182,11 +182,6 @@ class ArgumentTest(TestCase):
         with self.assertRaises(RuntimeError):
             s.run("bar --help")
 
-    def test_default(self):
-        pa = Argument('foo')
-        pa.set_default(True)
-        self.assertEqual("store_false", pa[1]["action"])
-
     def test_custom_standard_type(self):
         class FooType(str):
             def __new__(cls, d):

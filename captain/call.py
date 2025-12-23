@@ -98,8 +98,7 @@ class Command(object):
             or cls.__name__.endswith("Command")
         )
 
-    def __init__(self, parsed=None, application=None, parser=None):
-        self.parsed = parsed
+    def __init__(self, application=None, parser=None):
         self.input = self.input_class()
         self.output = self.output_class()
 
@@ -179,13 +178,10 @@ class Command(object):
         """
         try:
             args, kwargs = await self.get_method_params(*args, **kwargs)
-            #args, kwargs = await self.get_handle_params(*args, **kwargs)
             ret_code = self.handle(*args, **kwargs)
-            #ret_code = await self.handle_call(*args, **kwargs)
 
         except Exception as e:
             ret_code = self.handle_error(e)
-            #ret_code = await self.handle_error(e)
 
         finally:
             while inspect.iscoroutine(ret_code):
@@ -194,7 +190,13 @@ class Command(object):
         return ret_code
 
     async def handle(self, *args, **kwargs):
-        self.parser.print_help()
+        if self.parser:
+            self.parser.print_help()
+
+#         if self.application:
+#             node = self.application.pathfinder.find_class_node(type(self))
+#             node["parser"].print_help()
+        #self.parser.print_help()
 
     async def handle_error(self, e):
         """This is called when an uncaught exception on the Command is raised,

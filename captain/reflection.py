@@ -109,8 +109,6 @@ class ReflectParam(ReflectParam):
             # mutual exclusive values can't be required, if it can be passed
             # in as either a positional or keyword it can't be required
             flags["required"] = not self.is_param()
-#             if not self.is_param():
-#                 flags["required"] = True
 
         if "type" in flags:
             rt = self.create_reflect_type(flags["type"])
@@ -217,7 +215,6 @@ class ReflectMethod(ReflectCallable):
             else:
                 pas[pa.name] = [pa]
 
-        #pout.v(pas)
         yield from pas.values()
 
 

@@ -33,16 +33,6 @@ class Application(object):
 
     pathfinder_class = Pathfinder
 
-    #router_class = Router
-    """The router class that converts the passed in arg strings into a
-    callable command class"""
-
-#    def create_router(self):
-#         return self.router_class(
-#             command_class=self.command_class,
-#             command_prefixes=self.command_prefixes,
-#         )
-
     def __init__(self, command_prefixes=None, paths=None, **kwargs):
         """Create the application interface that binds the CLI comamnd string
         to the captain commands
@@ -147,8 +137,8 @@ class Application(object):
 
                 parser.set_defaults(
                     _command_class=value["command_class"],
-                    _parser=parser,
-                    _parser_node=n,
+                    #_parser=parser,
+                    _pathfinder_node=n,
                     #_application=self,
                 )
                 value["parser"] = parser
@@ -209,17 +199,6 @@ class Application(object):
 
         return parser
 
-#     def create_command(self, argv=None) -> Command:
-#         """This command is used by the Application instance to get the
-#         command that will ultimately handle the request
-# 
-#         :param argv: list[str], a list of argument strings, if this isn't
-#             passed in then it will use sys.argv
-#         :returns: Command
-#         """
-#         parsed = self.parser.parse_args(argv)
-#         return parsed._command_class(parsed)
-
     async def run(self, argv: list[str]|None = None) -> int:
         """Actually run captain with the given argv
 
@@ -230,9 +209,8 @@ class Application(object):
         """
         parsed = self.parser.parse_args(argv)
         command = parsed._command_class(
-            parsed=parsed,
             application=self,
-            parser=self.parser,
+            parser=parsed._pathfinder_node.value["parser"],
         )
         args, kwargs = await command.get_parsed_params(parsed)
         return await command.run(*args, **kwargs)
