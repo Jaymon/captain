@@ -35,7 +35,7 @@ class ReflectCommand(ReflectClass):
 #         the command name"""
 #         return self.get_target().get_name()
 
-    def get_class_arguments(self):
+    def get_class_arguments(self) -> Generator[list[tuple]]:
     #def get_arguments(self):
         """Returns all the defined class arguments that will become class
         properties when the command is ran
@@ -52,7 +52,7 @@ class ReflectCommand(ReflectClass):
         for k, v in arg_iter:
             yield [v]
 
-    def get_arguments(self):
+    def get_arguments(self) -> Generator[list[tuple]]:
         yield from self.get_class_arguments()
         yield from self.reflect_method().get_arguments()
 
@@ -81,89 +81,69 @@ class ReflectCommand(ReflectClass):
 
 
 class ReflectParam(ReflectParam):
-#     def __init__(self, param, reflect_method, **kwargs):
-#         super().__init__(param)
+    def _get_argument_flags(self) -> Mapping:
+        flags = {"aliases": []}
+
+        rt = None
+        param = self.get_target()
+
+        if param.default is not param.empty:
+            flags["default"] = param.default
+
+#         if param.default is param.empty:
+#             flags["required"] = True
 # 
-#         self.names, self.flags = self.get_argument_params(param)
+#         else:
+#             flags["default"] = param.default
 
-    def get_argparse_names(self):
-        name = self.name
-        if self.is_keyword():
-            name = NamingConvention(name).cli_keyword()
+        if param.annotation is param.empty:
+            if "default" in flags:
+                rt = self.create_reflect_type(type(flags["default"]))
 
-        names = [name]
+        else:
+            rt = self.create_reflect_type(param.annotation)
 
-        if rt := self.reflect_type():
+        if rt:
+            flags["type"] = rt.get_origin_type()
+
+            if not rt.is_castable():
+                flags.pop("type")
+
+            if rt.is_literal():
+                flags.pop("type", None)
+                flags["choices"] = set(rt.get_args())
+
             for metadata in rt.get_metadata():
                 if isinstance(metadata, Mapping):
-                    for k in ["aliases", "names"]:
-                        if vs := metadata.get(k, []):
-                            names.extend(vs)
+                    flags.update(metadata)
 
-                    for k in ["alias", "name"]:
-                        if v := metadata.get(k, ""):
-                            names.append(v)
+                else:
+                    flags["aliases"].append(metadata)
 
-        return names
+        return flags
 
-#     def get_argparse_keywords(self):
-#         flags = super().get_argparse_keywords()
-#         pout.v(argparse.ArgumentParser.add_argument)
-# 
-#         flagset = set()
-#         rc = ReflectCallable(argparse.ArgumentParser.add_argument)
-#         for param in rc.get_params():
-#             flagset.add(param.name)
-# 
-#         pout.v(flagset)
-# 
-#         return flags
+    def get_positional_argument_flags(self) -> Mapping:
+        flags = self._get_argument_flags()
+        flags.pop("aliases", None)
+        return flags
 
-#     def get_argument_params(self):
-#         params
-#         names = []
-#         flags = {}
-# 
-#         if param.kind in (param.VAR_POSITIONAL, param.POSITIONAL_ONLY):
-#             names.append(param.name)
-# 
-#         if param.default is param.empty:
-#             if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
-#                 flags["required"] = False
-# 
-#             else:
-#                 flags["required"] = True
-# 
-#         else:
-#             flags["required"] = False
-#             flags["default"] = param.default
-# 
-#         if param.annotation is param.empty:
-#             if param.kind == param.VAR_POSITIONAL:
-#                 flags["action"] = "append"
-# 
-# #                 elif param.kind == param.VAR_KEYWORD:
-# #                     flags["type"] = dict
-# # 
-# #                 else:
-# #                     flags["type"] = Any
-# 
-#         else:
-#             flags["type"] = param.annotation
-# 
-#             rt = self.create_reflect_type(flags["type"])
-#             if rt.is_annotated():
-#                 for metadata in rt.get_metadata():
-#                     if isinstance(metadata, Mapping):
-#                         flags.update(metadata)
-# 
-#                     elif isinstance(metadata, str):
-#                         names.extend(filter(None, metadata.split(" ")))
-# 
-#                     else:
-#                         names.extend(metadata)
-# 
-#         return names, flags
+    def get_keyword_argument_flags(self) -> Mapping:
+        flags = self._get_argument_flags()
+
+        if "default" not in flags:
+            flags["required"] = True
+
+        if "type" in flags:
+            rt = self.create_reflect_type(flags["type"])
+            if rt.is_bool():
+                # https://docs.python.org/3/library/argparse.html#action
+                if not flags.pop("default", False):
+                    flags["action"] = "store_true"
+
+                else:
+                    flags["action"] = "store_false"
+
+        return flags
 
 
 class ReflectMethod(ReflectCallable):
@@ -188,7 +168,7 @@ class ReflectMethod(ReflectCallable):
 #             **kwargs,
 #         )
 
-    def get_arguments(self) -> Generator[tuple]:
+    def get_arguments(self) -> Generator[list[tuple]]:
         """Return all the Argument instances that should be added to the
         ArgumentParser instance that will validate all the arguments that want
         to be passed to this method
@@ -203,28 +183,35 @@ class ReflectMethod(ReflectCallable):
 
         for rp in self.reflect_params():
             pa = []
-            arg_kwargs = {}
+#             arg_kwargs = {}
             param = rp.get_target()
             name = rp.name
             nc = NamingConvention(name)
 
-            if name in param_descs:
-                arg_kwargs["help"] = param_descs[name]
+#             if name in param_descs:
+#                 arg_kwargs["help"] = param_descs[name]
 
-            if param.default is not param.empty:
-                arg_kwargs["default"] = param.default
+#             if param.default is not param.empty:
+#                 arg_kwargs["default"] = param.default
 
             if param.kind is param.POSITIONAL_OR_KEYWORD:
+                # mutual exclusive values can't be required
+                key_flags = rp.get_keyword_argument_flags()
+                key_flags.pop("required", None)
+
                 pa = [
                     Argument(
                         nc.cli_positional(),
                         nargs="?",
-                        **arg_kwargs,
+                        **rp.get_positional_argument_flags(),
                     ),
                     Argument(
                         nc.cli_keyword(),
                         dest=name,
-                        **arg_kwargs,
+                        #**arg_kwargs,
+                        help=param_descs.get(name, ""),
+                        **key_flags,
+                        #**rp.get_keyword_argument_flags(),
                     ),
                 ]
 
@@ -232,19 +219,23 @@ class ReflectMethod(ReflectCallable):
                 pa = [
                     Argument(
                         nc.cli_positional(),
-                        **arg_kwargs,
+                        #**arg_kwargs,
+                        help=param_descs.get(name, ""),
+                        **rp.get_positional_argument_flags(),
                     )
                 ]
 
             elif param.kind is param.KEYWORD_ONLY:
-                if "default" not in arg_kwargs:
-                    arg_kwargs["required"] = True
+#                 if "default" not in arg_kwargs:
+#                     arg_kwargs["required"] = True
 
                 pa = [
                     Argument(
                         nc.cli_keyword(),
                         dest=name,
-                        **arg_kwargs,
+                        #**arg_kwargs,
+                        help=param_descs.get(name, ""),
+                        **rp.get_keyword_argument_flags(),
                     )
                 ]
 
@@ -281,8 +272,9 @@ class ReflectMethod(ReflectCallable):
                     pas[pa.name].merge(pa)
 
             else:
-                pas[pa.name] = pa
+                pas[pa.name] = [pa]
 
+        #pout.v(pas)
         yield from pas.values()
 
 #         pas = {}
@@ -331,7 +323,7 @@ class Argument(tuple):
 
     def __new__(cls, *names, **kwargs):
         instance = super().__new__(cls, [list(names), kwargs])
-        instance._infer_values()
+        instance._resolve()
         return instance
 
     def __set_name__(self, command_class, name):
@@ -357,20 +349,47 @@ class Argument(tuple):
             if self.is_keyword():
                 self[1]["dest"] = name
 
-    def _infer_values(self):
-        """Set the dest keyword if using the first name if dest wasn't
-        passed in explicitely"""
+    def _resolve(self):
+        """Check and fix any strange names or flags
+        """
+        # Set the dest keyword if using the first name if dest wasn't passed
+        # in explicitely
         if self[0] and "dest" not in self[1] and self.is_keyword():
             self[1]["dest"] = NamingConvention(self[0][0]).cli_dest()
 
+        # if no names were passed in then assume self is a keyword and try
+        # to infer a flag name
         if not self[0]:
             if dest := self[1].get("dest"):
                 self[0].append(NamingConvention(dest).cli_keyword())
 
+        # set name, use dest if we have it, use name if it's a positional
         if dest := self[1].get("dest"):
-            action = self[1].get("action")
             self[1]["metavar"] = NamingConvention(dest).cli_metavar()
             self.name = dest
+
+        else:
+            # if this fails, `.name` will have to be set in __set_name__
+            if self[0] and self.is_positional():
+                nc = NamingConvention(self[0][0])
+                self[1]["metavar"] = nc.cli_metavar()
+                self.name = nc.cli_positional()
+
+        # for our purposes, default and required are mutually exclusive
+        if "default" in self[1]:
+            self[1].pop("required", None)
+
+        action = self[1].get("action")
+        if action in ["store_true", "store_false"]:
+            self[1].pop("metavar", None)
+
+        for k in ["alias", "name"]:
+            if v := self[1].pop(k, ""):
+                self[0].append(v)
+
+        for k in ["aliases", "names"]:
+            if vs := self[1].pop(k, []):
+                self[0].extend(vs)
 
     def is_positional(self):
         return not self.is_keyword()
@@ -381,21 +400,6 @@ class Argument(tuple):
             if n.startswith("-"):
                 return True
         return False
-
-    def merge_signature(self, sig):
-        """merge a signature into self
-
-        :param sig: dict, a signature in the form of return value of
-            ReflectMethod.signature
-        """
-        for n in sig["names"]:
-            if n in self.names:
-                if self.is_keyword():
-                    self.name = n
-                    self[1]["dest"] = n
-
-                if n in sig["defaults"]:
-                    self.set_default(sig["defaults"][n])
 
     def merge(self, pa):
         """Merge another Argument instance into this one
@@ -412,12 +416,7 @@ class Argument(tuple):
         # passed in Argument kwargs take precedence
         self[1].update(pa[1])
 
-        if "default" in self[1]:
-            self[1].pop("required", None)
-
-        action = self[1].get("action")
-        if action in ["store_true", "store_false"]:
-            self[1].pop("metavar", None)
+        self._resolve()
 
     def get_keywords(self) -> set[str]:
         keywords = set()

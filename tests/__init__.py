@@ -121,11 +121,11 @@ class FileScript(object):
             if command_name.lower() == command_class.__name__.lower():
                 break
 
-            elif command_name.lower() == command_class.name:
+            elif command_name.lower() == command_class.get_name():
                 break
 
             else:
-                if command_name in command_class.aliases:
+                if command_name in command_class.get_aliases():
                     break
 
         return command_class

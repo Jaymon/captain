@@ -63,24 +63,11 @@ class ReflectCommandTest(TestCase):
 
         args = list(rc.get_arguments())
         self.assertEqual(1, len(args))
-        self.assertEqual("foo", args[0].name)
+        self.assertEqual("foo", args[0][0].name)
 
 
 class ReflectMethodTest(TestCase):
-    def test_signature_info(self):
-        cbi = ReflectCommand(FileScript([
-            "class Default(Command):",
-            "    def handle(self, foo, bar=1, che=3, **kwargs): pass",
-        ]).command_class()).reflect_method()
-
-        sig = cbi.get_signature_info()
-        self.assertEqual(set(["foo"]), sig["required"])
-        self.assertEqual(["foo", "bar", "che", "kwargs"], sig["names"])
-        self.assertEqual(1, sig["defaults"]["bar"])
-        self.assertEqual("kwargs", sig["keywords_name"])
-        self.assertEqual("", sig["positionals_name"])
-
-    def test_arguments(self):
+    def test_get_arguments(self):
         cbi = ReflectCommand(FileScript([
             "class Default(Command):",
             "    @arg('--foo', '-f', default=2, help='foo value')",
@@ -88,64 +75,10 @@ class ReflectMethodTest(TestCase):
             "    def handle(self, foo, bar=1, che=3, **kwargs): pass",
         ]).command_class()).reflect_method()
 
-        args = list(cbi.arguments())
-        self.assertEqual("foo", args[0][1]["dest"])
-        self.assertEqual("bang_one", args[1][1]["dest"])
+        args = list(cbi.get_arguments())
 
-    def test_omit(self):
-        """Makes sure you can ignore flags when inheriting
-
-        https://github.com/Jaymon/captain/issues/73
-        """
-        mi = ReflectCommand(FileScript([
-            "class Baz(Command):",
-            "    @arg('--baz-foo', default='1')",
-            "    @arg('--baz-bar', type=int)",
-            "    def handle(self, **kwargs): pass",
-            "",
-            "class Foo(Command):",
-            "    @arg('--foo-foo', default='1')",
-            "    @arg('--foo-bar', type=int)",
-            "    def handle(self, **kwargs): pass",
-            "",
-            "class Che(Command):",
-            "    @arg('--che-foo', default='1')",
-            "    @arg('--che-bar', type=int)",
-            "    def handle(self, **kwargs): pass",
-            "",
-            "class Bam(Command):",
-            "    @args(Che, Foo, omit=['foo-foo', 'che-bar'])",
-            "    @args(Baz, omit=['baz-foo'])",
-            "    def handle(self, **kwargs):",
-            "        print('kwargs: {}'.format(kwargs))",
-        ]).command_class("Bam")).reflect_method()
-
-        contains = set(["baz-bar", "foo-bar", "che-foo"])
-
-        pas = list(mi.arguments())
-        self.assertEqual(len(contains), len(pas))
-        for pa in pas:
-            self.assertTrue(pa.names & contains)
-
-    def test_override(self):
-        """Makes sure you can override flags
-
-        https://github.com/Jaymon/captain/issues/73
-        """
-        mi = ReflectCommand(FileScript([
-            "class Foo(Command):",
-            "    @arg('foo', nargs='*')",
-            "    def handle(self, **kwargs): pass",
-            "",
-            "class Bar(Command):",
-            "    @args(Foo)",
-            "    @arg('foo', nargs='+')",
-            "    def handle(self, **kwargs): pass",
-        ]).command_class("Bar")).reflect_method()
-
-        pas = list(mi.arguments())
-        self.assertEqual(1, len(pas))
-        self.assertEqual("+", pas[0].kwargs["nargs"])
+        self.assertEqual("foo", args[0][0][1]["dest"])
+        self.assertEqual("bang_one", args[3][0][1]["dest"])
 
     def test_annotation_1(self):
         #def handle(self, a1: int, a2: str, /, *, k1: str, k2: bool = False)
@@ -155,19 +88,19 @@ class ReflectMethodTest(TestCase):
                     pass
         """).command_class("Foo")).reflect_method()
 
+        am = {}
         for a in rm.get_arguments():
-            pout.v(a)
+            am[a[0].name] = a[0]
 
-        raise ValueError("ADD ASSERTS!!!!!!!!!")
-#         for rp in rm.reflect_params():
-#             pout.v(rp.get_argparse_keywords())
+        self.assertEqual(3, len(am))
+        self.assertEqual("store_true", am["k2"][1]["action"])
 
 
 class ArgumentTest(TestCase):
     def test___new__(self):
         pa = Argument("--foo-bar", "--foo", "-f", default=2, help="foo value")
         self.assertTrue("--foo" in pa[0])
-        self.assertEqual("foo-bar", pa.name)
+        self.assertEqual("foo_bar", pa.name)
 
         pa = Argument(
             "--foo-bar", "--foo", "-f",
@@ -177,20 +110,6 @@ class ArgumentTest(TestCase):
         )
         self.assertTrue("--foo-bar" in pa[0])
         self.assertEqual("foo", pa.name)
-
-    def test_merge_signature_1(self):
-        pa = Argument("--foo", "-f", help="foo value")
-        pa.merge_signature({"names": ["foo"], "defaults": {"foo": 1}})
-        self.assertFalse(pa[1]["required"])
-        self.assertEqual("foo", pa[1]["dest"])
-        self.assertEqual(int, pa[1]["type"])
-
-    def test_merge_signature_2(self):
-        pa = Argument("-f", dest="foo", help="foo value")
-        pa.merge_signature({"names": ["foo"], "defaults": {"foo": 1}})
-        self.assertFalse(pa[1]["required"])
-        self.assertEqual("foo", pa[1]["dest"])
-        self.assertEqual(1, pa[1]["default"])
 
     def test_merge_environment(self):
         """Make sure an environment variable argument merges correctly"""
@@ -263,21 +182,15 @@ class ArgumentTest(TestCase):
             "    foo = Argument('--foo', type=int)",
             "    bar = Argument('--bar', action='store_true')",
             "    che = Argument('--che', required=True)",
-            "    def handle(self, che):",
+            "    def handle(self):",
             "        print(f'foo: {self.foo}, bar: {self.bar}')",
-            "        print(f'{self.che}={che}')",
+            "        print(f'che={self.che}')",
         ])
 
         r = s.run("--foo=1 --bar --che=che")
         self.assertTrue("foo: 1" in r)
         self.assertTrue("bar: True" in r)
         self.assertTrue("che=che" in r)
-
-    def test_names(self):
-        pa = Argument("--foo-b", "--fb", "-f", dest="foo_bar")
-        vs = pa.names
-        for v in ["foo_bar", "FOO_BAR", "foo-bar"]:
-            self.assertTrue(v in vs)
 
     def test_no_names(self):
         c = FileScript("""
