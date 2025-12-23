@@ -38,27 +38,3 @@ def arg(*parser_args, **parser_kwargs):
     return wrap 
 
 
-def args(*subcommands, **kwargs):
-    """Decorator that makes another Command's flags active on this command also
-
-    :example:
-        class Foo(Command):
-            @arg("--che", "-c", dest="che", default=1, help="the che value")
-            def handle(self, che): pass
-
-        class Bar(Command):
-            @args(Foo)
-            def handle(self, che): pass
-
-    :param *subcommands: class, any Command child
-    :param **kwargs:
-        - ignore: a list of names you want to ignore from the subcommands, this
-            will allow you to remove flags you don't want to inherit
-    """
-    def wrap(handle_method):
-        handle_method.__dict__.setdefault('inherit_args', [])
-        handle_method.__dict__['inherit_args'].append((subcommands, kwargs))
-        return handle_method
-    return wrap 
-
-

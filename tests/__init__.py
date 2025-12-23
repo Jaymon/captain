@@ -48,7 +48,6 @@ class FileScript(object):
                     "    Command,",
                     "    Argument,",
                     "    arg,",
-                    "    args,",
                     "    exception,",
                     "    Application",
                     ")",

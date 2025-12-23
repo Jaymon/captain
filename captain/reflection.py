@@ -292,14 +292,14 @@ class Argument(tuple):
 
         # set name, use dest if we have it, use name if it's a positional
         if dest := self[1].get("dest"):
-            self[1]["metavar"] = NamingConvention(dest).cli_metavar()
+            self[1].setdefault("metavar", NamingConvention(dest).cli_metavar())
             self.name = dest
 
         else:
             # if this fails, `.name` will have to be set in __set_name__
             if self[0] and self.is_positional():
                 nc = NamingConvention(self[0][0])
-                self[1]["metavar"] = nc.cli_metavar()
+                self[1].setdefault("metavar", nc.cli_metavar())
                 self.name = nc.cli_positional()
 
         # for our purposes, default and required are mutually exclusive
