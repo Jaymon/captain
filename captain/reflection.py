@@ -63,6 +63,8 @@ class ReflectCommand(ReflectClass):
 
 class ReflectParam(ReflectParam):
     def _get_argument_flags(self) -> Mapping:
+        """Get the common argparse argument flags that are the same between
+        positional and keyword argparse arguments"""
         flags = {"aliases": []}
 
         rt = None
@@ -98,11 +100,13 @@ class ReflectParam(ReflectParam):
         return flags
 
     def get_positional_argument_flags(self) -> Mapping:
+        """Get argparse positional flags"""
         flags = self._get_argument_flags()
         flags.pop("aliases", None)
         return flags
 
     def get_keyword_argument_flags(self) -> Mapping:
+        """Get argparse keyword flags"""
         flags = self._get_argument_flags()
 
         if "default" not in flags:
@@ -229,17 +233,9 @@ class Argument(tuple):
 
     https://docs.python.org/3/library/argparse.html#the-add-argument-method
     """
-#     @property
-#     def args(self):
-#         return self[0]
-
     @property
     def positionals(self):
         return self[0]
-
-#     @property
-#     def kwargs(self):
-#         return self[1]
 
     @property
     def keywords(self):

@@ -206,3 +206,21 @@ class ApplicationTest(TestCase):
         node_value = parsed._pathfinder_node.value
         self.assertEqual("CheBoo", node_value["command_class"].__name__)
 
+    async def test_call(self):
+        a = FileScript("""
+            class FooBoo(Command):
+                class Bar(Command):
+                    class Che(Command):
+                        async def handle(self, *args, **kwargs):
+                            return kwargs["retcode"]
+        """).application
+
+        r = await a.call("foo-boo", "bar", "che", retcode=3)
+        self.assertEqual(3, r)
+
+        return
+        with self.capture() as c:
+            await a.call("foo-boo", "bar", "che", k1=1)
+
+        pout.v(c)
+

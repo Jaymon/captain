@@ -130,6 +130,8 @@ class Command(object):
         return cb
 
     async def get_parsed_params(self, parsed) -> tuple[Iterable, Mapping]:
+        """Translates parsed CLI positionals and keywords into arguments
+        and keywords to pass to the handler method"""
         args = []
         kwargs = {}
 
@@ -190,13 +192,7 @@ class Command(object):
         return ret_code
 
     async def handle(self, *args, **kwargs):
-        if self.parser:
-            self.parser.print_help()
-
-#         if self.application:
-#             node = self.application.pathfinder.find_class_node(type(self))
-#             node["parser"].print_help()
-        #self.parser.print_help()
+        self.parser.print_help()
 
     async def handle_error(self, e):
         """This is called when an uncaught exception on the Command is raised,
@@ -217,22 +213,9 @@ class Command(object):
 
         return ret_code
 
-    async def call(self, subcommands, *args, **kwargs):
+    async def call(self, *args, **kwargs) -> int:
         """Hook to make it easier to call other commands from a handle method
 
-        :example:
-            # call the "foo bar" command from self
-            self.call("foo bar")
-
-            # call the Default top level command, you have to pass in en empty
-            # string
-            self.call("")
-
-            # call "foo" subcommand with a value
-            self.call("foo", bar="<VALUE>")
-
-        :param subcommands: str|Sequence[str], the subcommand path to call.
-            If you want to call the root parser pass in empty string
         :param *args: anything in this will be passed to the other command
             as positional arguments
         :param **kwargs: anything in this will be passed to the other command
@@ -241,87 +224,5 @@ class Command(object):
         :raises: Exception, any exceptions the other command raises will be
             passed through
         """
-        call_args = []
-
-        if subcommands:
-            if isinstance(subcommands, str):
-                call_args.extend(re.split(r"\s+", subcommands))
-
-            else:
-                call_args.extend(subcommands)
-
-        call_args.extend(args)
-
-        # This is kind of cheating a bit, we turn these into keyword
-        # arguments so we can just run a new command with a new set of
-        # args
-        for k, v in kwargs.items():
-            if not k.startswith("-"):
-                k = f"--{k}"
-
-            call_args.append(k)
-
-            # booleans are a special case, for True or False only the flag
-            # (`k`) gets set, so if you want an `action="store_true"` flag to
-            # be set you would pass in `<NAME>=True` and for
-            # `action="store_false"` you'd pass in `<NAME>=False`
-            if not isinstance(v, bool):
-                call_args.append(v)
-
-        return await self.application.run(call_args)
-
-#         if not self.parsed:
-#             raise ValueError(
-#                 "Cannot run subcommands without .parsed property"
-#             )
-# 
-#         if isinstance(subcommands, str):
-#             subcommands = re.split(r"\s+", subcommands)
-# 
-#         if subcommands:
-#             # find the starting parser moving backwards from the current
-#             # parser until we find the first subcommand
-#             parser = self.parsed._parser_node.parent.value["parser"]
-#             while parser_node := parser._defaults["_parser_node"]:
-#                 action = parser_node.value["subparsers"]
-#                 subcommand = action.get_arg_string(subcommands[0])
-#                 if subcommand in action._name_parser_map:
-#                     #parser = action._name_parser_map[subcommand]
-#                     break
-# 
-#                 else:
-#                     pn = parser._defaults["_parser_node"]
-#                     parser = pn.parent.value["parser"]
-# 
-#         else:
-#             # since we don't have any subcommands we want the root-most parser
-#             parser = self.parsed._parser_node.root.value["parser"]
-# 
-#         for subcommand in subcommands:
-#             parser_node = parser._defaults["_parser_node"]
-# 
-#             if parser_node.value["subparsers"]:
-#                 action = parser_node.value["subparsers"]
-#                 subcommand = action.get_arg_string(subcommand)
-#                 parser = action._name_parser_map[subcommand]
-# 
-#             else:
-#                 if subcommand == subcommands[-1]:
-#                     parser = parser_node["parser"]
-# 
-#                 else:
-#                     raise ValueError(
-#                         f"Could not find parser for {subcommand} subcommand"
-#                     )
-# 
-#         command_class = parser._defaults["_command_class"]
-# 
-#         parsed = self.parsed
-#         rc = command_class.reflect()
-#         sig = rc.reflect_method().get_signature_info()
-#         parsed._handle_signature = sig
-# 
-#         command = command_class(parsed)
-# 
-#         return await command.run(*args, **kwargs)
+        return await self.application.call(*args, **kwargs)
 

@@ -344,7 +344,6 @@ class ArgumentParser(argparse.ArgumentParser):
     def parse_known_args(self, args=None, namespace=None):
         node_value = self._defaults["_pathfinder_node"].value
         command_class = node_value["command_class"]
-        #command_class = self._defaults["_command_class"]
         self._add_command_arguments(command_class)
 
         parsed, parsed_unknown = super().parse_known_args(args, namespace)
@@ -435,10 +434,6 @@ class ArgumentParser(argparse.ArgumentParser):
                         # see the ._add_action method for how I figured this
                         # out
                         self._option_string_actions[keyword] = action
-
-#         self.set_defaults(
-#             _command_class=command_class,
-#         )
 
     def add_argument(self, *args, **kwargs):
         """Overrides parent to allow for environment names to be placed into

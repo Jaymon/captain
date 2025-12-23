@@ -2,7 +2,7 @@
 import textwrap
 
 import testdata
-from testdata.test import TestCase
+from testdata.test import IsolatedAsyncioTestCase
 
 from captain.compat import *
 from captain import Application, Command
@@ -11,7 +11,11 @@ from captain import Application, Command
 class FileScript(object):
     @property
     def parser(self):
-        return Application(command_prefixes=[self.path]).parser
+        return self.application.parser
+
+    @property
+    def application(self):
+        return Application(command_prefixes=[self.path])
 
     @classmethod
     def reset_command_classes(cls):
@@ -152,7 +156,7 @@ class FileScript(object):
         ).strip()
 
 
-class TestCase(TestCase):
+class TestCase(IsolatedAsyncioTestCase):
     def setUp(self):
         # command classes need to be reset between tests otherwise one
         # test can step on another

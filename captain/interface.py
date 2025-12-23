@@ -196,6 +196,41 @@ class Application(object):
 
         return parser
 
+    async def call(self, *args, **kwargs) -> int:
+        """Run Command with `args` and `kwargs` instead of an `argv` list
+
+        :example:
+            # call the "foo bar" command from self
+            self.call("foo", "bar", che=<VALUE>)
+
+            # call the Default top level command
+            self.call()
+
+        :arguments *args: These should contain the subparsers you want to call
+        :keywords **kwargs: passed through to the found (sub)command
+        """
+        args = list(args)
+        parser = self.parser
+        subparser = parser._subparsers
+        while subparser and args:
+            action = subparser._group_actions[0]
+
+            if args[0] in action._name_parser_map:
+                k = args.pop(0)
+                parser = action._name_parser_map[k]
+                subparser = parser._subparsers
+
+            else:
+                break
+
+        node_value = parser._defaults["_pathfinder_node"].value
+        command_class = node_value["command_class"]
+        command = command_class(
+            application=self,
+            parser=node_value["parser"],
+        )
+        return await command.run(*args, **kwargs)
+
     async def run(self, argv: list[str]|None = None) -> int:
         """Actually run captain with the given argv
 
