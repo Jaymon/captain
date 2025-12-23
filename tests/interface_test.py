@@ -205,5 +205,4 @@ class ApplicationTest(TestCase):
         parsed = a.parser.parse_args(["foo-bar", "che-boo"])
         node_value = parsed._pathfinder_node.value
         self.assertEqual("CheBoo", node_value["command_class"].__name__)
-        #self.assertEqual("CheBoo", parsed._command_class.__name__)
 

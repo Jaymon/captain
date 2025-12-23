@@ -136,7 +136,6 @@ class Application(object):
                     )
 
                 parser.set_defaults(
-                    #_command_class=value["command_class"],
                     _pathfinder_node=n,
                 )
                 value["parser"] = parser

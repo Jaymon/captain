@@ -229,17 +229,17 @@ class Argument(tuple):
 
     https://docs.python.org/3/library/argparse.html#the-add-argument-method
     """
-    @property
-    def args(self):
-        return self[0]
+#     @property
+#     def args(self):
+#         return self[0]
 
     @property
     def positionals(self):
         return self[0]
 
-    @property
-    def kwargs(self):
-        return self[1]
+#     @property
+#     def kwargs(self):
+#         return self[1]
 
     @property
     def keywords(self):
