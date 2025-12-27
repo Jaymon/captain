@@ -30,7 +30,6 @@ class ReflectCommand(ReflectClass):
             return super().reflect_method(method_name)
 
     def get_class_arguments(self) -> Generator[list[tuple]]:
-    #def get_arguments(self):
         """Returns all the defined class arguments that will become class
         properties when the command is ran
 

@@ -102,26 +102,3 @@ class CommandTest(TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             r = s.run("--bar 1")
 
-    def test_call(self):
-        self.skip("Disabled while refactoring call")
-
-        s = FileScript("""
-            class Foo(Command):
-                class Bar(Command):
-                    class Che(Command):
-                        async def handle(self, subcommands):
-                            await self.call(subcommands)
-                    class Boo(Command):
-                        async def handle(self):
-                            print("success")
-        """)
-
-        r = s.run("foo bar che \"foo bar boo\"")
-        self.assertTrue("success" in r)
-
-        r = s.run("foo bar che \"bar boo\"")
-        self.assertTrue("success" in r)
-
-        r = s.run("foo bar che \"boo\"")
-        self.assertTrue("success" in r)
-

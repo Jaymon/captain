@@ -43,7 +43,6 @@ class Command(object):
         except KeyError as e:
             raise AttributeError("module") from e
 
-
     @classmethod
     def get_aliases(cls):
         """If you want your SUBCOMMAND to have aliases (ie, foo-bar and foo_bar

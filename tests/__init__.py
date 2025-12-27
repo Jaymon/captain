@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 import textwrap
+import sys
 
 import testdata
 from testdata.test import IsolatedAsyncioTestCase
 
 from captain.compat import *
 from captain import Application, Command
+from captain.logging import QuietFilter
 
 
 class FileScript(object):
@@ -147,7 +149,40 @@ class FileScript(object):
 
         return m
 
+
     def run(self, arg_str="", **kwargs):
+        import shlex, asyncio, subprocess
+        argv = shlex.split(arg_str)
+
+        # we want this to act completely like it was called from the CLI
+        # so we will set our module into __main__
+        main_module = sys.modules.get("__main__", None)
+
+        with testdata.chdir(self.cwd):
+            with testdata.capture() as c:
+                try:
+                    sys.modules["__main__"] = self.path.get_module()
+                    asyncio.run(self.application.run(argv))
+
+                except SystemExit as e:
+                    if e.code != 0:
+                        raise subprocess.CalledProcessError(
+                            e.code,
+                            argv
+                        ) from e
+
+                except Exception as e:
+                    raise subprocess.CalledProcessError(1, argv) from e
+
+        if main_module is not None:
+            sys.modules["__main__"] = main_module
+
+        # reset any quiet flags
+        QuietFilter.reset()
+
+        return str(c).strip()
+
+    def run_process(self, arg_str="", **kwargs):
         return testdata.run_command(
             "{} {}".format(testdata.get_interpreter(), self.path.path),
             arg_str,

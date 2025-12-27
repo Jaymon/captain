@@ -202,7 +202,8 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
 
 class _SubParsersChoices(NormalizeMixin, dict):
     """Internal class used by SubParsersAction. Allows setting aliases to a
-    key so that aliases can be used to find subparsers"""
+    key so that aliases can be used to find subparsers without showing up
+    in things like the help output"""
     def __init__(self, *args, **kwargs):
         self.key_lookup = {}
         super().__init__(*args, **kwargs)
@@ -243,22 +244,6 @@ class SubParsersAction(argparse._SubParsersAction):
             self.choices.add_aliases(name, aliases)
 
         return parser
-
-#     def get_arg_string(self, arg_string):
-#         """This is where the magic happens. This is called from
-#         ArgumentParser._get_value and normalizes the flag name if needed
-# 
-#         :param name: str, the arg string
-#         :returns: str, either the arg_string untouched or the actual name
-#             of the subparser if arg_string was an alias
-#         """
-#         if arg_string not in self._alias_map:
-#             for n, aliases in self._alias_map.items():
-#                 if arg_string in aliases:
-#                     arg_string = n
-#                     break
-# 
-#         return arg_string
 
 
 class GroupAction(argparse.Action):
@@ -304,11 +289,6 @@ class ArgumentParser(argparse.ArgumentParser):
         value is a String, I have no idea why, but a custom action using this
         needs to have string default values
         """
-
-        # this normalizes subcommand aliases (see SubParserAction)
-#         if cb := getattr(action, "get_arg_string", None):
-#             arg_string = cb(arg_string)
-
         ret = super()._get_value(action, arg_string)
 
         # see QuietAction
@@ -415,11 +395,11 @@ class ArgumentParser(argparse.ArgumentParser):
         """All the defined Command arguments will be added through this
         method, this is automatically called when .parse_known_args is called
 
-        This adds arguments to self from @arg, @args, and Argument class
+        This adds arguments to self from @arg, and Argument class
         properties. These arguments aren't all added on parser creation
         because that would be a lot of work if you have a lot of parsers, so
-        it is done at the last possible moment when the correct parser has
-        been chosen
+        it is done at the last possible moment when the correct (sub)parser
+        has been chosen but before it parses the argument strings
 
         :param command_class: Command, this is the Command subclass that is
             going to be added to this parser

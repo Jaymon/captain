@@ -162,28 +162,28 @@ class ArgumentParserTest(TestCase):
             "        self.output.err('err')",
         ])
 
-        r = s.run('--quiet=-C')
+        r = s.run_process('--quiet=-C')
         self.assertRegex(r, r"^\[CRITICAL]\s+critical\s*$")
 
-        r = s.run('--quiet=-I')
+        r = s.run_process('--quiet=-I')
         self.assertEqual("[INFO] info\nout", r)
 
-        r = s.run("-qqqqq")
+        r = s.run_process("-qqqqq")
         self.assertFalse("critical" in r)
 
-        r = s.run("-qqqq")
+        r = s.run_process("-qqqq")
         self.assertTrue("critical" in r)
 
-        r = s.run("-qqq")
+        r = s.run_process("-qqq")
         self.assertTrue("error" in r)
         self.assertTrue("critical" in r)
 
-        r = s.run("-qq")
+        r = s.run_process("-qq")
         self.assertTrue("warning" in r)
         self.assertTrue("error" in r)
         self.assertTrue("critical" in r)
 
-        r = s.run("-q")
+        r = s.run_process("-q")
         self.assertTrue("info" in r)
         self.assertTrue("warning" in r)
         self.assertTrue("error" in r)
@@ -211,7 +211,7 @@ class ArgumentParserTest(TestCase):
             "        self.output.err('err')",
         ])
 
-        r = s.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="")
+        r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="")
         self.assertTrue("debug" in r)
         self.assertTrue("info" in r)
         self.assertTrue("warning" in r)
@@ -219,15 +219,15 @@ class ArgumentParserTest(TestCase):
         self.assertTrue("critical" in r)
 
         # this won't call QuietAction.__call__()
-        r = s.run(CAPTAIN_QUIET_DEFAULT="D")
+        r = s.run_process(CAPTAIN_QUIET_DEFAULT="D")
         self.assertFalse("debug" in r)
         self.assertFalse("verbose" in r)
 
-        r = s.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="D")
+        r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="D")
         self.assertTrue("debug" in r)
         self.assertTrue("verbose" in r)
 
-        r = s.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="DI")
+        r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="DI")
         self.assertTrue("debug" in r)
         self.assertFalse("info" in r)
         self.assertFalse("out" in r)
