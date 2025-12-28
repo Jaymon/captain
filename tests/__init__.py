@@ -13,7 +13,10 @@ from captain.logging import QuietFilter
 class FileScript(object):
     @property
     def parser(self):
-        return self.application.parser
+        parser = self.application.parser
+        parser.exit_on_error = False
+        return parser
+        #return self.application.parser
 
     @property
     def application(self):
@@ -149,8 +152,13 @@ class FileScript(object):
 
         return m
 
+    async def run(self, arg_str: str = "", **kwargs) -> str:
+        """Mimics running a command with `arg_str`
 
-    def run(self, arg_str="", **kwargs):
+        If you actually need to run a subprocess use `.run_process`
+
+        :returns: the captured output from the mimicked process
+        """
         import shlex, asyncio, subprocess
         argv = shlex.split(arg_str)
 
@@ -162,7 +170,7 @@ class FileScript(object):
             with testdata.capture() as c:
                 try:
                     sys.modules["__main__"] = self.path.get_module()
-                    asyncio.run(self.application.run(argv))
+                    await self.application.run(argv)
 
                 except SystemExit as e:
                     if e.code != 0:
@@ -182,7 +190,7 @@ class FileScript(object):
 
         return str(c).strip()
 
-    def run_process(self, arg_str="", **kwargs):
+    def run_process(self, arg_str: str = "", **kwargs) -> str:
         return testdata.run_command(
             "{} {}".format(testdata.get_interpreter(), self.path.path),
             arg_str,

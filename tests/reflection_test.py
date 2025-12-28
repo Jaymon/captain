@@ -157,7 +157,7 @@ class ArgumentTest(TestCase):
         args = parser.parse_args(["--footype", "/foo/bar/che"])
         self.assertTrue(args.footype.startswith("HAPPY"))
 
-    def test_class_property(self):
+    async def test_class_property(self):
         s = FileScript([
             "class Default(Command):",
             "    foo = Argument('--foo', type=int)",
@@ -168,7 +168,7 @@ class ArgumentTest(TestCase):
             "        print(f'che={self.che}')",
         ])
 
-        r = s.run("--foo=1 --bar --che=che")
+        r = await s.run("--foo=1 --bar --che=che")
         self.assertTrue("foo: 1" in r)
         self.assertTrue("bar: True" in r)
         self.assertTrue("che=che" in r)
@@ -270,7 +270,7 @@ class PathfinderTest(TestCase):
         self.assertTrue("bar subcommands" in pf["foo", "bar"]["description"])
         self.assertEqual("", pf["foo", "bar", "che"]["description"])
 
-    def test_default_node(self):
+    async def test_default_node(self):
         s = FileScript([
             "class Default(Command):",
             "    def handle(self, foo, bar):",
@@ -278,7 +278,7 @@ class PathfinderTest(TestCase):
             "        print(f'bar: {bar}')",
         ])
 
-        r = s.run("--bar 1 --foo=2")
+        r = await s.run("--bar 1 --foo=2")
         self.assertTrue("bar: 1" in r)
         self.assertTrue("foo: 2" in r)
 

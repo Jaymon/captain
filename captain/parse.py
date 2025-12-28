@@ -477,6 +477,9 @@ class ArgumentParser(argparse.ArgumentParser):
         for environ_name in environ_names:
             if environ_name in environ:
                 kwargs["default"] = environ[environ_name]
+                # the environment variable exists so this argument no longer
+                # needs to be required
+                kwargs.pop("required", None)
 
         return super().add_argument(*flags, **kwargs)
 

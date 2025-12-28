@@ -158,7 +158,7 @@ class ReflectMethod(ReflectCallable):
             if param.kind is param.POSITIONAL_OR_KEYWORD:
                 pa = [
                     Argument(
-                        nc.cli_positional(),
+                        name,
                         nargs="?",
                         **rp.get_positional_argument_flags(),
                     ),

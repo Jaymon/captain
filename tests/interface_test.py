@@ -6,62 +6,62 @@ from captain.interface import Application
 
 
 class ApplicationTest(TestCase):
-    def test_version(self):
+    async def test_version(self):
         c = FileScript()
-        self.assertTrue("0.0.1" in c.run("--version"))
+        self.assertTrue("0.0.1" in (await c.run("--version")))
 
-    def test_handle_1(self):
+    async def test_handle_1(self):
         s = FileScript(subcommands=True)
-        s.run("--bar=1 --che=2")
+        await s.run("--bar=1 --che=2")
 
-    def test_handle_help(self):
+    async def test_handle_help(self):
         s = FileScript(subcommands=True)
 
         # run help
-        r1 = s.run("--help")
-        r2 = s.run("foo --help")
-        r3 = s.run("--help foo")
+        r1 = await s.run("--help")
+        r2 = await s.run("foo --help")
+        r3 = await s.run("--help foo")
         self.assertEqual(r1, r3)
         self.assertNotEqual(r1, r2)
 
-    def test_handle_sub_default(self):
+    async def test_handle_sub_default(self):
         s = FileScript(subcommands=True)
 
         # run the main command
-        r = s.run()
+        r = await s.run()
         self.assertTrue("success default" in r)
 
-        r = s.run("--bar=1")
+        r = await s.run("--bar=1")
         self.assertTrue("success default" in r)
 
         # run the subcommand
-        r = s.run("foo")
+        r = await s.run("foo")
         self.assertTrue("success foo" in r)
 
-        r = s.run("foo --bar=1")
+        r = await s.run("foo --bar=1")
         self.assertTrue("success foo" in r)
 
         # test error
         with self.assertRaises(subprocess.CalledProcessError):
-            r = s.run("1")
+            r = await s.run("1")
 
         with self.assertRaises(subprocess.CalledProcessError):
-            r = s.run("1 --bar=1")
+            r = await s.run("1 --bar=1")
 
-    def test_handle_sub_no_default(self):
+    async def test_handle_sub_no_default(self):
         s = FileScript([
             "class Foo(Command):",
             "    def handle(self, **kwargs):",
             "        print('success foo')",
         ])
 
-        r = s.run("foo --bar=1")
+        r = await s.run("foo --bar=1")
         self.assertTrue("success foo" in r)
 
-        r = s.run()
+        r = await s.run()
         self.assertTrue("usage" in r)
 
-    def test_handle_error(self):
+    async def test_handle_error(self):
         s = FileScript([
             "class Foo(Command):",
             "    def handle(self, **kwargs):",
@@ -73,12 +73,12 @@ class ApplicationTest(TestCase):
         ])
 
         with self.assertRaises(subprocess.CalledProcessError):
-            r = s.run("foo")
+            r = await s.run("foo")
 
-        r = s.run("bar")
+        r = await s.run("bar")
         self.assertTrue("stop message" in r)
 
-    def test_handle_aliases(self):
+    async def test_handle_aliases(self):
         s = FileScript([
             "class Foo_One(Command):",
             "    def handle(self, **kwargs):",
@@ -89,13 +89,13 @@ class ApplicationTest(TestCase):
             "        self.output.out('foo_two')",
         ])
 
-        r = s.run("foo-one")
+        r = await s.run("foo-one")
         self.assertTrue("foo_one" in r)
 
-        r = s.run("foo_one")
+        r = await s.run("foo_one")
         self.assertTrue("foo_one" in r)
 
-        r = s.run("foo_two")
+        r = await s.run("foo_two")
         self.assertTrue("foo_two" in r)
 
     def test_only_default(self):
@@ -217,10 +217,4 @@ class ApplicationTest(TestCase):
 
         r = await a.call("foo-boo", "bar", "che", retcode=3)
         self.assertEqual(3, r)
-
-        return
-        with self.capture() as c:
-            await a.call("foo-boo", "bar", "che", k1=1)
-
-        pout.v(c)
 
