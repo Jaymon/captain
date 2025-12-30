@@ -459,3 +459,16 @@ class ArgumentParserTest(TestCase):
         r = await s.run("che")
         self.assertEqual("che", r)
 
+    async def test_annotation_bool_store_true(self):
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, *, foo_bar: bool = False):
+                    self.out(foo_bar)
+        """)
+
+        r = await s.run("")
+        self.assertEqual("False", r)
+
+        r = await s.run("--foo-bar")
+        self.assertEqual("True", r)
+

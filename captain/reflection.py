@@ -302,6 +302,7 @@ class Argument(tuple):
         action = self[1].get("action")
         if action in ["store_true", "store_false"]:
             self[1].pop("metavar", None)
+            self[1].pop("type", None)
 
         for k in ["alias", "name"]:
             if v := self[1].pop(k, ""):
