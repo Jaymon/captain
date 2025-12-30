@@ -173,7 +173,8 @@ class ReflectMethod(ReflectCallable):
             elif param.kind is param.POSITIONAL_ONLY:
                 pa = [
                     Argument(
-                        nc.cli_positional(),
+                        #nc.cli_positional(),
+                        name,
                         help=param_descs.get(name, ""),
                         **rp.get_positional_argument_flags(),
                     )

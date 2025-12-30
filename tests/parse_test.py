@@ -442,3 +442,20 @@ class ArgumentParserTest(TestCase):
         r = await s.run("")
         self.assertEqual("che", r)
 
+    async def test_annotation_positional_dash(self):
+        """When the value could be either a positional or keyword it would
+        fail with:
+
+            TypeError: ... got an unexpected keyword argument 'foo-bar'
+
+        This makes sure that is fixed
+        """
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, foo_bar: str, /):
+                    self.out(foo_bar)
+        """)
+
+        r = await s.run("che")
+        self.assertEqual("che", r)
+
