@@ -9,7 +9,7 @@ import io
 from datatypes import cball
 
 from .compat import *
-from . import environ
+from .config import environ
 from . import logging
 
 
@@ -738,7 +738,6 @@ class Profile(object):
 
     def get_elapsed(self, start, stop, multiplier, rnd):
         return round(abs(stop - start) * float(multiplier), rnd)
-
 
 
 class Progress(object):

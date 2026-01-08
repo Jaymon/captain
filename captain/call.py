@@ -2,6 +2,7 @@
 import sys
 import inspect
 import re
+from collections.abc import Iterable, Mapping
 
 from datatypes import NamingConvention
 
@@ -34,22 +35,6 @@ class Command(object):
     """Set this as the version for this command"""
 
     @classproperty
-    def name(cls):
-        """This is the name that will be used to invoke the SUBCOMMAND, it can
-        be overridden in child classes but has no effect if the child class is
-        named Default"""
-        n = NamingConvention(cls.__name__)
-        return n.kebabcase()
-
-    @classproperty
-    def aliases(cls):
-        """If you want your SUBCOMMAND to have aliases (ie, foo-bar and foo_bar
-        will both trigger the subcommand) then you can return the aliases, this
-        can be set in a child class or set aliases = [] to completely remove
-        any aliases in a subclass"""
-        return set()
-
-    @classproperty
     def module(cls):
         """The module the child class is defined in"""
         try:
@@ -57,6 +42,34 @@ class Command(object):
 
         except KeyError as e:
             raise AttributeError("module") from e
+
+    @classmethod
+    def get_aliases(cls):
+        """If you want your SUBCOMMAND to have aliases (ie, foo-bar and foo_bar
+        will both trigger the subcommand) then you can return the aliases, this
+        can be set in a child class or set aliases = [] to completely remove
+        any aliases in a subclass"""
+        nc = NamingConvention(cls.__name__)
+        return nc.variations()
+
+    @classmethod
+    def get_name(cls):
+        """Get the Command name.
+
+        This is used in Pathfinder to decide the subcommand for this class
+
+        :returns: str|None, the basename in kebab case, or None if this is
+            a default controller
+        """
+        name = cls.__name__
+        ignore_names = set(["Default"])
+        if name in ignore_names:
+            name = None
+
+        else:
+            name = NamingConvention(name).kebabcase()
+
+        return name
 
     @classmethod
     def reflect(cls):
@@ -84,32 +97,12 @@ class Command(object):
             or cls.__name__.endswith("Command")
         )
 
-    @classmethod
-    def arguments(cls):
-        """Returns all the defined class arguments that will become class
-        properties when the command is ran
-
-        :returns: dict[str, Argument], where the key is the name of the 
-            property and the value is the Argument information that can be
-            used when adding the argument to a parser using
-            parser.add_argument
-        """
-        arguments = {}
-        for k, v in inspect.getmembers(cls, lambda v: isinstance(v, Argument)):
-            arguments[k] = v
-
-        return arguments
-
-    def __init__(self, parsed=None):
-        self.parsed = parsed
+    def __init__(self, application=None, parser=None):
         self.input = self.input_class()
         self.output = self.output_class()
 
-        # any class properties should be set to None on this instance since
-        # they don't exist and we don't want any instance methods messing with
-        # the actual Argument instance
-        for k in self.arguments().keys():
-            setattr(self, k, None)
+        self.application = application
+        self.parser = parser
 
     def __init_subclass__(cls):
         """When a child class is loaded into memory it will be saved into
@@ -119,7 +112,6 @@ class Command(object):
 
         https://peps.python.org/pep-0487/
         """
-        super().__init_subclass__()
         cls.command_classes[f"{cls.__module__}:{cls.__qualname__}"] = cls
 
     def __getattr__(self, k):
@@ -136,47 +128,41 @@ class Command(object):
 
         return cb
 
-    async def get_handle_params(self, *args, **kwargs):
-        """Called right before the command's handle method is called.
+    async def get_parsed_params(self, parsed) -> tuple[Iterable, Mapping]:
+        """Translates parsed CLI positionals and keywords into arguments
+        and keywords to pass to the handler method"""
+        args = []
+        kwargs = {}
 
-        passed in args and kwargs will be merged with .parsed
+        rm = self.reflect().reflect_method()
+        parsed_kwargs = {}
 
-        :param *args: will override any matching .parsed args
-        :param **kwargs: will override any matching .parsed values
-        :returns: tuple[tuple, dict], whatever is returned from this method is
-            passed into the .handle method as *args, **kwargs
-        """
-        cargs = []
-        ckwargs = {}
-        c_argnames = set(self.arguments().keys())
+        for k, v in parsed._get_kwargs():
+            # we filter out private (starts with _) and placeholder
+            # (surrounded by <>) keys
+            if not k.startswith("_") and not k.startswith("<"):
+                parsed_kwargs[k] = v
 
-        if parsed := self.parsed:
-            m_argnames = set(parsed._handle_signature["names"])
+        for ra in rm.reflect_arguments(**parsed_kwargs):
+            if ra.is_positional():
+                args.extend(ra.get_positional_values())
 
-            for k, v in vars(parsed).items():
-                # we filter out private (starts with _) and placeholder
-                # (surrounded by <>) keys
-                if not k.startswith("_") and not k.startswith("<"):
-                    if k in c_argnames:
-                        setattr(self, k, v)
+            elif ra.is_keyword():
+                kwargs.update(ra.get_keyword_values())
 
-                    if k in m_argnames:
-                        ckwargs[k] = v
+        return args, kwargs
 
-                    elif parsed._handle_signature["keywords_name"]:
-                        ckwargs[k] = v
+    async def get_method_params(self, *args, **kwargs) -> tuple[Iterable, Mapping]:
+        # set instance properties that have been passed in
+        rc = self.reflect()
+        for pas in rc.get_class_arguments():
+            for pa in pas:
+                # any class properties should be set to None on this instance
+                # since they don't exist and we don't want any instance methods
+                # messing with the actual Argument instance
+                setattr(self, pa.name, kwargs.pop(pa.name, None))
 
-                    elif k == parsed._handle_signature["positionals_name"]:
-                        ckwargs[k] = v
-
-            ckwargs.update(kwargs)
-
-            if args_name := parsed._handle_signature["positionals_name"]:
-                cargs.extend(ckwargs.pop(args_name, []))
-
-            cargs.extend(args)
-
-        return cargs, ckwargs
+        return args, kwargs
 
     async def run(self, *args, **kwargs):
         """Wrapper around the internal handle methods, this should be
@@ -192,40 +178,20 @@ class Command(object):
         :returns: int, the return code
         """
         try:
-            args, kwargs = await self.get_handle_params(*args, **kwargs)
-            ret_code = await self.handle_call(*args, **kwargs)
+            args, kwargs = await self.get_method_params(*args, **kwargs)
+            ret_code = self.handle(*args, **kwargs)
 
         except Exception as e:
-            ret_code = await self.handle_error(e)
+            ret_code = self.handle_error(e)
 
-        return ret_code
-
-    async def handle_call(self, *args, **kwargs):
-        """Run the main .handle method
-
-        this could be easily overridden so you can easily do something before
-        or after the handle calls. This exists so there is an easy hook for
-        context managers or the like after the parameters have been shaken out
-        (which is why .run didn't work for things like context managers).
-
-        See: https://github.com/Jaymon/captain/issues/90
-
-        :param *args: the positional arguments that will be passed to .handle
-            because they've already been normalized with .get_handle_params
-        :param *kwargs: the keyword arguments that will be passed to .handle
-            because they've already been normalized with .get_handle_params
-        :returns: int, the return code
-        """
-        # child classes without async handle methods is common so we
-        # don't await and instead await if we know it's a coroutine
-        ret_code = self.handle(*args, **kwargs)
-        while inspect.iscoroutine(ret_code):
-            ret_code = await ret_code
+        finally:
+            while inspect.iscoroutine(ret_code):
+                ret_code = await ret_code
 
         return ret_code
 
     async def handle(self, *args, **kwargs):
-        self.parsed._parser.print_help()
+        self.parser.print_help()
 
     async def handle_error(self, e):
         """This is called when an uncaught exception on the Command is raised,
@@ -246,22 +212,9 @@ class Command(object):
 
         return ret_code
 
-    async def call(self, subcommands, *args, **kwargs):
+    async def call(self, *args, **kwargs) -> int:
         """Hook to make it easier to call other commands from a handle method
 
-        :example:
-            # call the "foo bar" command from self
-            self.call("foo bar")
-
-            # call the Default top level command, you have to pass in en empty
-            # string
-            self.call("")
-
-            # call "foo" subcommand with a value
-            self.call("foo", bar="<VALUE>")
-
-        :param subcommands: str|Sequence[str], the subcommand path to call.
-            If you want to call the root parser pass in empty string
         :param *args: anything in this will be passed to the other command
             as positional arguments
         :param **kwargs: anything in this will be passed to the other command
@@ -270,87 +223,5 @@ class Command(object):
         :raises: Exception, any exceptions the other command raises will be
             passed through
         """
-        call_args = []
-
-        if subcommands:
-            if isinstance(subcommands, str):
-                call_args.extend(re.split(r"\s+", subcommands))
-
-            else:
-                call_args.extend(subcommands)
-
-        call_args.extend(args)
-
-        # This is kind of cheating a bit, we turn these into keyword
-        # arguments so we can just run a new command with a new set of
-        # args
-        for k, v in kwargs.items():
-            if not k.startswith("-"):
-                k = f"--{k}"
-
-            call_args.append(k)
-
-            # booleans are a special case, for True or False only the flag
-            # (`k`) gets set, so if you want an `action="store_true"` flag to
-            # be set you would pass in `<NAME>=True` and for
-            # `action="store_false"` you'd pass in `<NAME>=False`
-            if not isinstance(v, bool):
-                call_args.append(v)
-
-        return await self.application.run(call_args)
-
-#         if not self.parsed:
-#             raise ValueError(
-#                 "Cannot run subcommands without .parsed property"
-#             )
-# 
-#         if isinstance(subcommands, str):
-#             subcommands = re.split(r"\s+", subcommands)
-# 
-#         if subcommands:
-#             # find the starting parser moving backwards from the current
-#             # parser until we find the first subcommand
-#             parser = self.parsed._parser_node.parent.value["parser"]
-#             while parser_node := parser._defaults["_parser_node"]:
-#                 action = parser_node.value["subparsers"]
-#                 subcommand = action.get_arg_string(subcommands[0])
-#                 if subcommand in action._name_parser_map:
-#                     #parser = action._name_parser_map[subcommand]
-#                     break
-# 
-#                 else:
-#                     pn = parser._defaults["_parser_node"]
-#                     parser = pn.parent.value["parser"]
-# 
-#         else:
-#             # since we don't have any subcommands we want the root-most parser
-#             parser = self.parsed._parser_node.root.value["parser"]
-# 
-#         for subcommand in subcommands:
-#             parser_node = parser._defaults["_parser_node"]
-# 
-#             if parser_node.value["subparsers"]:
-#                 action = parser_node.value["subparsers"]
-#                 subcommand = action.get_arg_string(subcommand)
-#                 parser = action._name_parser_map[subcommand]
-# 
-#             else:
-#                 if subcommand == subcommands[-1]:
-#                     parser = parser_node["parser"]
-# 
-#                 else:
-#                     raise ValueError(
-#                         f"Could not find parser for {subcommand} subcommand"
-#                     )
-# 
-#         command_class = parser._defaults["_command_class"]
-# 
-#         parsed = self.parsed
-#         rc = command_class.reflect()
-#         sig = rc.reflect_method().get_signature_info()
-#         parsed._handle_signature = sig
-# 
-#         command = command_class(parsed)
-# 
-#         return await command.run(*args, **kwargs)
+        return await self.application.call(*args, **kwargs)
 

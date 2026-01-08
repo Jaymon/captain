@@ -2,7 +2,7 @@
 
 from .interface import Application
 from .interface import Command
-from .decorators import arg, args
+from .decorators import arg
 from .reflection import Argument
 from . import exception
 from .exception import Stop, Error
@@ -15,7 +15,7 @@ def application(*args, **kwargs):
     """Factory method to create and call the Application in order to answer
     CLI requests
 
-    :Example:
+    :example:
         from captain import application
 
         if __name__ == "__main__":

@@ -1,17 +1,26 @@
 # -*- coding: utf-8 -*-
 import textwrap
+import sys
 
 import testdata
-from testdata.test import TestCase
+from testdata.test import IsolatedAsyncioTestCase
 
 from captain.compat import *
 from captain import Application, Command
+from captain.logging import QuietFilter
 
 
 class FileScript(object):
     @property
     def parser(self):
-        return Application(command_prefixes=[self.path]).router.parser
+        parser = self.application.parser
+        parser.exit_on_error = False
+        return parser
+        #return self.application.parser
+
+    @property
+    def application(self):
+        return Application(command_prefixes=[self.path])
 
     @classmethod
     def reset_command_classes(cls):
@@ -48,7 +57,6 @@ class FileScript(object):
                     "    Command,",
                     "    Argument,",
                     "    arg,",
-                    "    args,",
                     "    exception,",
                     "    Application",
                     ")",
@@ -60,6 +68,12 @@ class FileScript(object):
                     "import captain",
                     "",
                 ])
+
+            header += "\n".join([
+                "from typing import *",
+                "from collections.abc import *",
+            ])
+
 
             header += "\n".join([
                 "",
@@ -115,11 +129,11 @@ class FileScript(object):
             if command_name.lower() == command_class.__name__.lower():
                 break
 
-            elif command_name.lower() == command_class.name:
+            elif command_name.lower() == command_class.get_name():
                 break
 
             else:
-                if command_name in command_class.aliases:
+                if command_name in command_class.get_aliases():
                     break
 
         return command_class
@@ -138,7 +152,45 @@ class FileScript(object):
 
         return m
 
-    def run(self, arg_str="", **kwargs):
+    async def run(self, arg_str: str = "", **kwargs) -> str:
+        """Mimics running a command with `arg_str`
+
+        If you actually need to run a subprocess use `.run_process`
+
+        :returns: the captured output from the mimicked process
+        """
+        import shlex, asyncio, subprocess
+        argv = shlex.split(arg_str)
+
+        # we want this to act completely like it was called from the CLI
+        # so we will set our module into __main__
+        main_module = sys.modules.get("__main__", None)
+
+        with testdata.chdir(self.cwd):
+            with testdata.capture() as c:
+                try:
+                    sys.modules["__main__"] = self.path.get_module()
+                    await self.application.run(argv)
+
+                except SystemExit as e:
+                    if e.code != 0:
+                        raise subprocess.CalledProcessError(
+                            e.code,
+                            argv
+                        ) from e
+
+                except Exception as e:
+                    raise subprocess.CalledProcessError(1, argv) from e
+
+        if main_module is not None:
+            sys.modules["__main__"] = main_module
+
+        # reset any quiet flags
+        QuietFilter.reset()
+
+        return str(c).strip()
+
+    def run_process(self, arg_str: str = "", **kwargs) -> str:
         return testdata.run_command(
             "{} {}".format(testdata.get_interpreter(), self.path.path),
             arg_str,
@@ -147,7 +199,7 @@ class FileScript(object):
         ).strip()
 
 
-class TestCase(TestCase):
+class TestCase(IsolatedAsyncioTestCase):
     def setUp(self):
         # command classes need to be reset between tests otherwise one
         # test can step on another

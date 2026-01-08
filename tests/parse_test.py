@@ -1,201 +1,12 @@
 # -*- coding: utf-8 -*-
 import subprocess
+import argparse
 
 from captain.compat import *
 from captain.logging import QuietFilter
-from captain.parse import Router, Pathfinder
 from captain.call import Command
 
 from . import TestCase, FileScript
-
-
-class PathfinderTest(TestCase):
-    def test_add_class(self):
-        modpath = self.get_module_name(2, "commands")
-        self.create_module(
-            [
-                "from captain import Command",
-                "",
-                "class CheBoo(Command):",
-                "    def handle(self):",
-                "        self.output.out('foo-bar che-boo')",
-                "",
-                "class Default(Command):",
-                "    def handle(self):",
-                "        self.output.out('foo-bar')",
-            ],
-            modpath=modpath + ".foo_bar",
-            load=True
-        )
-
-        pf = Router([modpath]).pathfinder
-
-        value = pf.get(["foo-bar"])
-        self.assertEqual("Default", value["command_class"].__name__)
-
-        value = pf.get(["foo-bar", "che-boo"])
-        self.assertEqual("CheBoo", value["command_class"].__name__)
-        self.assertTrue(issubclass(pf.get([])["command_class"], Command))
-
-    def test_multi(self):
-        modpath = self.create_module([
-            "from captain import Command, arg",
-            "",
-            "class Che(Command):",
-            "    @arg('--foo', default='1')",
-            "    @arg('--bar', type=int)",
-            "    def handle(self, foo, bar):",
-            "        print('foo: {}, bar: {}'.format(foo, bar))",
-            "",
-            "class Bam(Command):",
-            "    def handle(self, **kwargs):",
-            "        print('kwargs: {}'.format(kwargs))",
-        ], load=True)
-
-        pf = Router([modpath]).pathfinder
-
-        self.assertEqual(2, len(pf))
-        self.assertEqual("Che", pf.get("che")["command_class"].__name__)
-        self.assertEqual("Bam", pf.get("bam")["command_class"].__name__)
-
-    def test_module_description(self):
-        modpath = self.create_module({
-            "foo": {
-                "": "'''bundles foo subcommands'''",
-                "bar": """
-                    '''bundles bar subcommands'''
-                    from captain import Command
-                    class Che(Command): pass
-                """,
-            }
-        }, load=True)
-
-        pf = Router([modpath]).pathfinder
-
-        self.assertTrue("foo subcommands" in pf["foo"]["description"])
-        self.assertTrue("bar subcommands" in pf["foo", "bar"]["description"])
-        self.assertEqual("", pf["foo", "bar", "che"]["description"])
-
-    def test_default_node(self):
-        s = FileScript([
-            "class Default(Command):",
-            "    def handle(self, foo, bar):",
-            "        print('foo: {}'.format(foo))",
-            "        print('bar: {}'.format(bar))",
-        ])
-
-        r = s.run("--bar 1 --foo=2")
-        self.assertTrue("bar: 1" in r)
-        self.assertTrue("foo: 2" in r)
-
-
-class RouterTest(TestCase):
-    def test_only_default(self):
-        p = self.create_module([
-            "from captain import Command",
-            "",
-            "class Default(Command):",
-            "    def handle(self, *args, **kwargs):",
-            "        self.output.out('default')",
-        ])
-
-        r = Router(command_prefixes=[p])
-
-        parsed = r.parser.parse_args(["foo", "--one=1", "--two=2"])
-
-        self.assertEqual(["foo"], parsed.args)
-        self.assertEqual("1", parsed.one)
-        self.assertEqual("2", parsed.two)
-
-    def test_only_subcommands(self):
-        p = self.create_module([
-            "from captain import Command",
-            "",
-            "class Foo(Command):",
-            "    def handle(self, *args, **kwargs):",
-            "        self.output.out('foo')",
-            "",
-            "class Bar(Command):",
-            "    def handle(self, *args, **kwargs):",
-            "        self.output.out('bar')",
-        ])
-
-        r = Router(command_prefixes=[p])
-
-        parsed = r.parser.parse_args(["foo", "--one=1", "--two=2"])
-        self.assertEqual("1", parsed.one)
-        self.assertEqual("2", parsed.two)
-
-    def test_prefixes(self):
-        p = self.create_modules({
-            "far.commands": {
-                "foo": [
-                    "from captain import Command",
-                    "",
-                    "class Default(Command):",
-                    "    def handle(self):",
-                    "        self.output.out('foo')",
-                    "",
-                    "class Bar(Command):",
-                    "    def handle(self):",
-                    "        self.output.out('foo bar')",
-                ],
-                "__init__": [
-                    "from captain import Command",
-                    "",
-                    "class Default(Command):",
-                    "    def handle(self):",
-                    "        self.output.out('foo')",
-                ],
-                "che": {
-                    "__init__": [
-                        "from captain import Command",
-                        "",
-                        "class Default(Command):",
-                        "    def handle(self):",
-                        "        self.output.out('che')",
-                    ],
-                    "boo": [
-                        "from captain import Command",
-                        "",
-                        "class Default(Command):",
-                        "    def handle(self):",
-                        "        self.output.out('che boo')",
-                    ],
-                },
-            },
-        })
-
-        r = Router(paths=[p])
-
-        value = r.pathfinder.get(["che", "boo"])
-        self.assertIsNotNone(value["parser"])
-
-        value = r.pathfinder.get(["foo", "bar"])
-        self.assertIsNotNone(value["parser"])
-
-        value = r.pathfinder.get(["foo"])
-        self.assertIsNotNone(value["parser"])
-
-    def test_dash_underscore_subcommands(self):
-        p = self.create_modules(
-            {
-                "commands": {
-                    "foo_bar": [
-                        "from captain import Command",
-                        "",
-                        "class CheBoo(Command):",
-                        "    def handle(self):",
-                        "        self.output.out('foo-bar che-boo')",
-                    ],
-                }
-            },
-            modpath=self.get_module_name()
-        )
-
-        r = Router(paths=[p])
-        parsed = r.parser.parse_args(["foo-bar", "che-boo"])
-        self.assertEqual("CheBoo", parsed._command_class.__name__)
 
 
 class ArgumentParserTest(TestCase):
@@ -212,7 +23,7 @@ class ArgumentParserTest(TestCase):
         #rquiet = p._option_string_actions["--quiet"].OPTIONS
         rargs = ["arg1", "arg2"]
 
-        with self.assertRaises(SystemExit):
+        with self.assertRaises((argparse.ArgumentError, SystemExit)):
             p.parse_args(['-q', '--quiet=D'])
 
         args = p.parse_args(['-q', 'arg1', 'arg2'])
@@ -270,7 +81,7 @@ class ArgumentParserTest(TestCase):
         self.assertEqual("DIWEC", getattr(args, "<QUIET_INJECT>"))
         self.assertTrue(args.D)
 
-    def test_quiet_1(self):
+    async def test_quiet_1(self):
         s = FileScript([
             "class Default(Command):",
             "    def handle(self):",
@@ -279,27 +90,27 @@ class ArgumentParserTest(TestCase):
             "        self.output.err('err')",
         ])
 
-        r = s.run('')
+        r = await s.run('')
         self.assertTrue("err" in r)
         self.assertTrue("verbose" in r)
         self.assertTrue("out" in r)
 
-        r = s.run('--quiet=-WE')
+        r = await s.run('--quiet=-WE')
         self.assertTrue("err" in r)
         self.assertFalse("verbose" in r)
         self.assertFalse("out" in r)
 
-        r = s.run('--quiet=D')
+        r = await s.run('--quiet=D')
         self.assertTrue("err" in r)
         self.assertFalse("verbose" in r)
         self.assertTrue("out" in r)
 
-        r = s.run('--quiet')
+        r = await s.run('--quiet')
         self.assertFalse("err" in r)
         self.assertFalse("verbose" in r)
         self.assertFalse("out" in r)
 
-    def test_quiet_override(self):
+    async def test_quiet_override(self):
         s = FileScript([
             "class Default(Command):",
             "    @arg(",
@@ -310,11 +121,11 @@ class ArgumentParserTest(TestCase):
             "    def handle(self, quiet):",
             "        self.output.out(quiet)",
         ])
-        r = s.run('--help')
+        r = await s.run('--help')
         self.assertTrue("override quiet" in r)
         self.assertNotRegex(r, r"-Q\s+QUIET")
 
-        r = s.run('--quiet')
+        r = await s.run('--quiet')
         self.assertEqual("True", r)
 
         s = FileScript([
@@ -324,7 +135,7 @@ class ArgumentParserTest(TestCase):
             "        pass",
         ])
 
-        r = s.run('--help')
+        r = await s.run('--help')
         self.assertRegex(r, r"--quiet\s+override\s+quiet")
         self.assertRegex(r, r"-Q\s+<QUIET")
 
@@ -352,28 +163,28 @@ class ArgumentParserTest(TestCase):
             "        self.output.err('err')",
         ])
 
-        r = s.run('--quiet=-C')
+        r = s.run_process('--quiet=-C')
         self.assertRegex(r, r"^\[CRITICAL]\s+critical\s*$")
 
-        r = s.run('--quiet=-I')
+        r = s.run_process('--quiet=-I')
         self.assertEqual("[INFO] info\nout", r)
 
-        r = s.run("-qqqqq")
+        r = s.run_process("-qqqqq")
         self.assertFalse("critical" in r)
 
-        r = s.run("-qqqq")
+        r = s.run_process("-qqqq")
         self.assertTrue("critical" in r)
 
-        r = s.run("-qqq")
+        r = s.run_process("-qqq")
         self.assertTrue("error" in r)
         self.assertTrue("critical" in r)
 
-        r = s.run("-qq")
+        r = s.run_process("-qq")
         self.assertTrue("warning" in r)
         self.assertTrue("error" in r)
         self.assertTrue("critical" in r)
 
-        r = s.run("-q")
+        r = s.run_process("-q")
         self.assertTrue("info" in r)
         self.assertTrue("warning" in r)
         self.assertTrue("error" in r)
@@ -401,7 +212,7 @@ class ArgumentParserTest(TestCase):
             "        self.output.err('err')",
         ])
 
-        r = s.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="")
+        r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="")
         self.assertTrue("debug" in r)
         self.assertTrue("info" in r)
         self.assertTrue("warning" in r)
@@ -409,20 +220,20 @@ class ArgumentParserTest(TestCase):
         self.assertTrue("critical" in r)
 
         # this won't call QuietAction.__call__()
-        r = s.run(CAPTAIN_QUIET_DEFAULT="D")
+        r = s.run_process(CAPTAIN_QUIET_DEFAULT="D")
         self.assertFalse("debug" in r)
         self.assertFalse("verbose" in r)
 
-        r = s.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="D")
+        r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="D")
         self.assertTrue("debug" in r)
         self.assertTrue("verbose" in r)
 
-        r = s.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="DI")
+        r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="DI")
         self.assertTrue("debug" in r)
         self.assertFalse("info" in r)
         self.assertFalse("out" in r)
 
-    def test_parse_handle_args(self):
+    async def test_parse_handle_args(self):
         s = FileScript([
             "class Default(Command):",
             "    @arg('--foo', type=int)",
@@ -432,96 +243,61 @@ class ArgumentParserTest(TestCase):
         ])
 
         with self.assertRaises(subprocess.CalledProcessError):
-            r = s.run("--foo 1 --bar 2 --che 3")
+            r = await s.run("--foo 1 --bar 2 --che 3")
 
-        r = s.run("--foo 1 --bar 2")
+        r = await s.run("--foo 1 --bar 2")
         self.assertTrue("foo: 1, bar: 2" in r)
 
-    def test_parse_custom_action(self):
-        s = FileScript([
-            "import argparse",
-            "",
-            "class FooAction(argparse.Action):",
-            "    def parse_args(self, parser, arg_strings): return arg_strings",
-            "    def get_value(self, value): pout.v(value); return int(value) + 1",
-            "    def __call__(self, parser, namespace, values, option_string):",
-            "        setattr(namespace, self.dest, values)",
-            "",
-            "class Che(Command):",
-            "    @arg('--foo', default='1', action=FooAction)",
-            "    @arg('--bar', type=int)",
-            "    def handle(self, foo, bar):",
-            "        print('foo: {}, bar: {}'.format(foo, bar))",
-            "",
-            "class Bam(Command):",
-            "    def handle(self, **kwargs):",
-            "        print('kwargs: {}'.format(kwargs))",
-        ])
+    async def test_parse_custom_action(self):
+        s = FileScript("""
+            import argparse
 
-        r = s.run("bam --foo 1 --bar 2")
+            class FooAction(argparse.Action):
+                def parse_args(self, parser, arg_strings): return arg_strings
+                def get_value(self, value): return int(value) + 1
+                def __call__(self, parser, namespace, values, option_string):
+                    setattr(namespace, self.dest, values)
+
+            class Che(Command):
+                @arg('--foo', default='1', action=FooAction)
+                @arg('--bar', type=int)
+                def handle(self, foo, bar):
+                    print('foo: {}, bar: {}'.format(foo, bar))
+
+            class Bam(Command):
+                def handle(self, **kwargs):
+                    print('kwargs: {}'.format(kwargs))
+        """)
+
+        r = await s.run("bam --foo 1 --bar 2")
         self.assertTrue("foo': '1'" in r)
 
-        r = s.run("che --bar 2")
+        r = await s.run("che --bar 2")
         self.assertTrue("foo: 2" in r)
 
-        r = s.run("che --foo 1 --bar 2")
+        r = await s.run("che --foo 1 --bar 2")
         self.assertTrue("foo: 2" in r)
 
-    def test_handle_quiet(self):
+    async def test_handle_quiet(self):
         s = FileScript(subcommands=True)
-        r = s.run("--help")
+        r = await s.run("--help")
         self.assertTrue("--quiet" in r)
 
-        r = s.run("foo --help")
+        r = await s.run("foo --help")
         self.assertTrue("subcommand description")
         self.assertTrue("--quiet" in r)
 
-        r = s.run("--help foo")
+        r = await s.run("--help foo")
         self.assertTrue("--quiet" in r)
 
-    def test_group_simple(self):
-        s = FileScript([
-            "class Default(Command):",
-            "    @arg('--foo', type=int, group='bar')",
-            "    @arg('--che', action='store_true', group='bar')",
-            "    @arg('--baz', type=int)",
-            "    def handle(self, bar, baz):",
-            "        print('bar group: {}, baz: {}'.format(bar, baz))",
-        ])
-
-        r = s.run("--foo=1 --che --baz=3")
-        self.assertTrue("bar group: Namespace(foo=1, che=True), baz: 3" in r)
-
-        r = s.run("--help")
-        self.assertTrue("bar:" in r)
-
-    def test_group_multiword(self):
-        s = FileScript([
-            "class Default(Command):",
-            "    @arg('--foo', type=int, group='Bar Bam')",
-            "    @arg('--che', action='store_true', group='Bar Bam')",
-            "    def handle(self, bar_bam):",
-            "        print('bar_bam group: {}'.format(bar_bam))",
-            "        print('bar_bam foo: {}'.format(bar_bam.foo))",
-            "        print('bar_bam che: {}'.format(bar_bam.che))",
-        ])
-
-        r = s.run("--foo=1 --che")
-        self.assertTrue("bar_bam group: Namespace(foo=1, che=True)" in r)
-        self.assertTrue("bar_bam foo: 1" in r)
-        self.assertTrue("bar_bam che: True" in r)
-
-        r = s.run("--help")
-        self.assertTrue("Bar Bam:" in r)
-
-    def test_parse_undefined_normalization(self):
+    async def test_parse_undefined_normalization(self):
         s = FileScript([
             "class Default(Command):",
             "    def handle(self, **kwargs):",
             "        print('kwargs: {}'.format(kwargs))"
         ])
 
-        r = s.run("--foo-bar 1")
+        r = await s.run("--foo-bar 1")
         self.assertTrue("'foo_bar':" in r)
         self.assertFalse("'foo-bar':" in r)
 
@@ -537,15 +313,15 @@ class ArgumentParserTest(TestCase):
         self.assertEqual("2", parsed.foo)
         self.assertEqual("1", parsed.bar)
 
-        parsed = parser.parse_args(["1", "--foo=2"])
-        self.assertEqual("2", parsed.foo)
-        self.assertEqual("1", parsed.bar)
+        parsed = parser.parse_args(["1", "--bar=2"])
+        self.assertEqual("1", parsed.foo)
+        self.assertEqual("2", parsed.bar)
 
         parsed = parser.parse_args(["1", "2"])
         self.assertEqual("1", parsed.foo)
         self.assertEqual("2", parsed.bar)
 
-    def test_help_aliases(self):
+    async def test_help_aliases(self):
         s = FileScript([
             "class FooBar(Command):",
             "    def handle(self): pass",
@@ -557,11 +333,11 @@ class ArgumentParserTest(TestCase):
             "    def handle(self): pass",
         ])
 
-        r = s.run("--help")
+        r = await s.run("--help")
         self.assertTrue("foo-bar" in r)
         self.assertFalse("FooBar" in r)
 
-    def test_subcommand_variations(self):
+    async def test_subcommand_variations(self):
         s = FileScript([
             "class FooBar(Command):",
             "    def handle(self): self.out('FooBar')",
@@ -570,9 +346,9 @@ class ArgumentParserTest(TestCase):
             "    def handle(self): self.out('BarChe')",
         ])
 
-        r = s.run("foobar")
+        r = await s.run("foobar")
 
-    def test_environ_arg(self):
+    async def test_environ_arg_1(self):
         """
         https://github.com/Jaymon/captain/issues/77
         """
@@ -583,17 +359,38 @@ class ArgumentParserTest(TestCase):
             "        self.out(foo)",
         ])
 
-        r = s.run("")
+        r = await s.run("")
         self.assertEqual("1", r)
 
         with self.environ(FOO="2"):
-            r = s.run("")
+            r = await s.run("")
             self.assertEqual("2", r)
 
-            r = s.run("--foo=3")
+            r = await s.run("--foo=3")
             self.assertEqual("3", r)
 
-    def test_option_string_variations(self):
+    async def test_environ_arg_required(self):
+        """Make sure environment defaults still work if the argument is marked
+        as required
+        """
+        s = FileScript("""
+            class Default(Command):
+                @arg('--foo', '$FOO', required=True)
+                def handle(self, foo):
+                    self.out(foo)
+        """)
+
+        p = s.parser
+
+        with self.assertRaises(argparse.ArgumentError):
+            p.parse_args([""])
+
+        with self.environ(FOO="2"):
+            r = await s.run("")
+            self.assertEqual("2", r)
+
+
+    async def test_option_string_variations(self):
         s = FileScript([
             "class Default(Command):",
             "    foo_bar = Argument('--fb', '--fo-bo')",
@@ -603,13 +400,95 @@ class ArgumentParserTest(TestCase):
             "        self.out(remote_directory)",
         ])
 
-        r = s.run("--help")
+        r = await s.run("--help")
         self.assertFalse("remote_directory" in r)
+        self.assertTrue("remote-directory" in r)
         self.assertFalse("foo-bar" in r)
+
 
         v1 = "other"
         v2 = "something"
-        r = s.run(f"--foo_bar={v1} --remote-directory {v2}")
+        r = await s.run(f"--foo_bar={v1} --remote-directory {v2}")
         self.assertTrue(v1 in r)
         self.assertTrue(v2 in r)
+
+    async def test_unknown_args(self):
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, *args, **kwargs):
+                    self.out(args)
+                    self.out(kwargs)
+                    pass
+        """)
+
+        r = await s.run("--foo 1 --bar 2 3 4")
+        self.assertTrue("('3', '4')" in r)
+        self.assertTrue("{'foo': '1', 'bar': '2'}" in r)
+
+    async def test_annotation_dest_dash(self):
+        """When the value could be either a positional or keyword it would
+        fail with:
+
+            TypeError: ... got an unexpected keyword argument 'foo-bar'
+
+        This makes sure that is fixed
+        """
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, foo_bar: str = "che"):
+                    self.out(foo_bar)
+        """)
+
+        r = await s.run("")
+        self.assertEqual("che", r)
+
+    async def test_annotation_positional_dash(self):
+        """When the value could be either a positional or keyword it would
+        fail with:
+
+            TypeError: ... got an unexpected keyword argument 'foo-bar'
+
+        This makes sure that is fixed
+        """
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, foo_bar: str, /):
+                    self.out(foo_bar)
+        """)
+
+        r = await s.run("che")
+        self.assertEqual("che", r)
+
+    async def test_annotation_positional_default_value(self):
+        """If the positional has a default value then it doesn't need to be
+        passed in, but that only works in python if nargs=? is set, this makes
+        sure this use case gets set correctly
+        """
+        p = FileScript("""
+            class Default(Command):
+                def handle(self, foo_bar: str = "", /):
+                    self.out(foo_bar)
+        """).parser
+
+        r = p.parse_args([])
+        self.assertEqual("", r.foo_bar)
+
+        r = p.parse_args(["che"])
+        self.assertEqual("che", r.foo_bar)
+
+    async def test_annotation_bool_store_true(self):
+        """boolean flags can't have a type, this makes sure type is removed
+        if the action is inferred to be "store_true" or "store_false"
+        """
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, *, foo_bar: bool = False):
+                    self.out(foo_bar)
+        """)
+
+        r = await s.run("")
+        self.assertEqual("False", r)
+
+        r = await s.run("--foo-bar")
+        self.assertEqual("True", r)
 

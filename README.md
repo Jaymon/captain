@@ -1,11 +1,11 @@
 # Captain
 
-Easy python cli scripts for people that just want get things done.
+Easy python CLI scripts for people that just want get things done.
 
 
 ## Usage
 
-A valid `captain` cli script needs just two things:
+A valid `captain` CLI script needs just two things:
 
 1. A `Default` class that extends `captain.Command` and has a `handle()` method (can be async):
 
@@ -116,8 +116,8 @@ would become:
 import captain
 
 class Default(captain.Command):
-    async def handle(foo=False, bar=0, *args):
-        '''fancy script description'''
+    async def handle(self, *args, foo: bool = False, bar:int = 0):
+        """fancy script description"""
         return 0
 
 if __name__ == '__main__':
@@ -136,11 +136,11 @@ import captain
 
 class Foo(captain.Command):
     async def handle(self):
-        pass
+        self.output.out("Foo called")
 
 class Bar(captain.Command):
     async def handle(self):
-        pass
+        self.output.out("Bar called")
 
 if __name__ == '__main__':
     captain.application()
@@ -149,10 +149,12 @@ if __name__ == '__main__':
 So `foo` could be called using:
 
     $ python cli.py foo
+    Foo called
 
 And `bar` could be called using:
 
     $ python cli.py bar
+    Bar called
 
 
 ### Embedding captain in another package
