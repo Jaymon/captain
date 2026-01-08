@@ -14,6 +14,7 @@ from datatypes.reflection import (
     ReflectClass,
     ReflectCallable,
     ReflectModule,
+    ReflectType,
 )
 
 from .compat import *
@@ -312,8 +313,17 @@ class Argument(tuple):
             if vs := self[1].pop(k, []):
                 self[0].extend(vs)
 
+        if self.is_positional():
+            if rt := self.reflect_type():
+                if not rt.is_listish():
+                    if not self.is_required():
+                        self[1]["nargs"] = "?"
+
+                else:
+                    self[1]["nargs"] = "+" if self.is_required() else "*"
+
     def is_positional(self):
-        return not self.is_keyword()
+        return self[0] and not self.is_keyword()
 
     def is_keyword(self):
         """returns True if argument is a keyword argument"""
@@ -321,6 +331,14 @@ class Argument(tuple):
             if n.startswith("-"):
                 return True
         return False
+
+    def is_required(self):
+        """Return True if this argument is required to be passed in"""
+        if "required" in self[1]:
+            return self[1]["required"]
+
+        else:
+            return "default" not in self[1]
 
     def merge(self, pa):
         """Merge another Argument instance into this one
@@ -359,6 +377,18 @@ class Argument(tuple):
                     keywords.add(get_flag(n))
 
         return keywords
+
+    def reflect_type(self) -> ReflectType|None:
+        if "type" in self[1]:
+            return ReflectType(self[1]["type"])
+
+        elif "default" in self[1]:
+            return ReflectType(type(self[1]["default"]))
+
+        else:
+            action = self[1].get("action")
+            if action in ["store_true", "store_false"]:
+                return ReflectType(bool)
 
 
 class Pathfinder(ClasspathFinder):

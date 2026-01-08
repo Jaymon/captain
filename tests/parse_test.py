@@ -459,7 +459,27 @@ class ArgumentParserTest(TestCase):
         r = await s.run("che")
         self.assertEqual("che", r)
 
+    async def test_annotation_positional_default_value(self):
+        """If the positional has a default value then it doesn't need to be
+        passed in, but that only works in python if nargs=? is set, this makes
+        sure this use case gets set correctly
+        """
+        p = FileScript("""
+            class Default(Command):
+                def handle(self, foo_bar: str = "", /):
+                    self.out(foo_bar)
+        """).parser
+
+        r = p.parse_args([])
+        self.assertEqual("", r.foo_bar)
+
+        r = p.parse_args(["che"])
+        self.assertEqual("che", r.foo_bar)
+
     async def test_annotation_bool_store_true(self):
+        """boolean flags can't have a type, this makes sure type is removed
+        if the action is inferred to be "store_true" or "store_false"
+        """
         s = FileScript("""
             class Default(Command):
                 def handle(self, *, foo_bar: bool = False):
