@@ -426,18 +426,21 @@ class Pathfinder(MethodpathFinder):
             key = kwargs["class"].get_name()
 
         else:
-            # can be `Foo` or `Bar` in: Foo.Bar.Che
+            # can be `Foo` or `Bar` in: <MODULE>:Foo.Bar.Che
             rc = None
             key = NamingConvention(key).kebabcase()
 
         key, value = super()._get_node_class_info(key, **kwargs)
 
         if rc:
-            #value["reflect_class"] = rc
             value["aliases"] = value["class"].get_aliases()
             value["description"] = rc.get_docblock()
             value["version"] = value["class"].version
             value["command_class"] = value["class"]
+
+        else:
+            nc = NamingConvention(value["class_name"])
+            value["aliases"] = nc.variations()
 
         return key, value
 

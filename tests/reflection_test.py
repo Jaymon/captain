@@ -301,3 +301,25 @@ class PathfinderTest(TestCase):
             await s.application.call("foo", "bar")
             self.assertEqual("foo bar", str(c).strip())
 
+    async def test_aliases(self):
+        """
+        https://github.com/Jaymon/captain/issues/98
+        """
+        modpath = self.create_module({
+            "foo_bar": {
+                "che_boo": """
+                    from captain import Command
+                    class WooToo:
+                        class BamFoo(Command): pass
+                """,
+            },
+        })
+
+        p = Application([modpath]).parser
+
+        n = p.parse_args(["foo_bar", "che_boo", "WooToo"])
+        self.assertEqual("woo-too", n._pathfinder_node.key)
+
+        n = p.parse_args(["foo-bar", "che-boo", "woo-too"])
+        self.assertEqual("woo-too", n._pathfinder_node.key)
+
