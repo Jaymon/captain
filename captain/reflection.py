@@ -422,24 +422,26 @@ class Pathfinder(MethodpathFinder):
     def _get_node_class_info(self, key, **kwargs):
         """All user defined Command children go through this method"""
         if "class" in kwargs:
+            key, value = super()._get_node_class_info(
+                kwargs["class"].get_name(),
+                **kwargs,
+            )
+
             rc = kwargs["class"].reflect()
-            key = kwargs["class"].get_name()
-
-        else:
-            # can be `Foo` or `Bar` in: <MODULE>:Foo.Bar.Che
-            rc = None
-            key = NamingConvention(key).kebabcase()
-
-        key, value = super()._get_node_class_info(key, **kwargs)
-
-        if rc:
             value["aliases"] = value["class"].get_aliases()
             value["description"] = rc.get_docblock()
             value["version"] = value["class"].version
             value["command_class"] = value["class"]
 
         else:
-            nc = NamingConvention(value["class_name"])
+            # can be `Foo` or `Bar` in: <MODULE>:Foo.Bar.Che
+            nc = NamingConvention(key)
+
+            key, value = super()._get_node_class_info(
+                nc.kebabcase(),
+                **kwargs,
+            )
+
             value["aliases"] = nc.variations()
 
         return key, value
@@ -449,11 +451,11 @@ class Pathfinder(MethodpathFinder):
         key: str,
         **kwargs,
     ) -> tuple[str|None, Mapping|None]:
-        if not key.startswith("handle") or key == "handle_error":
-            return None, None
-
-        parts = key.split("_", 1)
-        if len(parts) > 1:
+        """All methods of Command children go through this method but this
+        method only cares about `handle_* methods, all other methods won't
+        create a node in the tree"""
+        if key.startswith("handle_") and key != "handle_error":
+            parts = key.split("_", 1)
             nc = NamingConvention(parts[1])
 
             key, value = super()._get_node_method_info(

@@ -8,7 +8,7 @@ from . import exception
 from .exception import Stop, Error
 
 
-__version__ = "5.2.0"
+__version__ = "6.0.0"
 
 
 def application(*args, **kwargs):

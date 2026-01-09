@@ -234,12 +234,6 @@ class Application(object):
                 break
 
         command = self._create_command(parser._defaults["_pathfinder_node"])
-#         node_value = parser._defaults["_pathfinder_node"].value
-#         command_class = node_value["command_class"]
-#         command = command_class(
-#             application=self,
-#             parser=node_value["parser"],
-#         )
         return await command.run(*args, **kwargs)
 
     async def run(self, argv: list[str]|None = None) -> int:
@@ -252,12 +246,6 @@ class Application(object):
         """
         parsed = self.parser.parse_args(argv)
         command = self._create_command(parsed._pathfinder_node)
-#         node_value = parsed._pathfinder_node.value
-#         command_class = node_value["command_class"]
-#         command = command_class(
-#             application=self,
-#             parser=node_value["parser"],
-#         )
         args, kwargs = await command.get_parsed_params(parsed)
         return await command.run(*args, **kwargs)
 
