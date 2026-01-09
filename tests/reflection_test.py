@@ -282,3 +282,22 @@ class PathfinderTest(TestCase):
         self.assertTrue("bar: 1" in r)
         self.assertTrue("foo: 2" in r)
 
+    async def test_method_node(self):
+        s = FileScript("""
+            class Foo(Command):
+                def handle_bar(self):
+                    print("foo bar")
+                def handle_che(self):
+                    print("foo che")
+        """)
+
+        self.assertEqual("foo bar", await s.run("foo bar"))
+        self.assertEqual("foo che", await s.run("foo che"))
+
+        r = await s.run("foo")
+        self.assertTrue("usage" in r)
+
+        with self.capture() as c:
+            await s.application.call("foo", "bar")
+            self.assertEqual("foo bar", str(c).strip())
+

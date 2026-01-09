@@ -3,11 +3,11 @@ import re
 import inspect
 import types
 import argparse
-from collections.abc import Iterable, Generator
+from collections.abc import Iterable, Generator, Mapping
 
 from datatypes import (
     NamingConvention,
-    ClasspathFinder,
+    MethodpathFinder,
 )
 from datatypes.reflection import (
     ReflectParam,
@@ -391,7 +391,7 @@ class Argument(tuple):
                 return ReflectType(bool)
 
 
-class Pathfinder(ClasspathFinder):
+class Pathfinder(MethodpathFinder):
     """Internal class to Router. This handles setting the subcommand hierarchy,
     this is used to create all the parsers in the Router."""
     def _get_node_default_value(self, **kwargs):
@@ -441,4 +441,33 @@ class Pathfinder(ClasspathFinder):
 
         return key, value
 
+    def _get_node_method_info(
+        self,
+        key: str,
+        **kwargs,
+    ) -> tuple[str|None, Mapping|None]:
+        if not key.startswith("handle") or key == "handle_error":
+            return None, None
+
+        parts = key.split("_", 1)
+        if len(parts) > 1:
+            nc = NamingConvention(parts[1])
+
+            key, value = super()._get_node_method_info(
+                nc.kebabcase(),
+                **kwargs
+            )
+
+            value["aliases"] = nc.variations()
+
+            rc = ReflectCallable(value["method"])
+            value["description"] = rc.get_docblock()
+
+            value["command_class"] = value["class"]
+            value["version"] = value["class"].version
+
+            return key, value
+
+        else:
+            return None, None
 

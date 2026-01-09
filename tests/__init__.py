@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import textwrap
 import sys
+import shlex
+import asyncio
+import subprocess
 
 import testdata
 from testdata.test import IsolatedAsyncioTestCase
@@ -58,7 +61,8 @@ class FileScript(object):
                     "    Argument,",
                     "    arg,",
                     "    exception,",
-                    "    Application",
+                    "    application,",
+                    "    Application,",
                     ")",
                     "",
                 ])
@@ -111,10 +115,8 @@ class FileScript(object):
         if "__name__ == " not in body:
             body += "\n".join([
                 "",
-                "",
-                "application = Application()",
-                "",
                 "if __name__ == '__main__':",
+                #"    application = Application()",
                 "    application()",
             ])
 
@@ -159,7 +161,6 @@ class FileScript(object):
 
         :returns: the captured output from the mimicked process
         """
-        import shlex, asyncio, subprocess
         argv = shlex.split(arg_str)
 
         # we want this to act completely like it was called from the CLI

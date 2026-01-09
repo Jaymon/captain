@@ -196,6 +196,16 @@ class Application(object):
 
         return parser
 
+    def _create_command(self, node: Pathfinder) -> Command:
+        """Internal method to this class. Creates the command instance that
+        will be ran"""
+        node_value = node.value
+        command_class = node_value["command_class"]
+        return command_class(
+            application=self,
+            parser=node_value["parser"],
+        )
+
     async def call(self, *args, **kwargs) -> int:
         """Run Command with `args` and `kwargs` instead of an `argv` list
 
@@ -223,12 +233,13 @@ class Application(object):
             else:
                 break
 
-        node_value = parser._defaults["_pathfinder_node"].value
-        command_class = node_value["command_class"]
-        command = command_class(
-            application=self,
-            parser=node_value["parser"],
-        )
+        command = self._create_command(parser._defaults["_pathfinder_node"])
+#         node_value = parser._defaults["_pathfinder_node"].value
+#         command_class = node_value["command_class"]
+#         command = command_class(
+#             application=self,
+#             parser=node_value["parser"],
+#         )
         return await command.run(*args, **kwargs)
 
     async def run(self, argv: list[str]|None = None) -> int:
@@ -240,12 +251,13 @@ class Application(object):
         :returns: int, the return code you want the script to exit with
         """
         parsed = self.parser.parse_args(argv)
-        node_value = parsed._pathfinder_node.value
-        command_class = node_value["command_class"]
-        command = command_class(
-            application=self,
-            parser=node_value["parser"],
-        )
+        command = self._create_command(parsed._pathfinder_node)
+#         node_value = parsed._pathfinder_node.value
+#         command_class = node_value["command_class"]
+#         command = command_class(
+#             application=self,
+#             parser=node_value["parser"],
+#         )
         args, kwargs = await command.get_parsed_params(parsed)
         return await command.run(*args, **kwargs)
 

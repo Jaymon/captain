@@ -2,7 +2,8 @@
 import sys
 import inspect
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Callable
+from types import ModuleType
 
 from datatypes import NamingConvention
 
@@ -35,7 +36,7 @@ class Command(object):
     """Set this as the version for this command"""
 
     @classproperty
-    def module(cls):
+    def module(cls) -> ModuleType:
         """The module the child class is defined in"""
         try:
             return sys.modules[cls.__module__]
@@ -44,7 +45,7 @@ class Command(object):
             raise AttributeError("module") from e
 
     @classmethod
-    def get_aliases(cls):
+    def get_aliases(cls) -> set[str]:
         """If you want your SUBCOMMAND to have aliases (ie, foo-bar and foo_bar
         will both trigger the subcommand) then you can return the aliases, this
         can be set in a child class or set aliases = [] to completely remove
@@ -53,12 +54,12 @@ class Command(object):
         return nc.variations()
 
     @classmethod
-    def get_name(cls):
+    def get_name(cls) -> str|None:
         """Get the Command name.
 
         This is used in Pathfinder to decide the subcommand for this class
 
-        :returns: str|None, the basename in kebab case, or None if this is
+        :returns: the basename in kebab case, or None if this is
             a default controller
         """
         name = cls.__name__
@@ -72,24 +73,21 @@ class Command(object):
         return name
 
     @classmethod
-    def reflect(cls):
+    def reflect(cls) -> ReflectCommand:
         """The interface does a lot of introspection to figure out how to call
         the .handle() method, this returns the reflection class of this
-        specific command
-
-        :returns: ReflectCommand
-        """
+        specific command"""
         return ReflectCommand(cls)
 
     @classmethod
-    def is_private(cls):
+    def is_private(cls) -> bool:
         """Return true if this is a valid user facing command class
 
         any found Command subclass that has a name that doesn't end with
         Command (eg BaseCommand) and doesn't start with an underscore (eg _Foo) 
         is a valid external command
 
-        :returns: bool, True if valid, False if not user facing
+        :returns: True if valid, False if not user facing
         """
         return (
             cls.private
@@ -98,6 +96,13 @@ class Command(object):
         )
 
     def __init__(self, application=None, parser=None):
+        """
+        :param application: the instance that was used to create self
+        :type application: Application
+        :param parser: the parser that was used to parse the flags on the
+            command line that led to self being created
+        :type parser: argparse.ArgumentParser
+        """
         self.input = self.input_class()
         self.output = self.output_class()
 
@@ -127,6 +132,18 @@ class Command(object):
                 raise AttributeError(k)
 
         return cb
+
+    def _get_handler_method(self) -> Callable[..., int]:
+        """Internal method. This returns the method that will be called in
+        `.run`"""
+        method = self.handle
+
+        if self.parser:
+            node_value = self.parser._defaults["_pathfinder_node"].value
+            if method_name := node_value.get("method_name", None):
+                method = getattr(self, method_name)
+
+        return method
 
     async def get_parsed_params(self, parsed) -> tuple[Iterable, Mapping]:
         """Translates parsed CLI positionals and keywords into arguments
@@ -164,36 +181,10 @@ class Command(object):
 
         return args, kwargs
 
-    async def run(self, *args, **kwargs):
-        """Wrapper around the internal handle methods, this should be
-        considered the correct external method to call
-
-        The handle methods should be considered "internal" to the Captain class
-        that are interacted with through this method
-
-        :param *args: all positional values passed in through the command line
-            passed through any configured parsers, merged with .parsed
-        :param **kwargs: all the flag values passed in through the command line
-            passed through any configured parsers, merged with .parsed
-        :returns: int, the return code
-        """
-        try:
-            args, kwargs = await self.get_method_params(*args, **kwargs)
-            ret_code = self.handle(*args, **kwargs)
-
-        except Exception as e:
-            ret_code = self.handle_error(e)
-
-        finally:
-            while inspect.iscoroutine(ret_code):
-                ret_code = await ret_code
-
-        return ret_code
-
-    async def handle(self, *args, **kwargs):
+    async def handle(self, *args, **kwargs) -> int|None:
         self.parser.print_help()
 
-    async def handle_error(self, e):
+    async def handle_error(self, e) -> int|None:
         """This is called when an uncaught exception on the Command is raised,
         it can be defined in the child to allow custom handling of uncaught
         exceptions"""
@@ -211,6 +202,33 @@ class Command(object):
             raise e
 
         return ret_code
+
+    async def run(self, *args, **kwargs) -> int:
+        """Wrapper around the internal handle methods, this should be
+        considered the correct external method to call
+
+        The handle methods should be considered "internal" to the Captain class
+        that are interacted with through this method
+
+        :param *args: all positional values passed in through the command line
+            passed through any configured parsers, merged with .parsed
+        :param **kwargs: all the flag values passed in through the command line
+            passed through any configured parsers, merged with .parsed
+        :returns: int, the return code
+        """
+        try:
+            args, kwargs = await self.get_method_params(*args, **kwargs)
+            method = self._get_handler_method()
+            ret_code = method(*args, **kwargs)
+
+        except Exception as e:
+            ret_code = self.handle_error(e)
+
+        finally:
+            while inspect.iscoroutine(ret_code):
+                ret_code = await ret_code
+
+        return ret_code or 0
 
     async def call(self, *args, **kwargs) -> int:
         """Hook to make it easier to call other commands from a handle method
