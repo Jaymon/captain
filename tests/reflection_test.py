@@ -323,3 +323,17 @@ class PathfinderTest(TestCase):
         n = p.parse_args(["foo-bar", "che-boo", "woo-too"])
         self.assertEqual("woo-too", n._pathfinder_node.key)
 
+    async def test_lowercase_subcommand_class_names(self):
+        """
+        https://github.com/Jaymon/captain/issues/97
+        """
+        s = FileScript("""
+            class foo(Command):
+                def handle(self):
+                    print("foo")
+        """)
+
+        a = s.application
+        self.assertTrue("foo" in a.pathfinder)
+        self.assertEqual("foo", a.pathfinder["foo"]["class_name"])
+
