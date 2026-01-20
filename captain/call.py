@@ -170,6 +170,16 @@ class Command(object):
         return args, kwargs
 
     async def get_method_params(self, *args, **kwargs) -> tuple[Iterable, Mapping]:
+        """Convert the args and kwargs to params that can be passed to the
+        handle method
+
+        This expects args and kwargs to have passed through normalization
+        like `.get_parsed_params` that cast the values and normalize the
+        names. It does not go through the class argument aliases and stuff,
+        and it doesn't cast anything
+
+        This does pluck out class arguments and places them into `self`
+        """
         # set instance properties that have been passed in
         rc = self.reflect()
         for pas in rc.get_class_arguments():
@@ -242,4 +252,50 @@ class Command(object):
             passed through
         """
         return await self.application.call(*args, **kwargs)
+
+    async def runcall(self, *args, **kwargs) -> int:
+        """Hook to make it easier to call other commands from a handle method
+
+        This is different than `.call` in that it will convert the args and
+        kwargs into an `argv` list that will be treated like it came directly
+        from the commandline, meaning it will go through the parsers and
+        so aliases can be used and values will be cast and things like that.
+
+        Since this expects to convert args and kwargs to a list[str] it
+        has undefined behavior for passing in complex non-string types, this
+        does no casting to str when building the list so it will pass non
+        string values that were passed in, which might lead to unexpected
+        bahavior in the parsers
+
+        :param *args: anything in this will be passed to the other command
+            as positional arguments
+        :param **kwargs: anything in this will be passed to the other command
+            as keyword arguments
+        :returns: int, the return code of the other command
+        :raises: Exception, any exceptions the other command raises will be
+            passed through
+        """
+        argv = [*args]
+
+        # This is kind of cheating a bit, we turn these into keyword
+        # arguments so we can just run a new command with a new set of
+        # args
+        for k, v in kwargs.items():
+            if not k.startswith("-"):
+                if len(k) > 1:
+                    k = f"--{k}"
+
+                else:
+                    k = f"-{k}"
+
+            argv.append(k)
+
+            # booleans are a special case, for True or False only the flag
+            # (`k`) gets set, so if you want an `action="store_true"` flag to
+            # be set you would pass in `<NAME>=True` and for
+            # `action="store_false"` you'd pass in `<NAME>=False`
+            if not isinstance(v, bool):
+                argv.append(v)
+
+        return await self.application.run(argv)
 

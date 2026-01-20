@@ -492,3 +492,17 @@ class ArgumentParserTest(TestCase):
         r = await s.run("--foo-bar")
         self.assertEqual("True", r)
 
+    async def test_parser_default_subcommand(self):
+        s = FileScript("""
+            class Default(Command):
+                def handle(self):
+                    self.out("default")
+
+            class FooBar(Command):
+                def handle(self):
+                    self.out("foo-bar")
+        """)
+
+        r = await s.run("foo-bar")
+        pout.v(r)
+

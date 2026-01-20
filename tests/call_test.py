@@ -102,3 +102,27 @@ class CommandTest(TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             r = await s.run("--bar 1")
 
+    async def test_get_method_params_call_runcall(self):
+        """Passing an alias for a class argument to .call should fail.
+
+        Command.get_method_params could go through the class argument aliases
+        and stuff, but it's even more complicated because it would also need
+        to cast, this is normally taken care of by the Parser
+        """
+        s = FileScript("""
+            class Default(Command):
+                bar = Argument("--bar", "-b", "--bar-che")
+                async def handle(self): pass
+        """)
+
+        a = s.application
+
+        with self.assertRaises(TypeError):
+            await a.call(bar_che="...")
+
+        command_class = s.command_class()
+        command = command_class(a)
+
+        r = await command.runcall(bar_che="...")
+        self.assertEqual(0, r)
+
