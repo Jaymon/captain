@@ -9,7 +9,7 @@ from datatypes import NamingConvention
 
 from .compat import *
 from .decorators import classproperty
-from .reflection import ReflectCommand, Argument
+from .reflection import ReflectCommand, Argument, ReflectMethod
 from .io import Output, Input
 from . import exception
 
@@ -148,10 +148,22 @@ class Command(object):
     async def get_parsed_params(self, parsed) -> tuple[Iterable, Mapping]:
         """Translates parsed CLI positionals and keywords into arguments
         and keywords to pass to the handler method"""
+#         parsed_kwargs = {}
+# 
+#         for k, v in parsed._get_kwargs():
+#             # we filter out private (starts with _) and placeholder
+#             # (surrounded by <>) keys
+#             if not k.startswith("_") and not k.startswith("<"):
+#                 parsed_kwargs[k] = v
+# 
+#         return [], parsed_kwargs
+
         args = []
         kwargs = {}
 
-        rm = self.reflect().reflect_method()
+        method = self._get_handler_method()
+        rm = ReflectMethod(method, target_class=self)
+        #rm = self.reflect().reflect_method()
         parsed_kwargs = {}
 
         for k, v in parsed._get_kwargs():
@@ -169,7 +181,12 @@ class Command(object):
 
         return args, kwargs
 
-    async def get_method_params(self, *args, **kwargs) -> tuple[Iterable, Mapping]:
+    async def get_method_params(
+        self,
+        method: Callable,
+        *args,
+        **kwargs
+    ) -> tuple[Iterable, Mapping]:
         """Convert the args and kwargs to params that can be passed to the
         handle method
 
@@ -180,6 +197,7 @@ class Command(object):
 
         This does pluck out class arguments and places them into `self`
         """
+
         # set instance properties that have been passed in
         rc = self.reflect()
         for pas in rc.get_class_arguments():
@@ -190,6 +208,25 @@ class Command(object):
                 setattr(self, pa.name, kwargs.pop(pa.name, None))
 
         return args, kwargs
+
+#         margs = []
+#         mkwargs = {}
+# 
+#         rm = ReflectMethod(method, target_class=self)
+#         for ra in rm.reflect_arguments(*args, **kwargs):
+#             if ra.is_bound():
+#                 if ra.is_positional():
+#                     margs.extend(ra.get_positional_values())
+# 
+#                 elif ra.is_keyword():
+#                     mkwargs.update(ra.get_keyword_values())
+# 
+#         return margs, mkwargs
+
+#         info = rm.get_bind_info(*args, **kwargs)
+#         pout.v(args, kwargs, info)
+#         return info["bound_args"], info["bound_kwargs"]
+        #return args, kwargs
 
     async def handle(self, *args, **kwargs) -> int|None:
         self.parser.print_help()
@@ -227,8 +264,12 @@ class Command(object):
         :returns: int, the return code
         """
         try:
-            args, kwargs = await self.get_method_params(*args, **kwargs)
             method = self._get_handler_method()
+            args, kwargs = await self.get_method_params(
+                method,
+                *args,
+                **kwargs,
+            )
             ret_code = method(*args, **kwargs)
 
         except Exception as e:

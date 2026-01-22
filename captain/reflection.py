@@ -24,6 +24,7 @@ class ReflectCommand(ReflectClass):
     """Provides some handy helper introspection methods for dealing with the
     Command class"""
     def reflect_method(self, method_name="handle"):
+        # WARN -- this method is out of date with handle_* subcommands
         if method_name == "handle":
             return ReflectMethod(self.get(method_name))
 
@@ -48,6 +49,7 @@ class ReflectCommand(ReflectClass):
 
     def get_arguments(self) -> Generator[list[tuple]]:
         yield from self.get_class_arguments()
+        # WARN -- this method is out of date with handle_* subcommands
         yield from self.reflect_method().get_arguments()
 
     def get_docblock(self):

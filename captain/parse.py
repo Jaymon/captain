@@ -335,6 +335,18 @@ class ArgumentParser(argparse.ArgumentParser):
         override both to hook in my overriding functionality and make it
         possible to manipulate the arg_strings
         """
+        # save the namespace so we can delete values from it if we move down
+        # a level to a subcommand parser. This is a terrible way to do this but
+        # it's the only way I can figure out how to make this work without
+        # changing a whole bunch of stdlib code. What happens is a namespace
+        # is created and default values are added in `._parse_known_args2` and
+        # then that method calls this method. So the default values for a
+        # "parent" parser are set before a subcommand parser is called, then
+        # when the subcommand returns, the namespaces are merged together and
+        # the parent's default values are inherited and then the namespace is
+        # returned with values the subcommand knows nothing about
+        self._namespace = namespace
+
         arg_strings = self._parse_action_args(arg_strings)
         return super()._parse_known_args(
             arg_strings,
@@ -389,6 +401,7 @@ class ArgumentParser(argparse.ArgumentParser):
                 else:
                     parsed_unknown = []
 
+        #pout.v(parsed._pathfinder_node.value, parsed_unknown)
         return parsed, parsed_unknown
 
     def _add_command_arguments(self, command_class):
@@ -442,6 +455,45 @@ class ArgumentParser(argparse.ArgumentParser):
                         # see the ._add_action method for how I figured this
                         # out
                         self._option_string_actions[keyword] = action
+
+        # save the computed actions so we can disable them in a subsequent
+        # subcommand if we need to
+        self._pa_actions = pa_actions
+
+        # disable all the added arguments of a previous command parser so they
+        # don't interfere with this parser
+        #
+        # By default, a subcommand inherits all of the previous parser's
+        # commands. This seems to be because each parser is fully parsed and
+        # a subcommand is only a special action on the parser, and so each
+        # parser will check all its positionals and keywords and fail if
+        # something is wrong. That means that a subcommand "inherits" its
+        # "parent" command's arguments even though it doesn't know anything
+        # about them
+        parent = self._defaults["_pathfinder_node"].parent
+        while parent:
+            parent_ns = parent.value["parser"]._namespace
+
+            for pa, action in parent.value["parser"]._pa_actions:
+                action.required = False
+
+                if action.dest in parent_ns:
+                    del parent_ns.__dict__[action.dest]
+
+
+#                 action.default = argparse.SUPPRESS
+#                 action.dest = argparse.SUPPRESS
+
+#                 if namespace is not None:
+#                     pout.v(namespace)
+#                     if action.dest and action.dest in namespace:
+#                         # strip parent arguments from our namespace
+#                         delattr(namespace, action.dest)
+
+            parent = parent.parent
+
+
+
 
     def add_argument(self, *args, **kwargs):
         """Overrides parent to allow for environment names to be placed into
