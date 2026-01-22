@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import textwrap
 import sys
 import shlex
@@ -194,6 +193,7 @@ class FileScript(object):
 
         # reset any quiet flags
         QuietFilter.reset()
+
         return str(c).strip()
 
     def run_process(self, arg_str: str = "", **kwargs) -> str:

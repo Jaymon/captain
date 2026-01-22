@@ -211,15 +211,15 @@ class ArgumentParserTest(TestCase):
             self.assertEqual("error", cm.records[2].message)
             self.assertEqual("critical", cm.records[3].message)
 
-#     def xtest_quiet_logging(self):
+#     def xtest_quiet_default(self):
 #         s = FileScript([
 #             "import sys",
 #             "import logging",
 #             "logging.basicConfig(",
 #             "  format='[%(levelname)s] %(message)s',",
-#             "  level=logging.DEBUG,",
-#             "  stream=sys.stdout,",
+#             "  level=logging.DEBUG, stream=sys.stdout",
 #             ")",
+#             "logging.getLogger('datatypes').setLevel(logging.ERROR)",
 #             "logging.getLogger('asyncio').setLevel(logging.ERROR)",
 #             "logger = logging.getLogger(__name__)",
 #             "",
@@ -235,105 +235,7 @@ class ArgumentParserTest(TestCase):
 #             "        self.output.err('err')",
 #         ])
 # 
-#         r = s.run_process('--quiet=-C')
-#         self.assertRegex(r, r"^\[CRITICAL]\s+critical\s*$")
-# 
-#         r = s.run_process('--quiet=-I')
-#         self.assertEqual("[INFO] info\nout", r)
-# 
-#         r = s.run_process("-qqqqq")
-#         self.assertFalse("critical" in r)
-# 
-#         r = s.run_process("-qqqq")
-#         self.assertTrue("critical" in r)
-# 
-#         r = s.run_process("-qqq")
-#         self.assertTrue("error" in r)
-#         self.assertTrue("critical" in r)
-# 
-#         r = s.run_process("-qq")
-#         self.assertTrue("warning" in r)
-#         self.assertTrue("error" in r)
-#         self.assertTrue("critical" in r)
-# 
-#         r = s.run_process("-q")
-#         self.assertTrue("info" in r)
-#         self.assertTrue("warning" in r)
-#         self.assertTrue("error" in r)
-#         self.assertTrue("critical" in r)
-
-    def test_quiet_default(self):
-        s = FileScript([
-            "import sys",
-            "import logging",
-            "logging.basicConfig(",
-            "  format='[%(levelname)s] %(message)s',",
-            "  level=logging.DEBUG, stream=sys.stdout",
-            ")",
-            "logger = logging.getLogger(__name__)",
-            "",
-            "class Default(Command):",
-            "    def handle(self):",
-            "        logger.debug('debug')",
-            "        logger.info('info')",
-            "        logger.warning('warning')",
-            "        logger.error('error')",
-            "        logger.critical('critical')",
-            "        self.output.verbose('verbose')",
-            "        self.output.out('out')",
-            "        self.output.err('err')",
-        ])
-
-        r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="")
-        self.assertTrue("debug" in r)
-        self.assertTrue("info" in r)
-        self.assertTrue("warning" in r)
-        self.assertTrue("error" in r)
-        self.assertTrue("critical" in r)
-
-        # this won't call QuietAction.__call__()
-        r = s.run_process(CAPTAIN_QUIET_DEFAULT="D")
-        self.assertFalse("debug" in r)
-        self.assertFalse("verbose" in r)
-
-        r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="D")
-        self.assertTrue("debug" in r)
-        self.assertTrue("verbose" in r)
-
-        r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="DI")
-        self.assertTrue("debug" in r)
-        self.assertFalse("info" in r)
-        self.assertFalse("out" in r)
-
-#     async def test_quiet_default(self):
-#         s = FileScript([
-#             "import sys",
-#             "import logging",
-#             "logging.basicConfig(",
-#             "  format='[%(levelname)s] %(message)s',",
-#             "  level=logging.DEBUG, stream=sys.stdout",
-#             ")",
-#             "logger = logging.getLogger(__name__)",
-#             "logger.setLevel(logging.DEBUG)",
-#             "logger.addHandler(logging.StreamHandler(sys.stdout))",
-#             "",
-#             "class Default(Command):",
-#             "    def handle(self):",
-#             "        logger.debug('debug')",
-#             "        logger.info('info')",
-#             "        logger.warning('warning')",
-#             "        logger.error('error')",
-#             "        logger.critical('critical')",
-#             "        self.output.verbose('verbose')",
-#             "        self.output.out('out')",
-#             "        self.output.err('err')",
-#         ])
-# 
-#         with self.assertLogs() as cm:
-#             r = await s.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="")
-#             pout.v(cm)
-#             pout.v(r)
-#         return
+#         r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="")
 #         self.assertTrue("debug" in r)
 #         self.assertTrue("info" in r)
 #         self.assertTrue("warning" in r)
@@ -353,6 +255,51 @@ class ArgumentParserTest(TestCase):
 #         self.assertTrue("debug" in r)
 #         self.assertFalse("info" in r)
 #         self.assertFalse("out" in r)
+
+    async def test_quiet_default(self):
+        s = FileScript("""
+            import sys
+            import logging
+
+            logging.basicConfig(
+                format="[%(levelname)s] %(message)s",
+                level=logging.DEBUG,
+                stream=sys.stdout,
+            )
+            logger = logging.getLogger(__name__)
+
+            class Default(Command):
+                def handle(self):
+                    logger.debug("debug")
+                    logger.info("info")
+                    logger.warning("warning")
+                    logger.error("error")
+                    logger.critical("critical")
+                    self.output.verbose("verbose")
+                    self.output.out("out")
+                    self.output.err("err")
+        """)
+
+        r = await s.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="D")
+        self.assertTrue("debug" in r)
+        self.assertTrue("verbose" in r)
+
+        # this won't call QuietAction.__call__()
+        r = await s.run(CAPTAIN_QUIET_DEFAULT="D")
+        self.assertFalse("debug" in r)
+        self.assertFalse("verbose" in r)
+
+        r = await s.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="DI")
+        self.assertTrue("debug" in r)
+        self.assertFalse("info" in r)
+        self.assertFalse("out" in r)
+
+        r = await s.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="")
+        self.assertTrue("debug" in r)
+        self.assertTrue("info" in r)
+        self.assertTrue("warning" in r)
+        self.assertTrue("error" in r)
+        self.assertTrue("critical" in r)
 
     async def test_parse_handle_args(self):
         s = FileScript([

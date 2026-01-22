@@ -232,7 +232,7 @@ class OutputTest(TestCase):
             "bar": [5, 6, 7],
             "che": [8, 9, 10, 11, 12],
         }
-        with testdata.capture(loggers=False) as r1:
+        with testdata.capture() as r1:
             o.table(d)
 
         d = {
@@ -240,7 +240,7 @@ class OutputTest(TestCase):
             "bar": "[5, 6, 7]",
             "che": "[8, 9, 10, 11, 12]",
         }
-        with testdata.capture(loggers=False) as r2:
+        with testdata.capture() as r2:
             o.table(d)
 
         self.assertNotEqual(r1, r2)
