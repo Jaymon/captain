@@ -418,6 +418,14 @@ class ArgumentParser(argparse.ArgumentParser):
             going to be added to this parser
         """
         if self.command_class_added:
+            # restore original values that might've been changed
+            parent = self._defaults["_pathfinder_node"]
+            while parent:
+                for pa, action in parent.value["parser"]._pa_actions:
+                    action.required = action._original_required
+
+                parent = parent.parent
+
             return
 
         self.command_class_added = True
@@ -446,6 +454,10 @@ class ArgumentParser(argparse.ArgumentParser):
         # let's add variations, we don't do this earlier so we don't risk
         # overriding a valid user defined flag with our computed alternatives
         for pa, action in pa_actions:
+            # keep track of the original values since we can change values
+            # when subcommands are ran to make the subcommand work as expected
+            action._original_required = action.required
+
             # add the variations for this argument, this allows
             # --foo_bar to work for foo-bar but they won't appear
             # in the help output

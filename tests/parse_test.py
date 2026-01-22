@@ -10,11 +10,18 @@ from . import TestCase, FileScript
 
 
 class ArgumentParserTest(TestCase):
-    @classmethod
-    def tearDownClass(cls):
+    def tearDown(self):
+        super().tearDown()
+
         # after this class is done testing the quiet functionality reset
         # logging
         QuietFilter.reset()
+
+#     @classmethod
+#     def tearDownClass(cls):
+#         # after this class is done testing the quiet functionality reset
+#         # logging
+#         QuietFilter.reset()
 
     def test_quiet_parsing(self):
         p = FileScript().parser
@@ -139,7 +146,7 @@ class ArgumentParserTest(TestCase):
         self.assertRegex(r, r"--quiet\s+override\s+quiet")
         self.assertRegex(r, r"-Q\s+<QUIET")
 
-    def test_quiet_logging(self):
+    async def test_quiet_logging(self):
         s = FileScript([
             "import sys",
             "import logging",
@@ -148,6 +155,7 @@ class ArgumentParserTest(TestCase):
             "  level=logging.DEBUG,",
             "  stream=sys.stdout,",
             ")",
+            "logging.getLogger('datatypes').setLevel(logging.ERROR)",
             "logging.getLogger('asyncio').setLevel(logging.ERROR)",
             "logger = logging.getLogger(__name__)",
             "",
@@ -163,32 +171,96 @@ class ArgumentParserTest(TestCase):
             "        self.output.err('err')",
         ])
 
-        r = s.run_process('--quiet=-C')
-        self.assertRegex(r, r"^\[CRITICAL]\s+critical\s*$")
+        with self.assertLogs() as cm:
+            r = await s.run('--quiet=-I')
+            self.assertEqual(1, len(cm.records))
+            self.assertEqual("info", cm.records[0].message)
+            self.assertEqual("out", r)
 
-        r = s.run_process('--quiet=-I')
-        self.assertEqual("[INFO] info\nout", r)
+        with self.assertLogs() as cm:
+            r = await s.run('--quiet=-C')
+            self.assertEqual(1, len(cm.records))
+            self.assertEqual("critical", cm.records[0].message)
+            self.assertEqual("", r)
 
-        r = s.run_process("-qqqqq")
-        self.assertFalse("critical" in r)
+        with self.assertRaises(AssertionError):
+            with self.assertLogs() as cm:
+                r = await s.run("-qqqqq")
 
-        r = s.run_process("-qqqq")
-        self.assertTrue("critical" in r)
+        with self.assertLogs() as cm:
+            await s.run("-qqqq")
+            self.assertEqual(1, len(cm.records))
+            self.assertEqual("critical", cm.records[0].message)
 
-        r = s.run_process("-qqq")
-        self.assertTrue("error" in r)
-        self.assertTrue("critical" in r)
+        with self.assertLogs() as cm:
+            r = await s.run("-qqq")
+            self.assertEqual(2, len(cm.records))
+            self.assertEqual("error", cm.records[0].message)
+            self.assertEqual("critical", cm.records[1].message)
 
-        r = s.run_process("-qq")
-        self.assertTrue("warning" in r)
-        self.assertTrue("error" in r)
-        self.assertTrue("critical" in r)
+        with self.assertLogs() as cm:
+            r = await s.run("-qq")
+            self.assertEqual("warning", cm.records[0].message)
+            self.assertEqual("error", cm.records[1].message)
+            self.assertEqual("critical", cm.records[2].message)
 
-        r = s.run_process("-q")
-        self.assertTrue("info" in r)
-        self.assertTrue("warning" in r)
-        self.assertTrue("error" in r)
-        self.assertTrue("critical" in r)
+        with self.assertLogs() as cm:
+            r = await s.run("-q")
+            self.assertEqual("info", cm.records[0].message)
+            self.assertEqual("warning", cm.records[1].message)
+            self.assertEqual("error", cm.records[2].message)
+            self.assertEqual("critical", cm.records[3].message)
+
+#     def xtest_quiet_logging(self):
+#         s = FileScript([
+#             "import sys",
+#             "import logging",
+#             "logging.basicConfig(",
+#             "  format='[%(levelname)s] %(message)s',",
+#             "  level=logging.DEBUG,",
+#             "  stream=sys.stdout,",
+#             ")",
+#             "logging.getLogger('asyncio').setLevel(logging.ERROR)",
+#             "logger = logging.getLogger(__name__)",
+#             "",
+#             "class Default(Command):",
+#             "    def handle(self):",
+#             "        logger.debug('debug')",
+#             "        logger.info('info')",
+#             "        logger.warning('warning')",
+#             "        logger.error('error')",
+#             "        logger.critical('critical')",
+#             "        self.output.verbose('verbose')",
+#             "        self.output.out('out')",
+#             "        self.output.err('err')",
+#         ])
+# 
+#         r = s.run_process('--quiet=-C')
+#         self.assertRegex(r, r"^\[CRITICAL]\s+critical\s*$")
+# 
+#         r = s.run_process('--quiet=-I')
+#         self.assertEqual("[INFO] info\nout", r)
+# 
+#         r = s.run_process("-qqqqq")
+#         self.assertFalse("critical" in r)
+# 
+#         r = s.run_process("-qqqq")
+#         self.assertTrue("critical" in r)
+# 
+#         r = s.run_process("-qqq")
+#         self.assertTrue("error" in r)
+#         self.assertTrue("critical" in r)
+# 
+#         r = s.run_process("-qq")
+#         self.assertTrue("warning" in r)
+#         self.assertTrue("error" in r)
+#         self.assertTrue("critical" in r)
+# 
+#         r = s.run_process("-q")
+#         self.assertTrue("info" in r)
+#         self.assertTrue("warning" in r)
+#         self.assertTrue("error" in r)
+#         self.assertTrue("critical" in r)
 
     def test_quiet_default(self):
         s = FileScript([
@@ -232,6 +304,55 @@ class ArgumentParserTest(TestCase):
         self.assertTrue("debug" in r)
         self.assertFalse("info" in r)
         self.assertFalse("out" in r)
+
+#     async def test_quiet_default(self):
+#         s = FileScript([
+#             "import sys",
+#             "import logging",
+#             "logging.basicConfig(",
+#             "  format='[%(levelname)s] %(message)s',",
+#             "  level=logging.DEBUG, stream=sys.stdout",
+#             ")",
+#             "logger = logging.getLogger(__name__)",
+#             "logger.setLevel(logging.DEBUG)",
+#             "logger.addHandler(logging.StreamHandler(sys.stdout))",
+#             "",
+#             "class Default(Command):",
+#             "    def handle(self):",
+#             "        logger.debug('debug')",
+#             "        logger.info('info')",
+#             "        logger.warning('warning')",
+#             "        logger.error('error')",
+#             "        logger.critical('critical')",
+#             "        self.output.verbose('verbose')",
+#             "        self.output.out('out')",
+#             "        self.output.err('err')",
+#         ])
+# 
+#         with self.assertLogs() as cm:
+#             r = await s.run("--quiet=+D", CAPTAIN_QUIET_DEFAULT="")
+#             pout.v(cm)
+#             pout.v(r)
+#         return
+#         self.assertTrue("debug" in r)
+#         self.assertTrue("info" in r)
+#         self.assertTrue("warning" in r)
+#         self.assertTrue("error" in r)
+#         self.assertTrue("critical" in r)
+# 
+#         # this won't call QuietAction.__call__()
+#         r = s.run_process(CAPTAIN_QUIET_DEFAULT="D")
+#         self.assertFalse("debug" in r)
+#         self.assertFalse("verbose" in r)
+# 
+#         r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="D")
+#         self.assertTrue("debug" in r)
+#         self.assertTrue("verbose" in r)
+# 
+#         r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="DI")
+#         self.assertTrue("debug" in r)
+#         self.assertFalse("info" in r)
+#         self.assertFalse("out" in r)
 
     async def test_parse_handle_args(self):
         s = FileScript([
@@ -491,4 +612,67 @@ class ArgumentParserTest(TestCase):
 
         r = await s.run("--foo-bar")
         self.assertEqual("True", r)
+
+    async def test_required_flag_dest_different(self):
+        s = FileScript("""
+            class _Command(Command):
+                bar_flag = Argument("--bar", type=int, required=True)
+
+            class Foo(_Command):
+                def handle(self):
+                    self.out(self.bar_flag)
+        """)
+
+        r = await s.run("foo --bar=1")
+        self.assertEqual(1, int(r))
+
+    async def test_ignore_default_subcommand_args_3(self):
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, bar: str, /):
+                    pass
+
+            class Foo(Command):
+                def handle(self):
+                    pass
+        """)
+
+        p = s.parser
+
+        # this is built-in behavior, "parent" commands can't have positional
+        # arguments
+        with self.assertRaises(argparse.ArgumentError):
+            p.parse_args(["bar"])
+
+        r = p.parse_args(["foo"])
+        self.assertEqual(
+            "Foo",
+            r._pathfinder_node.value["command_class"].__name__,
+        )
+
+    async def test_original_values_reset(self):
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, *, che: str):
+                    self.out("default")
+
+            class Foo(Command):
+                def handle(self):
+                    self.out("foo")
+        """)
+
+        p = s.parser
+
+        r = p.parse_args(["foo"])
+        self.assertEqual(
+            "Foo",
+            r._pathfinder_node.value["command_class"].__name__,
+        )
+
+        # when a subcommand is ran, the original action values get changed,
+        # these need to be restored if a parent command is ran (eg, through
+        # `Command.call` or the like). This makes sure a required argument
+        # causes an error if the "parent" command is ran after a subcommand
+        with self.assertRaises(argparse.ArgumentError):
+            p.parse_args([])
 

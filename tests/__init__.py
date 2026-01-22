@@ -163,32 +163,37 @@ class FileScript(object):
         """
         argv = shlex.split(arg_str)
 
+        environ = {}
+        for k, v in kwargs.items():
+            if k.isupper():
+                environ[k] = v
+
         # we want this to act completely like it was called from the CLI
         # so we will set our module into __main__
         main_module = sys.modules.get("__main__", None)
 
-        with testdata.chdir(self.cwd):
-            with testdata.capture() as c:
-                try:
-                    sys.modules["__main__"] = self.path.get_module()
-                    await self.application.run(argv)
+        with testdata.environment(**environ):
+            with testdata.chdir(self.cwd):
+                with testdata.capture() as c:
+                    try:
+                        sys.modules["__main__"] = self.path.get_module()
+                        await self.application.run(argv)
 
-                except SystemExit as e:
-                    if e.code != 0:
-                        raise subprocess.CalledProcessError(
-                            e.code,
-                            argv
-                        ) from e
+                    except SystemExit as e:
+                        if e.code != 0:
+                            raise subprocess.CalledProcessError(
+                                e.code,
+                                argv
+                            ) from e
 
-                except Exception as e:
-                    raise subprocess.CalledProcessError(1, argv) from e
+                    except Exception as e:
+                        raise subprocess.CalledProcessError(1, argv) from e
 
         if main_module is not None:
             sys.modules["__main__"] = main_module
 
         # reset any quiet flags
         QuietFilter.reset()
-
         return str(c).strip()
 
     def run_process(self, arg_str: str = "", **kwargs) -> str:
