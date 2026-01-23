@@ -23,14 +23,6 @@ from .compat import *
 class ReflectCommand(ReflectClass):
     """Provides some handy helper introspection methods for dealing with the
     Command class"""
-#     def reflect_method(self, method_name):
-#         # WARN -- this method is out of date with handle_* subcommands
-#         if method_name.startswith("handle"):
-#             return ReflectMethod(self.get(method_name))
-# 
-#         else:
-#             return super().reflect_method(method_name)
-
     def get_class_arguments(self) -> Generator[list[tuple]]:
         """Returns all the defined class arguments that will become class
         properties when the command is ran
@@ -52,19 +44,6 @@ class ReflectCommand(ReflectClass):
 
         if method_name:
             yield from self.reflect_method(method_name).get_arguments()
-
-        # WARN -- this method is out of date with handle_* subcommands
-        #yield from self.reflect_method().get_arguments()
-
-#     def get_docblock(self):
-#         doc = ""
-#         if not self.get_target().is_private():
-#             rm = self.reflect_method()
-#             doc = rm.get_docblock()
-#             if not doc:
-#                 doc = super().get_docblock()
-# 
-#         return doc
 
 
 class ReflectParam(ReflectParam):

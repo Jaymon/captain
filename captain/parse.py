@@ -398,7 +398,6 @@ class ArgumentParser(argparse.ArgumentParser):
                 elif not keywords_name:
                     parsed_unknown = unknown.get_keyword_strings()
 
-
                 else:
                     parsed_unknown = []
 

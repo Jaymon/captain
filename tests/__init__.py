@@ -18,7 +18,6 @@ class FileScript(object):
         parser = self.application.parser
         parser.exit_on_error = False
         return parser
-        #return self.application.parser
 
     @property
     def application(self):

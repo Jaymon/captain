@@ -12,27 +12,6 @@ from . import TestCase, FileScript
 
 
 class ReflectCommandTest(TestCase):
-#     def test_desc_method(self):
-#         class Default(Command):
-#             def handle(self):
-#                 """the description on method doc"""
-#                 pass
-# 
-#         cbi = ReflectCommand(Default)
-#         self.assertEqual("the description on method doc", cbi.get_docblock())
-# 
-#         class Default(Command):
-#             # the description on method comment
-#             # and the second line
-#             def handle(self):
-#                 pass
-# 
-#         cbi = ReflectCommand(Default)
-#         self.assertEqual(
-#             "the description on method comment\nand the second line",
-#             cbi.get_docblock()
-#         )
-
     def test_desc_class(self):
         class Default(Command):
             """the description on class doc"""

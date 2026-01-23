@@ -13,15 +13,8 @@ class ArgumentParserTest(TestCase):
     def tearDown(self):
         super().tearDown()
 
-        # after this class is done testing the quiet functionality reset
-        # logging
+        # after each test reset logging
         QuietFilter.reset()
-
-#     @classmethod
-#     def tearDownClass(cls):
-#         # after this class is done testing the quiet functionality reset
-#         # logging
-#         QuietFilter.reset()
 
     def test_quiet_parsing(self):
         p = FileScript().parser
@@ -210,51 +203,6 @@ class ArgumentParserTest(TestCase):
             self.assertEqual("warning", cm.records[1].message)
             self.assertEqual("error", cm.records[2].message)
             self.assertEqual("critical", cm.records[3].message)
-
-#     def xtest_quiet_default(self):
-#         s = FileScript([
-#             "import sys",
-#             "import logging",
-#             "logging.basicConfig(",
-#             "  format='[%(levelname)s] %(message)s',",
-#             "  level=logging.DEBUG, stream=sys.stdout",
-#             ")",
-#             "logging.getLogger('datatypes').setLevel(logging.ERROR)",
-#             "logging.getLogger('asyncio').setLevel(logging.ERROR)",
-#             "logger = logging.getLogger(__name__)",
-#             "",
-#             "class Default(Command):",
-#             "    def handle(self):",
-#             "        logger.debug('debug')",
-#             "        logger.info('info')",
-#             "        logger.warning('warning')",
-#             "        logger.error('error')",
-#             "        logger.critical('critical')",
-#             "        self.output.verbose('verbose')",
-#             "        self.output.out('out')",
-#             "        self.output.err('err')",
-#         ])
-# 
-#         r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="")
-#         self.assertTrue("debug" in r)
-#         self.assertTrue("info" in r)
-#         self.assertTrue("warning" in r)
-#         self.assertTrue("error" in r)
-#         self.assertTrue("critical" in r)
-# 
-#         # this won't call QuietAction.__call__()
-#         r = s.run_process(CAPTAIN_QUIET_DEFAULT="D")
-#         self.assertFalse("debug" in r)
-#         self.assertFalse("verbose" in r)
-# 
-#         r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="D")
-#         self.assertTrue("debug" in r)
-#         self.assertTrue("verbose" in r)
-# 
-#         r = s.run_process("--quiet=+D", CAPTAIN_QUIET_DEFAULT="DI")
-#         self.assertTrue("debug" in r)
-#         self.assertFalse("info" in r)
-#         self.assertFalse("out" in r)
 
     async def test_quiet_default(self):
         s = FileScript("""
