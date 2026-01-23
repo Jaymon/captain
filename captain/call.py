@@ -158,29 +158,6 @@ class Command(object):
 
         return [], parsed_kwargs
 
-#         args = []
-#         kwargs = {}
-# 
-#         method = self._get_handler_method()
-#         rm = ReflectMethod(method, target_class=self)
-#         #rm = self.reflect().reflect_method()
-#         parsed_kwargs = {}
-# 
-#         for k, v in parsed._get_kwargs():
-#             # we filter out private (starts with _) and placeholder
-#             # (surrounded by <>) keys
-#             if not k.startswith("_") and not k.startswith("<"):
-#                 parsed_kwargs[k] = v
-# 
-#         for ra in rm.reflect_arguments(**parsed_kwargs):
-#             if ra.is_positional():
-#                 args.extend(ra.get_positional_values())
-# 
-#             elif ra.is_keyword():
-#                 kwargs.update(ra.get_keyword_values())
-# 
-#         return args, kwargs
-
     async def get_method_params(
         self,
         method: Callable,
@@ -219,17 +196,6 @@ class Command(object):
                 mkwargs.update(ra.get_keyword_values())
 
         return margs, mkwargs
-
-        # set instance properties that have been passed in
-#         rc = self.reflect()
-#         for pas in rc.get_class_arguments():
-#             for pa in pas:
-#                 # any class properties should be set to None on this instance
-#                 # since they don't exist and we don't want any instance methods
-#                 # messing with the actual Argument instance
-#                 setattr(self, pa.name, kwargs.pop(pa.name, None))
-# 
-#         return args, kwargs
 
     async def handle(self, *args, **kwargs) -> int|None:
         self.parser.print_help()

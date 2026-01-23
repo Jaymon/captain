@@ -23,13 +23,13 @@ from .compat import *
 class ReflectCommand(ReflectClass):
     """Provides some handy helper introspection methods for dealing with the
     Command class"""
-    def reflect_method(self, method_name="handle"):
-        # WARN -- this method is out of date with handle_* subcommands
-        if method_name == "handle":
-            return ReflectMethod(self.get(method_name))
-
-        else:
-            return super().reflect_method(method_name)
+#     def reflect_method(self, method_name):
+#         # WARN -- this method is out of date with handle_* subcommands
+#         if method_name.startswith("handle"):
+#             return ReflectMethod(self.get(method_name))
+# 
+#         else:
+#             return super().reflect_method(method_name)
 
     def get_class_arguments(self) -> Generator[list[tuple]]:
         """Returns all the defined class arguments that will become class
@@ -47,20 +47,24 @@ class ReflectCommand(ReflectClass):
         for k, v in arg_iter:
             yield [v]
 
-    def get_arguments(self) -> Generator[list[tuple]]:
+    def get_arguments(self, method_name: str = "") -> Generator[list[tuple]]:
         yield from self.get_class_arguments()
+
+        if method_name:
+            yield from self.reflect_method(method_name).get_arguments()
+
         # WARN -- this method is out of date with handle_* subcommands
-        yield from self.reflect_method().get_arguments()
+        #yield from self.reflect_method().get_arguments()
 
-    def get_docblock(self):
-        doc = ""
-        if not self.get_target().is_private():
-            rm = self.reflect_method()
-            doc = rm.get_docblock()
-            if not doc:
-                doc = super().get_docblock()
-
-        return doc
+#     def get_docblock(self):
+#         doc = ""
+#         if not self.get_target().is_private():
+#             rm = self.reflect_method()
+#             doc = rm.get_docblock()
+#             if not doc:
+#                 doc = super().get_docblock()
+# 
+#         return doc
 
 
 class ReflectParam(ReflectParam):
@@ -405,6 +409,7 @@ class Pathfinder(MethodpathFinder):
             "aliases": set(),
             "description": "",
             "version": "",
+            "method_name": "handle",
         }
 
     def _get_node_module_info(self, key, **kwargs):
@@ -431,7 +436,13 @@ class Pathfinder(MethodpathFinder):
 
             rc = kwargs["class"].reflect()
             value["aliases"] = value["class"].get_aliases()
-            value["description"] = rc.get_docblock()
+
+            if desc := rc.get_docblock():
+                value["description"] = desc
+            else:
+                rm = rc.reflect_method(value["method_name"])
+                value["description"] = rm.get_docblock()
+
             value["version"] = value["class"].version
             value["command_class"] = value["class"]
 
@@ -458,8 +469,8 @@ class Pathfinder(MethodpathFinder):
         create a node in the tree"""
         if key.startswith("handle_") and key != "handle_error":
             parts = key.split("_", 1)
-            nc = NamingConvention(parts[1])
 
+            nc = NamingConvention(parts[1])
             key, value = super()._get_node_method_info(
                 nc.kebabcase(),
                 **kwargs

@@ -10,6 +10,7 @@ from datatypes import (
     ArgvParser as UnknownParser,
     NamingConvention,
     NormalizeMixin,
+    MethodpathFinder,
 )
 
 from .compat import *
@@ -362,14 +363,14 @@ class ArgumentParser(argparse.ArgumentParser):
         return arg_strings
 
     def parse_known_args(self, args=None, namespace=None):
-        node_value = self._defaults["_pathfinder_node"].value
-        command_class = node_value["command_class"]
-        self._add_command_arguments(command_class)
+        node = self._defaults["_pathfinder_node"]
+        self._add_command_arguments(node)
 
         parsed, parsed_unknown = super().parse_known_args(args, namespace)
 
         if parsed_unknown:
-            rm = command_class.reflect().reflect_method()
+            rc = node.value["command_class"].reflect()
+            rm = rc.reflect_method(node.value["method_name"])
 
             unknown = UnknownParser(
                 parsed_unknown,
@@ -401,10 +402,9 @@ class ArgumentParser(argparse.ArgumentParser):
                 else:
                     parsed_unknown = []
 
-        #pout.v(parsed._pathfinder_node.value, parsed_unknown)
         return parsed, parsed_unknown
 
-    def _add_command_arguments(self, command_class):
+    def _add_command_arguments(self, node: MethodpathFinder):
         """All the defined Command arguments will be added through this
         method, this is automatically called when .parse_known_args is called
 
@@ -413,13 +413,10 @@ class ArgumentParser(argparse.ArgumentParser):
         because that would be a lot of work if you have a lot of parsers, so
         it is done at the last possible moment when the correct (sub)parser
         has been chosen but before it parses the argument strings
-
-        :param command_class: Command, this is the Command subclass that is
-            going to be added to this parser
         """
         if self.command_class_added:
             # restore original values that might've been changed
-            parent = self._defaults["_pathfinder_node"]
+            parent = node
             while parent:
                 for pa, action in parent.value["parser"]._pa_actions:
                     action.required = action._original_required
@@ -431,10 +428,10 @@ class ArgumentParser(argparse.ArgumentParser):
         self.command_class_added = True
         pa_actions = []
 
-        rc = command_class.reflect()
+        rc = node.value["command_class"].reflect()
 
         # add class properties
-        for pas in rc.get_arguments():
+        for pas in rc.get_arguments(node.value["method_name"]):
             if len(pas) > 1:
                 group = self.add_mutually_exclusive_group(
                     required=("default" not in pas[0][1]),
@@ -482,7 +479,7 @@ class ArgumentParser(argparse.ArgumentParser):
         # something is wrong. That means that a subcommand "inherits" its
         # "parent" command's arguments even though it doesn't know anything
         # about them
-        parent = self._defaults["_pathfinder_node"].parent
+        parent = node.parent
         while parent:
             parent_ns = parent.value["parser"]._namespace
 
@@ -492,20 +489,7 @@ class ArgumentParser(argparse.ArgumentParser):
                 if action.dest in parent_ns:
                     del parent_ns.__dict__[action.dest]
 
-
-#                 action.default = argparse.SUPPRESS
-#                 action.dest = argparse.SUPPRESS
-
-#                 if namespace is not None:
-#                     pout.v(namespace)
-#                     if action.dest and action.dest in namespace:
-#                         # strip parent arguments from our namespace
-#                         delattr(namespace, action.dest)
-
             parent = parent.parent
-
-
-
 
     def add_argument(self, *args, **kwargs):
         """Overrides parent to allow for environment names to be placed into
