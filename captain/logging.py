@@ -4,27 +4,26 @@ from datatypes.logging import *
 
 
 # configure our special loggers
-log_formatter = Formatter('%(message)s')
-modname = __name__.split(".")[0]
+#modname = __name__.split(".")[0]
 
 
-stderr = getLogger('stderr.{}'.format(modname))
+stderr = getLogger(f"{__name__}.stderr")
 if len(stderr.handlers) == 0:
     stderr.propagate = False
     stderr.setLevel(DEBUG)
     errlh = StreamHandler(stream=sys.stderr)
     errlh.terminator = ""
-    errlh.setFormatter(log_formatter)
+    errlh.setFormatter(Formatter(MSG_FORMAT))
     stderr.addHandler(errlh)
 
 
-stdout = getLogger('stdout.{}'.format(modname))
+stdout = getLogger(f"{__name__}.stdout")
 if len(stdout.handlers) == 0:
     stdout.propagate = False
     stdout.setLevel(DEBUG)
     outlh = StreamHandler(stream=sys.stdout)
     outlh.terminator = ""
-    outlh.setFormatter(log_formatter)
+    outlh.setFormatter(Formatter(MSG_FORMAT))
     stdout.addHandler(outlh)
 
 
