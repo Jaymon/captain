@@ -76,14 +76,10 @@ class ReflectMethod(ReflectCallable):
             nc = NamingConvention(name)
 
             if param.kind is param.POSITIONAL_OR_KEYWORD:
-                #pos_flags = rp.get_positional_argument_flags()
-                #pos_flags["nargs"] = "?"
                 pa = [
                     Argument(
                         name,
-                        #nargs="?",
                         **rp.get_positional_argument_flags(),
-                        #**pos_flags,
                     ),
                     Argument(
                         nc.cli_keyword(),
@@ -96,7 +92,6 @@ class ReflectMethod(ReflectCallable):
             elif param.kind is param.POSITIONAL_ONLY:
                 pa = [
                     Argument(
-                        #nc.cli_positional(),
                         name,
                         help=param_descs.get(name, ""),
                         **rp.get_positional_argument_flags(),
@@ -265,7 +260,6 @@ class Argument(tuple):
     def __new__(cls, *names, **kwargs):
         instance = super().__new__(cls, [list(names), kwargs])
         instance._resolve()
-        #pout.v(instance)
         return instance
 
     def __set_name__(self, command_class, name):
@@ -335,16 +329,6 @@ class Argument(tuple):
         for k in ["aliases", "names"]:
             if vs := self[1].pop(k, []):
                 self[0].extend(vs)
-
-#         if self.is_positional():
-#             if "nargs" not in self[1]:
-#                 if rt := self.reflect_type():
-#                     if rt.is_listish():
-#                         self[1]["nargs"] = "+" if self.is_required() else "*"
-# 
-#                     else:
-#                         if not self.is_required():
-#                             self[1]["nargs"] = "?"
 
     def is_positional(self):
         return self[0] and not self.is_keyword()

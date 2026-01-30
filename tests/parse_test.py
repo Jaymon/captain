@@ -604,7 +604,8 @@ class ArgumentParserTest(TestCase):
         self.assertEqual(2, len(r.args))
 
     async def test_nargs_list_3(self):
-        """A `list` annotation on a postional is equivalent to `nargs="+"`"""
+        """A `list` annotation on an optional postional is equivalent to
+        `nargs="*"`"""
         s = FileScript("""
             class Default(Command):
                 def handle(self, args: list[str]|None = None, /):
@@ -619,7 +620,4 @@ class ArgumentParserTest(TestCase):
 
         r = p.parse_args([])
         self.assertEqual([], r.args)
-
-
-
 
