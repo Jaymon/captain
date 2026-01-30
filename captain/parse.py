@@ -429,7 +429,7 @@ class ArgumentParser(argparse.ArgumentParser):
 
         rc = node.value["command_class"].reflect()
 
-        # add class properties
+        # add class properties and method arguments
         for pas in rc.get_arguments(node.value["method_name"]):
             if len(pas) > 1:
                 group = self.add_mutually_exclusive_group(

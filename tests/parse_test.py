@@ -571,3 +571,55 @@ class ArgumentParserTest(TestCase):
         with self.assertRaises(argparse.ArgumentError):
             p.parse_args([])
 
+    async def test_nargs_list_1(self):
+        """The positionals name is equivalent to `nargs="*"`"""
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, *args):
+                    pass
+        """)
+
+        p = s.parser
+
+        r = p.parse_args([])
+        self.assertFalse("args" in r)
+
+        r = p.parse_args(["1", "2"])
+        self.assertEqual(2, len(r.args))
+
+    async def test_nargs_list_2(self):
+        """A `list` annotation on a postional is equivalent to `nargs="+"`"""
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, args: list[str], /):
+                    pass
+        """)
+
+        p = s.parser
+
+        with self.assertRaises(argparse.ArgumentError):
+            p.parse_args([])
+
+        r = p.parse_args(["1", "2"])
+        self.assertEqual(2, len(r.args))
+
+    async def test_nargs_list_3(self):
+        """A `list` annotation on a postional is equivalent to `nargs="+"`"""
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, args: list[str]|None = None, /):
+                    pass
+        """)
+
+        p = s.parser
+
+        r = p.parse_args(["1", "2"])
+        self.assertEqual(2, len(r.args))
+
+
+        r = p.parse_args([])
+        self.assertEqual([], r.args)
+
+
+
+

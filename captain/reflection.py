@@ -46,72 +46,6 @@ class ReflectCommand(ReflectClass):
             yield from self.reflect_method(method_name).get_arguments()
 
 
-class ReflectParam(ReflectParam):
-    def _get_argument_flags(self) -> Mapping:
-        """Get the common argparse argument flags that are the same between
-        positional and keyword argparse arguments"""
-        flags = {"aliases": []}
-
-        rt = None
-        param = self.get_target()
-
-        if param.default is not param.empty:
-            flags["default"] = param.default
-
-        if param.annotation is param.empty:
-            if "default" in flags:
-                rt = self.create_reflect_type(type(flags["default"]))
-
-        else:
-            rt = self.create_reflect_type(param.annotation)
-
-        if rt:
-            flags["type"] = rt.get_origin_type()
-
-            if not rt.is_castable():
-                flags.pop("type")
-
-            if rt.is_literal():
-                flags.pop("type", None)
-                flags["choices"] = set(rt.get_args())
-
-            for metadata in rt.get_metadata():
-                if isinstance(metadata, Mapping):
-                    flags.update(metadata)
-
-                else:
-                    flags["aliases"].append(metadata)
-
-        return flags
-
-    def get_positional_argument_flags(self) -> Mapping:
-        """Get argparse positional flags"""
-        flags = self._get_argument_flags()
-        flags.pop("aliases", None)
-        return flags
-
-    def get_keyword_argument_flags(self) -> Mapping:
-        """Get argparse keyword flags"""
-        flags = self._get_argument_flags()
-
-        if "default" not in flags:
-            # mutual exclusive values can't be required, if it can be passed
-            # in as either a positional or keyword it can't be required
-            flags["required"] = not self.is_param()
-
-        if "type" in flags:
-            rt = self.create_reflect_type(flags["type"])
-            if rt.is_bool():
-                # https://docs.python.org/3/library/argparse.html#action
-                if not flags.pop("default", False):
-                    flags["action"] = "store_true"
-
-                else:
-                    flags["action"] = "store_false"
-
-        return flags
-
-
 class ReflectMethod(ReflectCallable):
     def _get_decorator_args(self):
         """Iterate through all the @arg decorator calls
@@ -142,11 +76,14 @@ class ReflectMethod(ReflectCallable):
             nc = NamingConvention(name)
 
             if param.kind is param.POSITIONAL_OR_KEYWORD:
+                #pos_flags = rp.get_positional_argument_flags()
+                #pos_flags["nargs"] = "?"
                 pa = [
                     Argument(
                         name,
-                        nargs="?",
+                        #nargs="?",
                         **rp.get_positional_argument_flags(),
+                        #**pos_flags,
                     ),
                     Argument(
                         nc.cli_keyword(),
@@ -208,6 +145,104 @@ class ReflectMethod(ReflectCallable):
         yield from pas.values()
 
 
+class ReflectParam(ReflectParam):
+    def _get_argument_flags(self) -> Mapping:
+        """Get the common argparse argument flags that are the same between
+        positional and keyword argparse arguments
+
+        .. note:: `required` isn't a valid positional flag
+        """
+        flags = {"aliases": []}
+
+        rt = None
+        param = self.get_target()
+
+        if param.default is not param.empty:
+            flags["default"] = param.default
+
+        if param.annotation is param.empty:
+            if "default" in flags:
+                rt = self.create_reflect_type(type(flags["default"]))
+
+        else:
+            rt = self.create_reflect_type(param.annotation)
+
+        if rt:
+            flags["type"] = rt.get_origin_type()
+
+            if not rt.is_castable():
+                flags.pop("type")
+
+            if rt.is_literal():
+                flags.pop("type", None)
+                flags["choices"] = set(rt.get_args())
+
+            elif rt.is_listish():
+                vtypes = []
+                if rt.is_union():
+                    for srt in rt.reflect_value_types():
+                        vtypes.extend(srt.reflect_value_types())
+
+                else:
+                    vtypes.extend(rt.reflect_value_types())
+
+                if len(vtypes) == 1:
+                    flags["type"] = vtypes[0].get_origin_type()
+
+                else:
+                    flags.pop("type", None)
+
+                if "default" in flags:
+                    flags["nargs"] = "*"
+
+                else:
+                    flags["nargs"] = "+"
+
+            for metadata in rt.get_metadata():
+                if isinstance(metadata, Mapping):
+                    flags.update(metadata)
+
+                else:
+                    flags["aliases"].append(metadata)
+
+        if "nargs" not in flags:
+            # mutual exclusive values can't be required, if it can be passed in
+            # as either a positional or keyword it can't be required
+            if ("default" in flags) or self.is_param():
+                flags["nargs"] = "?"
+
+        return flags
+
+    def get_positional_argument_flags(self, **kwargs) -> Mapping:
+        """Get argparse positional flags"""
+        flags = self._get_argument_flags()
+        flags.pop("aliases", None)
+        flags.update(kwargs)
+        return flags
+
+    def get_keyword_argument_flags(self, **kwargs) -> Mapping:
+        """Get argparse keyword flags"""
+        flags = self._get_argument_flags()
+
+        if "default" not in flags:
+            # mutual exclusive values can't be required, if it can be passed
+            # in as either a positional or keyword it can't be required
+            flags["required"] = not self.is_param()
+
+        if "type" in flags:
+            rt = self.create_reflect_type(flags["type"])
+            if rt.is_bool():
+                # https://docs.python.org/3/library/argparse.html#action
+                if not flags.pop("default", False):
+                    flags["action"] = "store_true"
+
+                else:
+                    flags["action"] = "store_false"
+
+        flags.update(kwargs)
+        return flags
+
+
 class Argument(tuple):
     """This class gets all the *args and **kwargs together to be passed to an
     argparse.ArgumentParser.add_argument() call, this combines the signature
@@ -230,6 +265,7 @@ class Argument(tuple):
     def __new__(cls, *names, **kwargs):
         instance = super().__new__(cls, [list(names), kwargs])
         instance._resolve()
+        #pout.v(instance)
         return instance
 
     def __set_name__(self, command_class, name):
@@ -287,8 +323,10 @@ class Argument(tuple):
 
         action = self[1].get("action")
         if action in ["store_true", "store_false"]:
+            # remove flags that are incompatible with store actions
             self[1].pop("metavar", None)
             self[1].pop("type", None)
+            self[1].pop("nargs", None)
 
         for k in ["alias", "name"]:
             if v := self[1].pop(k, ""):
@@ -298,14 +336,15 @@ class Argument(tuple):
             if vs := self[1].pop(k, []):
                 self[0].extend(vs)
 
-        if self.is_positional():
-            if rt := self.reflect_type():
-                if not rt.is_listish():
-                    if not self.is_required():
-                        self[1]["nargs"] = "?"
-
-                else:
-                    self[1]["nargs"] = "+" if self.is_required() else "*"
+#         if self.is_positional():
+#             if "nargs" not in self[1]:
+#                 if rt := self.reflect_type():
+#                     if rt.is_listish():
+#                         self[1]["nargs"] = "+" if self.is_required() else "*"
+# 
+#                     else:
+#                         if not self.is_required():
+#                             self[1]["nargs"] = "?"
 
     def is_positional(self):
         return self[0] and not self.is_keyword()
@@ -458,7 +497,8 @@ class Pathfinder(MethodpathFinder):
             value["aliases"] = nc.variations()
 
             rc = ReflectCallable(value["method"])
-            value["description"] = rc.get_docblock()
+            if rdb := rc.reflect_docblock():
+                value["description"] = rdb.get_description()
 
             value["command_class"] = value["class"]
             value["version"] = value["class"].version
