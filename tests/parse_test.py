@@ -621,3 +621,20 @@ class ArgumentParserTest(TestCase):
         r = p.parse_args([])
         self.assertEqual([], r.args)
 
+    async def test_keyword_list_1(self):
+        """Keywords with a list annotation are equivalent to `action="append"`
+        """
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, *, foos: list[str]):
+                    pass
+        """)
+
+        p = s.parser
+
+        r = p.parse_args(["--foo", "1", "--foo=2"])
+        self.assertEqual(2, len(r.foos))
+
+        with self.assertRaises(argparse.ArgumentError):
+            p.parse_args([])
+

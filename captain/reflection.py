@@ -234,6 +234,12 @@ class ReflectParam(ReflectParam):
                 else:
                     flags["action"] = "store_false"
 
+        # positional sets certain values of nargs when the type is listish,
+        # this changes those values to actions
+        if nargs := flags.pop("nargs", None):
+            if nargs == "*" or nargs == "+":
+                flags.setdefault("action", "append")
+
         flags.update(kwargs)
         return flags
 
@@ -260,6 +266,7 @@ class Argument(tuple):
     def __new__(cls, *names, **kwargs):
         instance = super().__new__(cls, [list(names), kwargs])
         instance._resolve()
+        #pout.v(instance, names, kwargs)
         return instance
 
     def __set_name__(self, command_class, name):
