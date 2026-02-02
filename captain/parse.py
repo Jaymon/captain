@@ -382,11 +382,15 @@ class ArgumentParser(argparse.ArgumentParser):
 
             if positionals_name or keywords_name:
                 if positionals_name:
-                    setattr(
-                        parsed,
-                        positionals_name,
-                        unknown.positionals(),
-                    )
+                    positionals = getattr(parsed, positionals_name, []) or []
+                    positionals.extend(unknown.positionals())
+                    setattr(parsed, positionals_name, positionals)
+
+#                     setattr(
+#                         parsed,
+#                         positionals_name,
+#                         unknown.positionals(),
+#                     )
 
                 if keywords_name:
                     for k, v in unknown.unwrap_keywords().items():

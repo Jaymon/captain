@@ -186,7 +186,6 @@ class Command(object):
                 # messing with the actual Argument instance
                 setattr(self, pa.name, kwargs.pop(pa.name, None))
 
-
         rm = ReflectMethod(method, target_class=self)
         for ra in rm.reflect_arguments(*args, **kwargs):
             if ra.is_positional():
@@ -197,7 +196,7 @@ class Command(object):
 
         return margs, mkwargs
 
-    async def handle(self, *args, **kwargs) -> int|None:
+    async def handle(self) -> int|None:
         self.parser.print_help()
 
     async def handle_error(self, e) -> int|None:

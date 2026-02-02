@@ -437,7 +437,7 @@ class ArgumentParserTest(TestCase):
                     pass
         """)
 
-        r = await s.run("--foo 1 --bar 2 3 4")
+        r = await s.run("--foo=1 --bar=2 3 4")
         self.assertTrue("('3', '4')" in r)
         self.assertTrue("{'foo': '1', 'bar': '2'}" in r)
 
@@ -582,7 +582,7 @@ class ArgumentParserTest(TestCase):
         p = s.parser
 
         r = p.parse_args([])
-        self.assertFalse("args" in r)
+        self.assertFalse(r.args)
 
         r = p.parse_args(["1", "2"])
         self.assertEqual(2, len(r.args))
@@ -620,6 +620,22 @@ class ArgumentParserTest(TestCase):
 
         r = p.parse_args([])
         self.assertEqual([], r.args)
+
+    async def test_nargs_list_4(self):
+        """The positionals name can have a type"""
+        s = FileScript("""
+            class Default(Command):
+                def handle(self, *args: int):
+                    pass
+        """)
+
+        p = s.parser
+
+        r = p.parse_args([])
+        self.assertFalse(r.args)
+
+        r = p.parse_args(["1", "2"])
+        self.assertEqual([1, 2], r.args)
 
     async def test_keyword_list_1(self):
         """Keywords with a list annotation are equivalent to `action="append"`

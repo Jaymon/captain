@@ -109,7 +109,13 @@ class ReflectMethod(ReflectCallable):
                 ]
 
             elif param.kind is param.VAR_POSITIONAL:
-                pass
+                pa = [
+                    Argument(
+                        name,
+                        help=param_descs.get(name, ""),
+                        **rp.get_positional_argument_flags(nargs="*"),
+                    ),
+                ]
 
             elif param.kind is param.VAR_KEYWORD:
                 pass

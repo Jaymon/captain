@@ -110,7 +110,6 @@ class ApplicationTest(TestCase):
         a = Application(command_prefixes=[p])
 
         parsed = a.parser.parse_args(["foo", "--one=1", "--two=2"])
-
         self.assertEqual(["foo"], parsed.args)
         self.assertEqual("1", parsed.one)
         self.assertEqual("2", parsed.two)
