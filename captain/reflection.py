@@ -95,7 +95,7 @@ class ReflectMethod(ReflectCallable):
                         name,
                         help=param_descs.get(name, ""),
                         **rp.get_positional_argument_flags(),
-                    )
+                    ),
                 ]
 
             elif param.kind is param.KEYWORD_ONLY:
@@ -105,7 +105,7 @@ class ReflectMethod(ReflectCallable):
                         dest=name,
                         help=param_descs.get(name, ""),
                         **rp.get_keyword_argument_flags(),
-                    )
+                    ),
                 ]
 
             elif param.kind is param.VAR_POSITIONAL:
@@ -172,7 +172,7 @@ class ReflectParam(ReflectParam):
                 flags.pop("type", None)
                 flags["choices"] = set(rt.get_args())
 
-            elif rt.is_listish():
+            elif rt.is_listish() or rt.is_setish():
                 vtypes = []
                 if rt.is_union():
                     for srt in rt.reflect_value_types():

@@ -365,3 +365,10 @@ class OutputTest(TestCase):
         o = Output()
         o("this is just a test {}", "foo")
 
+    def test_spinner(self):
+        o = Output()
+        o.out("before")
+        with o.spinner("foo bar che"):
+            pass
+        o.out("after")
+

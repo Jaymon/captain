@@ -5,6 +5,8 @@ from contextlib import contextmanager
 from collections import Counter
 import time
 import io
+import threading
+import itertools
 
 from datatypes import cball
 
@@ -25,7 +27,7 @@ class Input(io.IOBase):
     def polar(self, question):
         """Ask a yes/no question
 
-        :Example:
+        :example:
             def handle(self):
                 answer = self.input.polar("Are you interested?")
 
@@ -38,7 +40,7 @@ class Input(io.IOBase):
             question,
             choices={
                 "y": ["yes", "y", "ye", "yeah", "yup"],
-                "n": ["no", "n", "nah"]
+                "n": ["no", "n", "nah", "nope", "not"],
             },
             type=lambda v: v.strip().lower()
         )
@@ -123,11 +125,11 @@ class Input(io.IOBase):
 
 
 class Output(io.IOBase):
-    """An instance of this class will be available in a handle() method using
-    self.output, it contains handy outputting format methods
+    """An instance of this class will be available in a `Command.handle`
+    method using `self.output`, it contains handy outputting format methods
 
-    This is handy for captain scripts to be able to route their prints through
-    and it will obey the passed in --quiet commmand line argument
+    This is handy for captain scripts to be able to route their output
+    through and it will obey the passed in --quiet commmand line argument
     automatically"""
     def __init__(self, stdout=None, stderr=None, **kwargs):
         self.stdout = stdout or logging.stdout
@@ -183,7 +185,8 @@ class Output(io.IOBase):
 
     def wrap(self, value, prefix="\"", postfix=""):
         """Wrap value in prefix and postfix, if postfix is not defined it will
-        default to prefix
+        usually default to prefix unless it has a well known postfix (eg, `(`
+        prefix will default to `)` postfix)
 
         :param value: str, the value to wrap
         :param prefix: str, defaults to double-quote
@@ -244,11 +247,54 @@ class Output(io.IOBase):
         kwargs["progress_class"] = ProgressBar
         return self.progress(length, **kwargs)
 
+    @contextmanager
+    def spinner(
+        self,
+        label: str = "",
+        interval: float = 0.25,
+    ) -> threading.Event:
+        """Print `label` with a spinner in front of it that spins every
+        `interval`
+
+        :param label: the text for the spinner
+        :param interval: the spin rate
+        """
+        it = itertools.cycle(["-", "\\", "|", "/"])
+
+        if label:
+            label = " " + label
+
+        def target(event, label, it):
+            while not event.is_set():
+                ch = next(it)
+
+                self.out(
+                    ch + label + (chr(8) * (len(ch) + len(label) + 1)),
+                    suffix="",
+                )
+
+                if event.wait(timeout=interval):
+                    break
+
+        event = threading.Event()
+        th = threading.Thread(
+            target=target,
+            daemon=True,
+            args=[event, label, it],
+        )
+        th.start()
+
+        yield event
+
+        event.set()
+
+        self.out(next(it) + label)
+
     def profile(self, format_msg="", *args, **kwargs):
         """context manager to print out how long it ran
 
-        :Example:
-            with echo.profile():
+        :example:
+            with self.profile():
                 # do stuff
 
         :param format_msg: string, the message you want to display with the elapsed time
@@ -427,9 +473,9 @@ class Output(io.IOBase):
     def pluralize(self, count, single, multiple="", format_str="{count} {desc}"):
         """Use the multiple value if count isn't 1, otherwise use single
 
-        :Example:
-            self.pluralize(1, "message", "messages") # 1 message
-            self.pluralize(10, "message", "messages") # 10 messages
+        :example:
+            Output().pluralize(1, "message", "messages") # 1 message
+            Output().pluralize(10, "message", "messages") # 10 messages
 
         https://github.com/Jaymon/captain/issues/71
 
@@ -507,7 +553,7 @@ class Output(io.IOBase):
         other packages that probably do this way better:
             https://stackoverflow.com/a/26937531/5006
 
-        :Example:
+        :example:
             >>> Output().table([(1, 2), (3, 4), (5, 6), (7, 8), (9, 0)])
             1  2
             3  4
