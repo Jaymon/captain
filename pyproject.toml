@@ -10,19 +10,21 @@ keywords = [
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3"
 ]
 dependencies = [
-  "datatypes"
+  "datatypes~=0.33.0"
 ]
 name = "captain"
 dynamic = [
   "version"
 ]
 readme = "README.md"
-license = { file = "LICENSE.txt" }
+license = "MIT"
+license-files = [
+  "LICENSE.txt"
+]
 
 [project.urls]
 Homepage = "http://github.com/jaymon/captain"
