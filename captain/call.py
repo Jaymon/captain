@@ -35,6 +35,17 @@ class Command(object):
     version = ""
     """Set this as the version for this command"""
 
+#     @classproperty
+#     def application(cls):
+#         # avoid circular import
+#         from .interface import Application
+# 
+#         return Application()
+        #return Application(*args, **kwargs)
+#         application = Application(*args, **kwargs)
+#         cls.application = application
+#         return application
+
     @classproperty
     def module(cls) -> ModuleType:
         """The module the child class is defined in"""
