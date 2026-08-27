@@ -9,7 +9,7 @@ from collections import defaultdict
 from datatypes import (
     ArgvParser as UnknownParser,
     NamingConvention,
-    NormalizeMixin,
+    NormalizeMappingMixin,
     MethodpathFinder,
 )
 
@@ -201,7 +201,7 @@ class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         return lines
 
 
-class _SubParsersChoices(NormalizeMixin, dict):
+class _SubParsersChoices(NormalizeMappingMixin, dict):
     """Internal class used by SubParsersAction. Allows setting aliases to a
     key so that aliases can be used to find subparsers without showing up
     in things like the help output"""
